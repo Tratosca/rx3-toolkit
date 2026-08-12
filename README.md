@@ -180,7 +180,7 @@ Open RX3 Mod Generator you downloaded from step 3, and select firmware `1.19`.
 
 Select your RX3 encryption key file.
 
->[!CAUTION] About the key
+>[!CAUTION] 
 This project does not distribute that key and cannot. It exists in source code
 Pioneer published publicly. Obtaining it, and deciding whether you may use it,
 is your call, and it is the one step in this guide that nobody can do for you.
