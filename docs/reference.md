@@ -353,9 +353,17 @@ removing the drive after a completed load cannot invalidate an active mapping.
 Allocation is rejected when the payload would exceed 60% of the estimated
 immediately available or reclaimable memory.
 
+The basename the hook sees is the one on the drive. Rekordbox truncates a
+filename to the first 44 characters of its stem when it exports a track, leaving
+the library file untouched, so Stem Studio derives the sidecar name from the
+library file through the same truncation (`export_stem`,
+`tools/rx3_stems/rekordbox.py`). Trailing spaces survive the cut on both sides
+and are not trimmed.
+
 Two tracks with the same basename cannot be told apart reliably through the
 observed load interface, so Stem Studio rejects such collisions instead of
-picking an arbitrary sidecar.
+picking an arbitrary sidecar. Truncation is applied before that comparison,
+because two names that only differ past character 44 collide on the drive.
 
 ### Audio domain and gain
 
@@ -367,6 +375,21 @@ converted before reaching the hooked buffer.
 Vocal stems and the full mix must come from the same decode path, because the
 instrumental is computed as full mix minus vocal. Phase, delay, gain or
 resampling differences leave residual vocals.
+
+Delay is the one the container introduces. An mp3 or AAC file declares the
+samples its encoder prepended, and FFmpeg drops them: position zero of a default
+FFmpeg decode is not position zero of `PcmReader`, which starts at the first
+sample the deck's own decoder emits, padding included. A 1,105-sample delay,
+which is what LAME declares, puts the stem 25 ms ahead of the mix and leaves the
+vocal essentially untouched in the instrumental while the isolated vocal still
+sounds correct. The sidecar encoder therefore decodes the source twice, once
+with `-flags2 +skip_manual` and once without, locates the trimmed decode inside
+the untrimmed one to measure the padding exactly, and pushes the separator's
+stem back by that many frames before padding and trimming it to the untrimmed
+length (`tools/rx3_stems/sidecar.py`). Sources declaring no padding, which is
+every WAV, AIFF and FLAC, are unaffected. When the offset cannot be measured —
+a silent decode leaves no unique pattern to locate — the stem stays on the
+separator's grid and the run reports it.
 
 Gain is the one a separator breaks silently. The MDX and MDXC architectures
 scale the mix to the normalization threshold before inference and write the stem

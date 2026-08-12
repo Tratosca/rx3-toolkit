@@ -17,7 +17,10 @@ Stem Studio writes an `RX3_STEMS` directory and a JSON manifest. Copy
 destination and skip the copy.
 
 A sidecar is matched to a track by exact basename, so `Artist - Title.mp3` needs
-`Artist - Title.rx3stem`. Two tracks with the same basename are rejected rather
+`Artist - Title.rx3stem`. Rekordbox shortens long filenames when it exports a
+track to a drive, keeping the first 44 characters, and the deck only ever knows
+the shortened name; Stem Studio names the sidecar the same way, from the library
+file it separated. Two tracks that end up with the same name are rejected rather
 than guessed at, because the RX3 load interface exposes nothing that would tell
 them apart.
 
