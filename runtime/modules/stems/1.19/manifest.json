@@ -1,0 +1,16 @@
+{
+  "id": "stems",
+  "name": "Vocal and instrumental controls",
+  "description": "Use prepared RX3 sidecars from Slip Loop pads 7 and 8.",
+  "firmware": "1.19",
+  "default": true,
+  "order": 40,
+  "runtime_directory": "stems",
+  "files": [
+    {"source": "module.sh", "target": "module.sh", "executable": false}
+  ],
+  "arm_hook": {
+    "source": "rx3_stems_hook.c",
+    "target": "librx3_stems.so"
+  }
+}

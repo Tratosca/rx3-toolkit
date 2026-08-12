@@ -1,0 +1,13 @@
+{
+  "id": "decoder-sleep",
+  "name": "Faster decoder polling",
+  "description": "Check decoded audio more frequently after seeks and large jumps.",
+  "firmware": "1.19",
+  "default": true,
+  "order": 30,
+  "runtime_directory": "decoder-sleep",
+  "files": [
+    {"source": "module.sh", "target": "module.sh", "executable": false},
+    {"source": "apply.sh", "target": "apply.sh", "executable": true}
+  ]
+}

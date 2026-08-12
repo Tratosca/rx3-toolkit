@@ -1,0 +1,71 @@
+# Build and generated packages
+/build/
+/dist/
+/.pyinstaller-cache/
+/outputs/
+*.bin
+*.so
+*.o
+*.a
+*.rx3stem
+
+# Private laboratory material
+/local/
+/work/
+*.UPD
+*.upd
+*.iso
+*.img
+*.squashfs
+*.gpr
+*.rep
+*.gzf
+
+# Secrets and local configuration
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+
+# Audio and archives used as test data
+*.wav
+*.aif
+*.aiff
+*.flac
+*.mp3
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+# Dependencies, caches and coverage
+/.venv*/
+**/node_modules/
+**/.models/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.next/
+**/.vinext/
+**/.wrangler/
+**/.logs/
+**/dist-spa/
+**/coverage/
+**/.openai/
+
+# Editor and operating-system noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

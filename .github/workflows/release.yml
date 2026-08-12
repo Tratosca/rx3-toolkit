@@ -1,0 +1,179 @@
+# SPDX-License-Identifier: MPL-2.0
+
+name: Release XDJ-RX3 Toolkit
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arm-hook:
+    name: Build XDJ-RX3 Toolkit runtime assets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld file
+      - name: Compile the firmware 1.19 stems hook
+        run: make hook FIRMWARE=1.19
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-assets-arm-hook
+          path: build/librx3_stems.so
+          if-no-files-found: error
+
+  mod-generator:
+    name: Build XDJ-RX3 Toolkit (${{ matrix.platform }})
+    needs: arm-hook
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: Linux x64
+            artifact: xdj-rx3-mod-generator-linux-x64
+            target: dist/RX3 Mod Generator
+            executable: dist/RX3 Mod Generator
+            archive: XDJ-RX3-Mod-Generator-Linux-x64.tar.gz
+          - runner: windows-2025
+            platform: Windows x64
+            artifact: xdj-rx3-mod-generator-windows-x64
+            target: dist/RX3 Mod Generator.exe
+            executable: dist/RX3 Mod Generator.exe
+            archive: XDJ-RX3-Mod-Generator-Windows-x64.zip
+          - runner: macos-15-intel
+            platform: macOS Intel
+            artifact: xdj-rx3-mod-generator-macos-intel
+            target: dist/RX3 Mod Generator.app
+            executable: dist/RX3 Mod Generator.app/Contents/MacOS/RX3 Mod Generator
+            archive: XDJ-RX3-Mod-Generator-macOS-Intel.zip
+          - runner: macos-latest
+            platform: macOS Apple Silicon
+            artifact: xdj-rx3-mod-generator-macos-apple-silicon
+            target: dist/RX3 Mod Generator.app
+            executable: dist/RX3 Mod Generator.app/Contents/MacOS/RX3 Mod Generator
+            archive: XDJ-RX3-Mod-Generator-macOS-Apple-Silicon.zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-assets-arm-hook
+          path: prebuilt
+      - name: Install release dependencies
+        run: python -m pip install -r requirements-release.txt
+      - name: Test the portable build engine
+        run: python -m unittest discover -s tests -p test_toolkit_builder.py
+      - name: Build the desktop application
+        env:
+          RX3_PREBUILT_HOOK: ${{ github.workspace }}/prebuilt/librx3_stems.so
+        run: pyinstaller --noconfirm --clean apps/rx3-mod-generator/mod_generator.spec
+      - name: Check the packaged OpenSSL libraries
+        if: runner.os == 'macOS'
+        run: python scripts/check_macos_bundle.py "${{ matrix.target }}"
+      - name: Test the packaged application
+        run: python scripts/smoke_desktop_app.py "${{ matrix.executable }}"
+      - name: Package the application
+        run: >-
+          python scripts/package_release.py
+          "${{ matrix.target }}"
+          "release/${{ matrix.archive }}"
+          --include LICENSE
+          --include THIRD_PARTY_NOTICES.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.archive }}
+          if-no-files-found: error
+
+  stem-studio:
+    name: Build RX3 Stem Studio (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: Linux x64
+            artifact: xdj-rx3-stem-studio-linux-x64
+            target: dist/RX3 Stem Studio
+            executable: dist/RX3 Stem Studio
+            archive: XDJ-RX3-Stem-Studio-Linux-x64.tar.gz
+          - runner: windows-2025
+            platform: Windows x64
+            artifact: xdj-rx3-stem-studio-windows-x64
+            target: dist/RX3 Stem Studio.exe
+            executable: dist/RX3 Stem Studio.exe
+            archive: XDJ-RX3-Stem-Studio-Windows-x64.zip
+          - runner: macos-15-intel
+            platform: macOS Intel
+            artifact: xdj-rx3-stem-studio-macos-intel
+            target: dist/RX3 Stem Studio.app
+            executable: dist/RX3 Stem Studio.app/Contents/MacOS/RX3 Stem Studio
+            archive: XDJ-RX3-Stem-Studio-macOS-Intel.zip
+          - runner: macos-latest
+            platform: macOS Apple Silicon
+            artifact: xdj-rx3-stem-studio-macos-apple-silicon
+            target: dist/RX3 Stem Studio.app
+            executable: dist/RX3 Stem Studio.app/Contents/MacOS/RX3 Stem Studio
+            archive: XDJ-RX3-Stem-Studio-macOS-Apple-Silicon.zip
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install release dependencies
+        run: python -m pip install -r requirements-release.txt
+      - name: Test the separation engine
+        run: python -m unittest discover -s tests -p test_stem_studio.py
+      - name: Build the desktop application
+        run: pyinstaller --noconfirm --clean apps/rx3-stem-studio/stem_studio.spec
+      - name: Test the packaged application
+        run: python scripts/smoke_desktop_app.py "${{ matrix.executable }}"
+      - name: Package the application
+        run: >-
+          python scripts/package_release.py
+          "${{ matrix.target }}"
+          "release/${{ matrix.archive }}"
+          --include LICENSE
+          --include THIRD_PARTY_NOTICES.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.archive }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish XDJ-RX3 Toolkit
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [mod-generator, stem-studio]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: xdj-rx3-*
+          path: release
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The job carries no working tree, so name the repository explicitly
+          # rather than letting gh resolve it from a git remote.
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}" release/*
+          --verify-tag
+          --generate-notes
+          --title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"
