@@ -12,6 +12,12 @@ from dataclasses import dataclass, field
 
 
 DRIVE_LETTER = re.compile(r"^/[A-Za-z]:")
+# Exporting to a drive shortens the filename: Rekordbox keeps the first 44
+# characters of the stem and the extension, and leaves the library file alone.
+# The deck asks for the sidecar under the basename of the file it loaded, which
+# is the shortened one, so the sidecar has to carry the same cut. Trailing
+# spaces survive the cut on the device, so nothing is trimmed after it.
+EXPORT_STEM_LIMIT = 44
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,15 @@ def safe_stem(value: str) -> str:
     value = unicodedata.normalize("NFC", value).replace("/", "_").replace(":", "_")
     value = "".join(character for character in value if ord(character) >= 32).strip(" .")
     return value[:180] or "track"
+
+
+def export_stem(value: str) -> str:
+    """The stem this file carries once Rekordbox has exported it to a drive.
+
+    A stem already within the limit is returned unchanged, so a drive filled by
+    hand rather than by an export matches just the same.
+    """
+    return safe_stem(value)[:EXPORT_STEM_LIMIT] or "track"
 
 
 def parse_collection(xml_path: pathlib.Path) -> Collection:
