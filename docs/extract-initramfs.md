@@ -1,130 +1,281 @@
-Extracting initramfs.tar.gz from the XDJ-RX3 Source Archive
+# Extracting `initramfs.tar.gz` from the XDJ-RX3 Source Package
 
-The source package is distributed as two ZIP files:
+The XDJ-RX3 source package is distributed as two ZIP files:
 
+```text
 A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
 57CB205B-D45A-4143-BC09-22D8400074C2.zip
+```
 
-Each ZIP contains one part of a split tar.bz2 archive.
+Each ZIP contains one part of a split `tar.bz2` archive.
 
-The goal is to reconstruct the archive, extract it, run make_rootfs, and obtain:
+The extraction process is:
 
+```text
+ZIP files
+   ↓
+split .tar.bz2 parts
+   ↓
+reassembled .tar.bz2
+   ↓
+source tree
+   ↓
+make_rootfs
+   ↓
 initramfs.tar.gz
+```
 
-1. Install 7-Zip
+The archive extraction and `make_rootfs` steps can be performed on **macOS or Linux**.
 
-On macOS:
+On Windows, the archive can be extracted natively, while the `make_rootfs` step is best performed through **WSL2**.
 
+---
+
+## 1. Extract the two ZIP files
+
+The ZIP files use **Deflate64**, so 7-Zip is recommended.
+
+### macOS
+
+Install 7-Zip:
+
+```bash
 brew install sevenzip
+```
 
-2. Extract both ZIP files
+Create a working directory and extract both files:
 
-Create a working directory:
-
+```bash
 mkdir rx3-source
 cd rx3-source
 
-Extract both archives:
+7zz x ../A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
+7zz x ../57CB205B-D45A-4143-BC09-22D8400074C2.zip
+```
+
+### Linux
+
+Install 7-Zip.
+
+Debian / Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install 7zip
+```
+
+Fedora:
+
+```bash
+sudo dnf install 7zip
+```
+
+Then extract both files:
+
+```bash
+mkdir rx3-source
+cd rx3-source
 
 7zz x ../A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
 7zz x ../57CB205B-D45A-4143-BC09-22D8400074C2.zip
+```
 
-You should now have:
+On some distributions, the executable may be named `7z` instead of `7zz`.
 
+### Windows
+
+Install 7-Zip, then open PowerShell in the directory containing the ZIP files.
+
+```powershell
+mkdir rx3-source
+cd rx3-source
+
+& "C:\Program Files\7-Zip\7z.exe" x ..\A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
+& "C:\Program Files\7-Zip\7z.exe" x ..\57CB205B-D45A-4143-BC09-22D8400074C2.zip
+```
+
+After extraction, you should have:
+
+```text
 pioneerdj_xdj_rx3.tar.bz2.00
 pioneerdj_xdj_rx3.tar.bz2.01
+```
 
-3. Reassemble the split archive
+---
 
-Concatenate both parts in order:
+## 2. Reassemble the split archive
 
+The two files are consecutive parts of the same `tar.bz2` archive.
+
+### macOS / Linux
+
+```bash
 cat \
   pioneerdj_xdj_rx3.tar.bz2.00 \
   pioneerdj_xdj_rx3.tar.bz2.01 \
   > pioneerdj_xdj_rx3.tar.bz2
+```
 
-Optionally verify the reconstructed archive:
+### Windows
 
+Using `cmd.exe`:
+
+```cmd
+copy /b pioneerdj_xdj_rx3.tar.bz2.00+pioneerdj_xdj_rx3.tar.bz2.01 pioneerdj_xdj_rx3.tar.bz2
+```
+
+---
+
+## 3. Verify the reconstructed archive
+
+This step is optional but recommended.
+
+### macOS / Linux
+
+```bash
 bzip2 -tv pioneerdj_xdj_rx3.tar.bz2
+```
 
-Expected result:
+Expected output:
 
+```text
 pioneerdj_xdj_rx3.tar.bz2: ok
+```
 
-4. Extract the reconstructed archive
+### Windows
 
+Using 7-Zip:
+
+```powershell
+& "C:\Program Files\7-Zip\7z.exe" t pioneerdj_xdj_rx3.tar.bz2
+```
+
+Expected output:
+
+```text
+Everything is Ok
+```
+
+---
+
+## 4. Extract the reconstructed archive
+
+### macOS / Linux
+
+```bash
 mkdir source
 tar -xjf pioneerdj_xdj_rx3.tar.bz2 -C source
 cd source
+```
 
-5. Locate make_rootfs
+### Windows
 
-Search for the script:
+Recent Windows versions include `tar`:
 
-find . -name make_rootfs
+```powershell
+mkdir source
+tar -xjf pioneerdj_xdj_rx3.tar.bz2 -C source
+cd source
+```
 
-Move to the directory containing it.
+Alternatively, use 7-Zip:
 
-For example:
+```powershell
+& "C:\Program Files\7-Zip\7z.exe" x pioneerdj_xdj_rx3.tar.bz2
+& "C:\Program Files\7-Zip\7z.exe" x pioneerdj_xdj_rx3.tar
+```
 
-cd path/to/directory
+At this point, the XDJ-RX3 source tree has been extracted.
+
+
+---
+
+## 5. Run `make_rootfs`
+
+### macOS / Linux
+
+Change to the extracted directory, containing `make_rootfs`:
+
+```bash
+cd /path/to/directory/containing/make_rootfs
+```
 
 Make it executable if necessary:
 
+```bash
 chmod +x make_rootfs
+```
 
-6. Run make_rootfs
+Run it:
 
-Run:
-
+```bash
 ./make_rootfs
+```
 
-The script calls LTIB internally:
+It then generates the `initrammfs.tar.gz`.
 
-./ltib --deploy
+### Windows
 
-This step should be performed in a Linux environment compatible with the LTIB build system used by the source package.
+Use WSL2 for the `make_rootfs` step.
 
-Running this part directly on macOS is not expected to work reliably.
+From WSL2, it is preferable to copy the source tree into the Linux filesystem instead of building directly under `/mnt/c`.
 
-7. Locate the generated initramfs
+For example:
 
-Once make_rootfs has completed successfully:
+```bash
+cp -a /mnt/c/path/to/source ~/rx3-source
+cd ~/rx3-source
+```
 
-find . -name initramfs.tar.gz
+Locate `make_rootfs`:
 
-The resulting file:
+```bash
+find . -type f -name make_rootfs
+```
 
-initramfs.tar.gz
+Then:
 
-is the generated initramfs.
+```bash
+cd /path/to/directory/containing/make_rootfs
+chmod +x make_rootfs
+./make_rootfs
+```
+---
 
-Process overview
+## Platform support
 
+| Step | macOS | Linux | Windows |
+|---|---:|---:|---:|
+| Extract ZIP files | Yes | Yes | Yes |
+| Reassemble split archive | Yes | Yes | Yes |
+| Extract `tar.bz2` | Yes | Yes | Yes |
+| Run `make_rootfs` | Yes | Yes | Via WSL2 |
+| Obtain `initramfs.tar.gz` | Yes | Yes | Via WSL2 |
+
+---
+
+## Full process
+
+```text
 A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
 57CB205B-D45A-4143-BC09-22D8400074C2.zip
-        |
-        v
-      7-Zip
-        |
-        v
+        │
+        │ 7-Zip
+        ▼
 pioneerdj_xdj_rx3.tar.bz2.00
 pioneerdj_xdj_rx3.tar.bz2.01
-        |
-        v
-       cat
-        |
-        v
+        │
+        │ concatenate
+        ▼
 pioneerdj_xdj_rx3.tar.bz2
-        |
-        v
-    tar -xjf
-        |
-        v
-   source tree
-        |
-        v
-   make_rootfs
-        |
-        v
+        │
+        │ tar -xjf
+        ▼
+XDJ-RX3 source tree
+        │
+        │ make_rootfs
+        │
+        │ ./ltib --deploy
+        ▼
 initramfs.tar.gz
+```
