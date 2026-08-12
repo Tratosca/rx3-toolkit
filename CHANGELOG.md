@@ -1,7 +1,10 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+Two reasons a sidecar was ignored or left the vocal in the instrumental. Both
+affect tracks prepared by any earlier version, which have to be generated again.
 
 ### Fixed
 
