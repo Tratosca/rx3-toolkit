@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable
 
 from tools.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
-from tools.rx3_stems.rekordbox import Collection, Playlist, Track, safe_stem
+from tools.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
 from tools.rx3_stems.separation import VOCAL_STEM, Settings, input_normalization
 from tools.rx3_stems.sidecar import write_sidecar
 
@@ -66,6 +66,8 @@ class TrackResult:
     # the samples the s16 container could not hold once it was applied.
     gain: float = 1.0
     clipped: int = 0
+    # Encoder padding the stem was pushed back by to land on the deck's grid.
+    delay: int = 0
 
     def as_manifest_entry(self) -> dict[str, object]:
         return {
@@ -73,6 +75,7 @@ class TrackResult:
             "sourceFile": self.source_file, "sidecar": self.sidecar,
             "bytes": self.size, "status": self.status,
             "gainCorrection": round(self.gain, 6), "clippedSamples": self.clipped,
+            "encoderDelayFrames": self.delay,
         }
 
 
@@ -258,17 +261,19 @@ class StemJob:
         source = track.location
         if not source.is_file():
             raise FileNotFoundError("Source file not found")
-        base = safe_stem(source.stem)
+        # The name the track carries on the exported drive, which is the only
+        # name the deck ever asks for.
+        base = export_stem(source.stem)
         collision = used_names.get(base.casefold())
         if collision is not None and collision != source:
             raise ValueError(
-                f"Ambiguous filename with {collision.name}: the RX3 load interface "
-                "cannot distinguish these two paths"
+                f"Ambiguous filename with {collision.name}: both are exported as "
+                f"{base}, and the RX3 load interface cannot distinguish them"
             )
         used_names[base.casefold()] = source
 
         destination = output / f"{base}{SIDECAR_SUFFIX}"
-        gain, clipped = 1.0, 0
+        gain, clipped, delay = 1.0, 0, 0
         if destination.is_file() and destination.stat().st_size > MINIMUM_SIDECAR_BYTES:
             self._update(stage="Already generated", track_progress=100)
             status = "existing"
@@ -291,7 +296,15 @@ class StemJob:
                             self.settings, self.architecture
                         ),
                     )
-                    gain, clipped = encoded.gain, encoded.clipped
+                    gain, clipped, delay = encoded.gain, encoded.clipped, encoded.delay
+                    if not encoded.aligned:
+                        self._notice(
+                            f"{destination.name}: the encoder padding of "
+                            f"{source.name} could not be measured, so the stem "
+                            "stays on the separator's timeline. If the deck "
+                            "leaves vocal in the instrumental, convert the "
+                            "source to WAV or FLAC and generate it again."
+                        )
                     if clipped:
                         self._notice(
                             f"{destination.name}: {clipped} sample(s) exceeded full "
@@ -308,7 +321,7 @@ class StemJob:
             track_id=track.track_id, artist=track.artist, title=track.title,
             source_file=source.name, sidecar=destination.name,
             size=destination.stat().st_size, status=status,
-            gain=gain, clipped=clipped,
+            gain=gain, clipped=clipped, delay=delay,
         )
 
     def run(self) -> JobState:
