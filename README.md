@@ -254,6 +254,7 @@ that for good, delete `autoexec.bin` from the drive.
 
 | Document | For |
 |---|---|
+| [Extracting the initramfs](docs/extract-initramfs.md) | How to extract the initramfs of the XDJ-RX3 from Pioneer GPL
 | [The RX3 mod](docs/mod-rx3.md) | Modules, applying, removing, reading the session log |
 | [Stem Studio](docs/stem-studio.md) | Models, accelerators, tuning, managing the runtime |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms and fixes |
