@@ -21,7 +21,7 @@ instrumental parts of a track.
 
 Time: about 20 minutes to set everything up, then a few minutes of separation
 per track. An NVIDIA, AMD or Apple Silicon GPU changes that by an order of
-magnitude. `[TODO: to be measured]`
+magnitude.
 
 The encryption key is not in this repository and never will be. It exists in
 source code Pioneer published publicly. Finding it, and deciding whether you may
@@ -29,25 +29,25 @@ use it, is on you.
 
 ## Before you start
 
-Read this. It is short and all of it is load-bearing.
+Read this please.
 
-Nothing is written to the RX3. The modules patch a copy of the player
-application held in RAM, after checking that the filesystem it runs from is
-RAM-backed. If the patched process does not survive eight seconds, the previous
-bytes are restored automatically. Power off, remove the drive, power on, and the
-device is stock again. There is no firmware backup step because there is nothing
-to back up.
+Nothing is written to any ROM, NAND or flash memory ofthe RX3. The way this unit boots, and the way Pionner wanted to be able to run on it their own maintenance/repair scripts made this possible "live", on RAM, without any flash.
+
+When the patch is applied, if the application does not survive eight seconds, the previous
+unpatched is restored automatically. Power off, remove the drive, power on, and the
+device is stock (and very probably under warranty) again. 
+
+There is no firmware backup step because there is nothing to back up.
 
 What can still go wrong is a crash or an unresponsive interface, which is a real
 problem in the middle of a set even though it costs you nothing permanently.
 Test at home first. Keep a second, unmodified Rekordbox drive in the bag.
 
+Running unofficial code on any device is in general likely to affect the manufacturer warranty. As usual on that kind of projects, assume it does, but I'm confident it does not on that very specific device
+
 This is for educational purposes. I cannot be held responsible if it causes a
 crash during a $50k DJ set, or, far less plausibly, if it bricks your device. I
 do wish you the opportunity to play the $50k gig tho.
-
-Running unofficial code on the device is likely to affect your manufacturer
-warranty. Assume it does.
 
 This project is not affiliated with, endorsed by, or connected to Pioneer DJ or
 AlphaTheta. Product names identify the tested hardware and nothing more.
@@ -58,8 +58,7 @@ responsibility and depends on where you live and what you licensed.
 
 ## Quick Start
 
-Do the steps in order. Each one tells you what you should see, and what to do
-when you do not see it.
+Do the steps in order. 
 
 This guide assumes you already have at least one Rekordbox prepared USB stick with some songs and playlists in it.
 
