@@ -67,8 +67,29 @@ The sidecar and the audio file must share exactly the same name before the
 extension. `Artist - Title.mp3` needs `Artist - Title.rx3stem`. A trailing
 space, a different dash character, or a renamed audio file all break the match.
 
+Compare the names on the drive, not the names in your library. Rekordbox cuts a
+filename to 44 characters when it exports the track, so a long title reaches the
+drive shortened while the library keeps it whole. Stem Studio applies the same
+cut. A sidecar generated before it did needs the same treatment: keep the first
+44 characters of the name and the `.rx3stem` extension.
+
 Check also that `RX3_STEMS` sits at the root of the drive and not inside another
 folder.
+
+## The instrumental still has the vocal in it
+
+The vocal pad works, the instrumental pad does not, and the vocal is as loud as
+ever rather than merely leaking. The stem and the audio the deck plays are on
+different timelines.
+
+You used an older version: please generate the track again with a current version. 
+An MP3 or AAC file declares samples its encoder prepended, which FFmpeg drops but the deck plays; a sidecar
+built without accounting for them sits about 25 ms early, which is far more than
+subtraction tolerates. Releases before this handling shipped are affected only
+for lossy sources that declare padding, which is why some of your tracks work.
+
+If the run reports that the padding could not be measured, the source is one the
+pipeline could not line up. Convert it to WAV or FLAC and generate it again.
 
 ## Stem Studio reports a missing runtime
 
