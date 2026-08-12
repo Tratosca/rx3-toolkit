@@ -16,7 +16,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from tools.rx3_stems import provisioning, separation, sidecar
 from tools.rx3_stems import job as job_module
 from tools.rx3_stems.job import JobState, StemJob, failure_detail
-from tools.rx3_stems.rekordbox import file_url_to_path, parse_collection, safe_stem
+from tools.rx3_stems.rekordbox import (
+    EXPORT_STEM_LIMIT, export_stem, file_url_to_path, parse_collection, safe_stem,
+)
 
 
 def write_export(root: pathlib.Path, tracks: list[tuple[str, str, str, pathlib.Path]]) -> pathlib.Path:
@@ -98,6 +100,17 @@ class RekordboxTests(unittest.TestCase):
         self.assertEqual(safe_stem("A/B:C\x01 "), "A_B_C")
         self.assertEqual(safe_stem("   "), "track")
 
+    def test_export_stem_reproduces_the_drive_truncation(self):
+        # A name Rekordbox shortens on export, cut where the deck cuts it,
+        # trailing space included.
+        long_name = "Air Force Blanche - Gims, Jul (Extended Mix By Fuvi Clan)"
+        self.assertEqual(export_stem(long_name), "Air Force Blanche - Gims, Jul (Extended Mix ")
+        self.assertEqual(len(export_stem(long_name)), EXPORT_STEM_LIMIT)
+        # A name already within the limit is exported as it stands.
+        self.assertEqual(export_stem("B.M.S (by my side) - Rambo goyard"),
+                         "B.M.S (by my side) - Rambo goyard")
+        self.assertEqual(export_stem("   "), "track")
+
 
 class JobTests(unittest.TestCase):
     def runtime(self) -> provisioning.Runtime:
@@ -119,6 +132,49 @@ class JobTests(unittest.TestCase):
             self.assertEqual(state.results[0].status, "existing")
             self.assertEqual(state.errors, ())
             self.assertTrue((output / "rx3-stems-manifest.json").is_file())
+
+    def test_the_sidecar_carries_the_name_the_drive_export_gives_the_track(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            audio = root / "Air Force Blanche - Gims, Jul (Extended Mix By Fuvi Clan).aiff"
+            audio.write_bytes(b"fixture")
+            xml = write_export(root, [("1", "Air Force Blanche", "Gims", audio)])
+            collection = parse_collection(xml)
+            output = root / "export"
+            stems = output / "RX3_STEMS"
+            stems.mkdir(parents=True)
+            # Named as the deck will ask for it, not as the library holds it.
+            existing = stems / "Air Force Blanche - Gims, Jul (Extended Mix .rx3stem"
+            existing.write_bytes(b"x" * 128)
+
+            state = StemJob(self.runtime(), collection, collection.playlists[0], output).run()
+            self.assertEqual(state.errors, ())
+            self.assertEqual(state.results[0].status, "existing")
+            self.assertEqual(state.results[0].sidecar, existing.name)
+
+    def test_two_sources_that_collide_only_once_truncated_are_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            sources = []
+            for folder, suffix in (("one", "first mix"), ("two", "second mix")):
+                source = root / folder / f"A Very Long Title That Rekordbox Will Cut - {suffix}.aiff"
+                source.parent.mkdir()
+                source.write_bytes(b"fixture")
+                sources.append(source)
+            self.assertEqual(export_stem(sources[0].stem), export_stem(sources[1].stem))
+            xml = write_export(root, [
+                ("1", "One", "A", sources[0]),
+                ("2", "Two", "B", sources[1]),
+            ])
+            collection = parse_collection(xml)
+            output = root / "export"
+            (output / "RX3_STEMS").mkdir(parents=True)
+            (output / f"RX3_STEMS/{export_stem(sources[0].stem)}.rx3stem").write_bytes(b"x" * 128)
+
+            state = StemJob(self.runtime(), collection, collection.playlists[0], output).run()
+            self.assertEqual(len(state.results), 1)
+            self.assertEqual(len(state.errors), 1)
+            self.assertIn("Ambiguous filename", state.errors[0].error)
 
     def test_refuses_two_distinct_sources_with_the_same_basename(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -445,6 +501,110 @@ class SidecarGainTests(unittest.TestCase):
             )
         for architecture in ("Demucs", "VR", None, "future"):
             self.assertIsNone(separation.input_normalization(settings, architecture))
+
+
+class SidecarAlignmentTests(unittest.TestCase):
+    """The deck indexes the sidecar by the position of its own decoder, which
+    plays the encoder padding that ffmpeg drops on the way into the separator."""
+
+    RATE = 44100
+    SECONDS = 3
+
+    def decode(self, path, *, untrimmed):
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error",
+             *(sidecar.UNTRIMMED if untrimmed else ()), "-i", str(path),
+             "-map", "0:a:0", "-vn", "-ar", str(self.RATE), "-ac", "2",
+             "-f", "s16le", "-"],
+            check=True, capture_output=True,
+        )
+        return result.stdout
+
+    def fixture(self, root):
+        """A padded mp3, and the stem a separator returns for it.
+
+        The separator sees ffmpeg's trimmed decode, so handing that decode back
+        as the stem makes any residue against the mix pure misalignment.
+        """
+        raw = root / "tone.s16le"
+        with raw.open("wb") as destination:
+            for index in range(self.RATE * self.SECONDS):
+                value = int(12000 * math.sin(2 * math.pi * 220 * index / self.RATE))
+                destination.write(struct.pack("<hh", value, value))
+        source = root / "source.mp3"
+        subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "s16le",
+             "-ar", str(self.RATE), "-ac", "2", "-i", str(raw), "-c:a", "libmp3lame",
+             "-b:a", "320k", str(source)],
+            check=True,
+        )
+        stem = root / "vocal.wav"
+        subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+             "-map", "0:a:0", "-vn", "-ar", str(self.RATE), "-ac", "2", str(stem)],
+            check=True,
+        )
+        return source, stem
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
+    def test_the_encoder_padding_of_a_lossy_source_is_put_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source, stem = self.fixture(root)
+            mix = self.decode(source, untrimmed=True)
+            self.assertGreater(
+                len(mix), len(self.decode(source, untrimmed=False)),
+                "the fixture has to declare padding to be meaningful",
+            )
+
+            output = root / "aligned.rx3stem"
+            result = sidecar.write_sidecar(stem, output, match_full=source)
+
+            self.assertTrue(result.aligned)
+            self.assertGreater(result.delay, 0)
+            self.assertEqual(result.frames, len(mix) // 4)
+            # The stem is the mix here, so anything left over is offset. The
+            # padding itself is silent in the stem: the separator never saw it,
+            # and 25 ms of encoder ramp-in is not part of the vocal.
+            payload = output.read_bytes()[sidecar.HEADER.size:]
+            worst = max(
+                abs(struct.unpack_from("<h", payload, offset)[0]
+                    - struct.unpack_from("<h", mix, offset)[0])
+                for offset in range(result.delay * 4, len(payload), 2)
+            )
+            # The tone moves about 376 counts per frame, so a single frame of
+            # offset would show here as two orders of magnitude more than the
+            # codec's own round-trip noise.
+            self.assertLess(worst, 100, "the stem does not sit on the deck's grid")
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
+    def test_a_source_without_padding_keeps_the_grid_it_already_had(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            raw = root / "tone.s16le"
+            raw.write_bytes(struct.pack("<hh", 4000, 4000) * (self.RATE // 2))
+            source = root / "source.wav"
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "s16le",
+                 "-ar", str(self.RATE), "-ac", "2", "-i", str(raw), str(source)],
+                check=True,
+            )
+            result = sidecar.write_sidecar(source, root / "out.rx3stem", match_full=source)
+            self.assertEqual(result.delay, 0)
+            self.assertTrue(result.aligned)
+            self.assertEqual(result.frames, self.RATE // 2)
+
+    def test_an_unmeasurable_offset_leaves_the_stem_where_the_separator_put_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            trimmed, untrimmed = root / "trimmed", root / "untrimmed"
+            # Silence matches at every offset, so no probe is ever unique.
+            trimmed.write_bytes(b"\0" * 4 * sidecar.SAMPLE_RATE)
+            untrimmed.write_bytes(b"\0" * 4 * (sidecar.SAMPLE_RATE + 512))
+            self.assertIsNone(sidecar._encoder_delay(trimmed, untrimmed))
+            # Identical lengths mean nothing was dropped, whatever the content.
+            untrimmed.write_bytes(b"\0" * 4 * sidecar.SAMPLE_RATE)
+            self.assertEqual(sidecar._encoder_delay(trimmed, untrimmed), 0)
 
 
 class ModelFileTests(unittest.TestCase):

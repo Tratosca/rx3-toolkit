@@ -26,6 +26,22 @@ MEASURE = "aformat=sample_fmts=fltp,astats=reset=0"
 # Each line carries an ffmpeg `[Parsed_astats_N @ ...]` prefix, so no anchor.
 PEAK_LEVEL = re.compile(r"Peak level dB:\s*(-?\d+(?:\.\d+)?|-?inf)")
 CLIPPED_SAMPLES = re.compile(r"Number of clipped samples:\s*(\d+)")
+# An mp3 or AAC file declares the samples its encoder prepended, and ffmpeg
+# drops them. The deck does not: `PcmReader` position zero is the first sample
+# its own decoder emits, padding included. A stem cut on ffmpeg's grid
+# therefore sits ahead of the mix the deck plays, and 25 ms of offset is enough
+# for the subtraction to leave the whole vocal audible while the vocal alone
+# still sounds correct. `skip_manual` hands the decoder's output over untouched,
+# which is the grid every frame index here is expressed in.
+UNTRIMMED = ("-flags2", "+skip_manual")
+# No encoder prepends anything close to a second; a larger apparent offset is a
+# measurement gone wrong rather than padding.
+MAX_ENCODER_DELAY = SAMPLE_RATE
+# Long enough that the pattern cannot repeat by chance, short enough to read.
+PROBE_FRAMES = 4096
+# Positions in the trimmed decode to take that pattern from. Silence matches
+# everywhere, so a probe that is not unique is abandoned for the next one.
+PROBE_POSITIONS = (0.5, 0.25, 0.75, 0.1)
 
 
 @dataclass(frozen=True)
@@ -38,6 +54,11 @@ class SidecarResult:
     gain: float = 1.0
     # Samples the container could not hold once that factor was applied.
     clipped: int = 0
+    # Encoder padding the stem was pushed back by to sit on the deck's grid.
+    delay: int = 0
+    # False when that padding could not be measured and the stem was left on
+    # the separator's own grid, which is only correct for a source without any.
+    aligned: bool = True
 
 
 def _decode(
@@ -72,6 +93,40 @@ def _peak_amplitude(report: str) -> float | None:
     return 0.0 if loudest == -math.inf else 10.0 ** (loudest / 20.0)
 
 
+def _encoder_delay(trimmed: pathlib.Path, untrimmed: pathlib.Path) -> int | None:
+    """Frames ffmpeg dropped from the head of `trimmed`, or None if unreadable.
+
+    Both files hold the same decoder output, one with the declared padding
+    removed and one without, so the offset is found by locating a stretch of the
+    trimmed decode inside the untrimmed one rather than by trusting a timestamp.
+    The first frames differ either way, which is why the pattern is taken from
+    further in.
+    """
+    trimmed_frames = trimmed.stat().st_size // 4
+    extra = untrimmed.stat().st_size // 4 - trimmed_frames
+    if extra == 0:
+        return 0
+    if extra < 0:
+        return None
+    limit = min(extra, MAX_ENCODER_DELAY)
+    with trimmed.open("rb") as source, untrimmed.open("rb") as reference:
+        for fraction in PROBE_POSITIONS:
+            position = int(trimmed_frames * fraction)
+            if position + PROBE_FRAMES > trimmed_frames:
+                continue
+            source.seek(position * 4)
+            probe = source.read(PROBE_FRAMES * 4)
+            reference.seek(position * 4)
+            window = reference.read((limit + PROBE_FRAMES) * 4)
+            offset = window.find(probe)
+            # An offset off the frame grid, or a pattern that repeats, means the
+            # match says nothing; silence is the usual reason for both.
+            if offset < 0 or offset % 4 or window.find(probe, offset + 4) >= 0:
+                continue
+            return offset // 4
+    return None
+
+
 def write_sidecar(
     vocals: pathlib.Path,
     output: pathlib.Path,
@@ -83,8 +138,10 @@ def write_sidecar(
 ) -> SidecarResult:
     """Convert `vocals` to the RX3 audio domain and write the sidecar container.
 
-    `match_full` aligns the frame count to the full track decoded at 44.1 kHz
-    rather than trusting the separator output duration.
+    `match_full` aligns the stem to the full track as the deck's own decoder
+    emits it, rather than trusting the separator output duration: the frame
+    count comes from that decode, and any encoder padding ffmpeg dropped on the
+    way into the separator is put back at the head of the stem.
 
     `separator_normalization` is the peak the separator scaled the mix to before
     inference, when its architecture does that. The stem it returns then carries
@@ -101,20 +158,50 @@ def write_sidecar(
         workspace = pathlib.Path(directory)
         target_frames: int | None = None
         gain = 1.0
+        delay = 0
+        aligned = True
         if match_full is not None:
-            full_raw = workspace / "full.s16le"
-            # Measured after the resample, which is where librosa measures it,
-            # and before the s16 conversion, which would clamp the overshoot.
-            measured = _decode(ffmpeg, [
-                "-i", str(match_full), "-map", "0:a:0", "-vn",
-                "-af", f"aresample={SAMPLE_RATE},{MEASURE}",
-                "-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS),
-                "-f", "s16le", str(full_raw),
-            ], report=True)
-            full_size = full_raw.stat().st_size
-            if not full_size or full_size % 4:
-                raise ValueError("full track decodes to empty or unaligned stereo PCM")
-            target_frames = full_size // 4
+            def decode_full(name: str, *, untrimmed: bool) -> tuple[pathlib.Path, str]:
+                raw_path = workspace / name
+                # Measured after the resample, which is where librosa measures
+                # it, and before the s16 conversion, which would clamp the
+                # overshoot.
+                report = _decode(ffmpeg, [
+                    *(UNTRIMMED if untrimmed else ()),
+                    "-i", str(match_full), "-map", "0:a:0", "-vn",
+                    "-af", f"aresample={SAMPLE_RATE},{MEASURE}",
+                    "-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS),
+                    "-f", "s16le", str(raw_path),
+                ], report=True)
+                size = raw_path.stat().st_size
+                if not size or size % 4:
+                    raise ValueError("full track decodes to empty or unaligned stereo PCM")
+                return raw_path, report
+
+            # The separator's grid, which its stem comes back on, and the deck's
+            # grid, which the sidecar is indexed against.
+            trimmed_raw, trimmed_report = decode_full("trimmed.s16le", untrimmed=False)
+            offset: int | None = None
+            try:
+                untrimmed_raw, untrimmed_report = decode_full("full.s16le", untrimmed=True)
+            except (RuntimeError, ValueError):
+                # An ffmpeg too old to know the flag, rather than a broken file:
+                # the same decode already succeeded without it.
+                untrimmed_raw = None
+            else:
+                offset = _encoder_delay(trimmed_raw, untrimmed_raw)
+            if offset is None:
+                # Staying on the separator's grid is what every release before
+                # this did, and it is right for a source declaring no padding.
+                aligned = False
+                full_raw, measured = trimmed_raw, trimmed_report
+                if untrimmed_raw is not None:
+                    untrimmed_raw.unlink()
+            else:
+                delay = offset
+                full_raw, measured = untrimmed_raw, untrimmed_report
+                trimmed_raw.unlink()
+            target_frames = full_raw.stat().st_size // 4
 
             peak = _peak_amplitude(measured)
             # An unreadable report leaves the stem alone: a wrong correction is
@@ -126,9 +213,12 @@ def write_sidecar(
         arguments = ["-i", str(vocals), "-map", "0:a:0", "-vn"]
         chain = [] if gain == 1.0 else [f"volume={gain:.9f}:precision=float"]
         if target_frames is not None:
-            chain.extend([
-                f"aresample={SAMPLE_RATE}", "apad", f"atrim=end_sample={target_frames}",
-            ])
+            chain.append(f"aresample={SAMPLE_RATE}")
+            # Silence for exactly the padding the deck's decoder will play
+            # before the first sample the separator ever saw.
+            if delay:
+                chain.append(f"adelay=delays={delay}S:all=1")
+            chain.extend(["apad", f"atrim=end_sample={target_frames}"])
             arguments.extend(["-ac", str(CHANNELS)])
         else:
             arguments.extend(["-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS)])
@@ -167,4 +257,6 @@ def write_sidecar(
         payload_bytes=size,
         gain=gain,
         clipped=clipped,
+        delay=delay,
+        aligned=aligned,
     )

@@ -1,6 +1,27 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Sidecars are named with the truncation Rekordbox applies when it exports a
+  track to a drive, keeping the first 44 characters of the stem. A track whose
+  library filename is longer reached the drive shortened while its sidecar kept
+  the full name, and the deck never matched the two. Two tracks that collide
+  only once truncated are now reported as ambiguous, as they always should have
+  been.
+- Stems for mp3 and AAC sources are aligned to the deck's decoder rather than
+  FFmpeg's. Those containers declare the samples their encoder prepended;
+  FFmpeg drops them and the deck plays them, which left the stem 25 ms early and
+  the vocal fully audible in the instrumental while the vocal pad still worked.
+  Existing sidecars for such sources have to be generated again — delete them,
+  or the run keeps them as already generated. WAV, AIFF and FLAC sources were
+  never affected.
+
+The manifest gained `encoderDelayFrames`, the padding each stem was pushed back
+by.
+
 ## 0.3.0
 
 First tagged release. Git history was reset to a single commit at this point, so
