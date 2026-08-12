@@ -1,0 +1,2 @@
+cryptography==50.0.0
+pycdlib==1.14.0

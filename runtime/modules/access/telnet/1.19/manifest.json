@@ -1,0 +1,12 @@
+{
+  "id": "telnet",
+  "name": "Diagnostic Telnet access",
+  "description": "Start a temporary diagnostic shell on an isolated network link.",
+  "firmware": "1.19",
+  "default": false,
+  "order": 90,
+  "runtime_directory": "telnet",
+  "files": [
+    {"source": "module.sh", "target": "module.sh", "executable": false}
+  ]
+}
