@@ -1134,6 +1134,26 @@ class EstimateTests(unittest.TestCase):
             # Another pairing is a different machine configuration entirely.
             self.assertFalse(estimate.estimator_for(path, "MDXC", "cpu").measured)
 
+    def test_the_two_presets_are_timed_apart_on_the_same_model(self):
+        """They name the same model and differ only in passes over the audio,
+        so one measured rate would be wrong for the other by that factor -
+        and the blend would drag it back and forth as the operator alternated."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / estimate.THROUGHPUT_NAME
+            quality = estimate.estimator_for(path, "MDXC", "mps", separation.QUALITY_MODE)
+            quality.observe(audio_seconds=100, elapsed=17)
+            estimate.remember(path, quality)
+
+            normal = estimate.estimator_for(
+                path, "MDXC", "mps", separation.NORMAL_MODE
+            )
+            self.assertFalse(normal.measured)
+            self.assertTrue(
+                estimate.estimator_for(
+                    path, "MDXC", "mps", separation.QUALITY_MODE
+                ).measured
+            )
+
     def test_an_unmeasured_estimator_writes_nothing(self):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / estimate.THROUGHPUT_NAME
@@ -1187,21 +1207,21 @@ class QualityPresetTests(unittest.TestCase):
         ))
 
     def variants(self):
-        """Every (preset, variant) pairing a machine can actually resolve to."""
+        """Every (preset, variant, accelerates_torch) a machine can resolve to."""
         for preset in separation.PRESETS:
-            yield preset, preset.resolve()
-            if preset.torch_variant is not None:
-                yield preset, preset.resolve(prefers_torch=True)
+            for accelerates_torch in (True, False):
+                yield (preset, preset.resolve(accelerates_torch=accelerates_torch),
+                       accelerates_torch)
 
     def test_a_preset_takes_its_first_candidate_the_catalogue_offers(self):
-        for preset, variant in self.variants():
+        for preset, variant, accelerates_torch in self.variants():
             catalogue = self.catalogue(
                 (variant.candidates[1], variant.architecture, 9.0),
                 (variant.candidates[0], variant.architecture, 8.0),
             )
             resolved = separation.apply_preset(
                 separation.Settings(), preset, catalogue,
-                prefers_torch=variant is preset.torch_variant,
+                accelerates_torch=accelerates_torch,
             )
             # The order of the candidate list wins over the catalogue's score:
             # these are the models this pipeline has been measured against.
@@ -1209,36 +1229,39 @@ class QualityPresetTests(unittest.TestCase):
             self.assertEqual(resolved.mode, preset.key)
 
     def test_a_withdrawn_candidate_falls_back_to_the_best_of_its_architecture(self):
-        preset = separation.preset(separation.FAST_MODE)
-        variant = preset.resolve()
+        preset = separation.preset(separation.QUICK_MODE)
+        variant = preset.resolve(accelerates_torch=False)
         catalogue = self.catalogue(
             ("renamed_upstream.onnx", variant.architecture, 12.4),
             ("weaker.onnx", variant.architecture, 9.0),
             ("another_architecture.ckpt", "MDXC", 13.0),
         )
-        resolved = separation.apply_preset(separation.Settings(), preset, catalogue)
+        resolved = separation.apply_preset(
+            separation.Settings(), preset, catalogue, accelerates_torch=False
+        )
         # The best of the preset's own architecture, not the best overall: the
-        # tuning and the timings only hold for that architecture.
+        # tuning and the timings only hold for that architecture, and on this
+        # build the other one would not reach the GPU at all.
         self.assertEqual(resolved.model, "renamed_upstream.onnx")
 
     def test_an_empty_catalogue_still_resolves_to_something_runnable(self):
         """The state before the runtime is installed, so before any model list."""
-        for preset, variant in self.variants():
+        for preset, variant, accelerates_torch in self.variants():
             resolved = separation.apply_preset(
                 separation.Settings(), preset, separation.Catalogue(),
-                prefers_torch=variant is preset.torch_variant,
+                accelerates_torch=accelerates_torch,
             )
             self.assertEqual(resolved.model, variant.candidates[0])
             self.assertEqual(resolved.mode, preset.key)
 
     def test_a_preset_only_passes_arguments_of_its_own_architecture(self):
-        for preset, variant in self.variants():
+        for preset, variant, accelerates_torch in self.variants():
             catalogue = self.catalogue(
                 (variant.candidates[0], variant.architecture, 10.0)
             )
             resolved = separation.apply_preset(
                 separation.Settings(), preset, catalogue,
-                prefers_torch=variant is preset.torch_variant,
+                accelerates_torch=accelerates_torch,
             )
             arguments = " ".join(resolved.arguments(variant.architecture))
             for other, options in separation.ARCHITECTURE_OPTIONS.items():
@@ -1247,76 +1270,151 @@ class QualityPresetTests(unittest.TestCase):
                 for option in options:
                     self.assertNotIn(option.flag, arguments)
 
-    def test_fast_asks_for_a_lighter_model_than_quality(self):
-        """The presets trade a model, not just a parameter: the roformer that
-        wins on quality has no setting that makes it cheap enough for a DJ
-        preparing a set, so `fast` moves to a smaller architecture."""
-        for prefers_torch in (False, True):
-            fast = separation.preset(separation.FAST_MODE).resolve(
-                prefers_torch=prefers_torch
-            )
+    def test_the_top_two_presets_trade_passes_rather_than_models(self):
+        """Trading the model costs a download and gives up SDR, so the ladder
+        only does it once, at the bottom. High quality and Normal are one model
+        at two steps: moving between them is free in both senses."""
+        for accelerates_torch in (True, False):
             quality = separation.preset(separation.QUALITY_MODE).resolve(
-                prefers_torch=prefers_torch
+                accelerates_torch=accelerates_torch
             )
-            self.assertNotEqual(fast.architecture, quality.architecture)
-            self.assertEqual(set(fast.candidates) & set(quality.candidates), set())
+            normal = separation.preset(separation.NORMAL_MODE).resolve(
+                accelerates_torch=accelerates_torch
+            )
+            self.assertEqual(quality.architecture, normal.architecture)
+            self.assertEqual(quality.candidates, normal.candidates)
+            self.assertNotEqual(quality.values, normal.values)
 
-    def test_quality_asks_for_more_passes_than_the_model_would(self):
-        """`mdxc_overlap` is a hop divisor, not an amount of overlap: lowering
-        it steps the prediction window less far, so the result is stitched from
-        more passes over the audio. Reading it the other way round, as the
-        option's help text once did, inverts the preset."""
+    def test_every_preset_is_a_distinct_configuration(self):
+        """Three names have to mean three things on every build, including the
+        one that can only run a single architecture."""
+        for accelerates_torch in (True, False):
+            resolved = [
+                preset.resolve(accelerates_torch=accelerates_torch)
+                for preset in separation.PRESETS
+            ]
+            configurations = {
+                (variant.architecture, variant.candidates, tuple(sorted(variant.values.items())))
+                for variant in resolved
+            }
+            self.assertEqual(len(configurations), len(separation.PRESETS))
+
+    def test_only_the_quickest_preset_gives_up_the_best_model(self):
+        """Below the roformer every architecture in the catalogue lands within
+        a quarter of the same cost, so there is no second step down to make.
+        Spending the one available trade anywhere but the bottom of the ladder
+        would give up SDR without buying speed."""
+        for key in (separation.QUALITY_MODE, separation.NORMAL_MODE):
+            self.assertEqual(
+                separation.preset(key).resolve(accelerates_torch=True).candidates,
+                separation.ROFORMER_CANDIDATES,
+            )
+        quick = separation.preset(separation.QUICK_MODE).resolve(accelerates_torch=True)
+        self.assertNotEqual(quick.candidates, separation.ROFORMER_CANDIDATES)
+        # A waveform model, so it gives up SDR without giving up the top of the
+        # spectrum the way the band-limited ONNX fallback does.
+        self.assertEqual(quick.architecture, "Demucs")
+
+    def test_a_build_that_accelerates_torch_asks_for_the_better_model(self):
+        """A roformer is a Torch checkpoint and an MDX-Net is an ONNX graph, so
+        which architecture reaches the GPU is not the same on every platform.
+        Where PyTorch is accelerated the roformer is both the better and the
+        quicker answer; where it is not, only the ONNX model runs on the GPU at
+        all, and 2.4 dB of vocal SDR is given up to get there."""
+        for preset in separation.PRESETS:
+            self.assertNotEqual(
+                preset.resolve(accelerates_torch=True).architecture, "MDX"
+            )
+            self.assertEqual(preset.resolve(accelerates_torch=False).architecture, "MDX")
+        accelerates_torch = {
+            key: acceleration.accelerates_torch
+            for key, acceleration in provisioning.ACCELERATIONS.items()
+        }
+        # DirectML accelerates ONNX Runtime alone and its PyTorch backend is
+        # pinned to a release far behind what a roformer needs; a CPU build
+        # accelerates neither, and ONNX Runtime is the quicker of the two
+        # there. Everything else runs PyTorch on the GPU.
+        self.assertEqual({key for key, value in accelerates_torch.items() if not value},
+                         {"directml", "cpu"})
+
+    def test_each_variant_says_what_it_costs_on_the_build_that_runs_it(self):
+        """One preset is not one offer: on a build that runs no roformer, every
+        preset is the same lighter model at a different overlap rather than the
+        ladder of models the other build gets, and saying so is the only way
+        the interface does not promise one quality everywhere."""
+        summaries = {
+            variant.summary
+            for preset in separation.PRESETS
+            for variant in (preset.torch, preset.onnx)
+        }
+        self.assertEqual(len(summaries), 2 * len(separation.PRESETS))
+        for summary in summaries:
+            self.assertTrue(summary and summary[0].isupper())
+
+    def test_the_two_overlap_options_are_read_in_opposite_directions(self):
+        """`mdxc_overlap` on a roformer is a step in seconds, not an amount of
+        overlap: raising it advances the prediction window further, so the
+        result is stitched from fewer passes. `mdx_overlap` is a real fraction
+        and reads the other way round. Taking either for the other inverts
+        every preset it appears in."""
+        mdxc = next(
+            item for item in separation.ARCHITECTURE_OPTIONS["MDXC"]
+            if item.name == "mdxc_overlap"
+        )
+        mdx = next(
+            item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
+            if item.name == "mdx_overlap"
+        )
+        # Normal is quicker than High quality, which on the roformer means a
+        # higher value and on the MDX fallback a lower one.
+        self.assertGreater(separation.NORMAL_OVERLAP, mdxc.default)
+        self.assertGreater(separation.MDX_QUALITY_OVERLAP, mdx.default)
+        self.assertLess(separation.MDX_QUICK_OVERLAP, mdx.default)
+        self.assertNotIn("Higher is better", mdxc.help)
+
+    def test_the_onnx_ladder_runs_from_most_passes_to_fewest(self):
+        """The build that can only run one architecture still gets three
+        distinct offers, and they have to be ordered the way their names are."""
+        overlaps = [
+            preset.onnx.values.get("mdx_overlap", next(
+                item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
+                if item.name == "mdx_overlap"
+            ).default)
+            for preset in separation.PRESETS
+        ]
+        self.assertEqual(overlaps, sorted(overlaps, reverse=True))
+
+    # `vocals_mel_band_roformer` chunks at `stft_hop_length * (dim_t - 1)`, or
+    # 441 * 1100 = 485100 samples = 11.0 s at 44.1 kHz.
+    ROFORMER_CHUNK_SECONDS = 11
+
+    def test_the_normal_preset_stops_short_of_a_seam(self):
+        """The step is clamped to the chunk, so any value at or above the chunk
+        length in seconds separates in one pass with no overlap at all. Measured
+        on a 90 s excerpt, that leaves a discontinuity every 11.0 s reaching 25x
+        the surrounding sample-to-sample difference, against 0.7x away from a
+        boundary - a click, and the deck subtracts the stem from the mix, so it
+        lands in the instrumental too. One step below, 9% of the chunk still
+        overlaps, the boundaries measure like any other sample, and it costs
+        nothing: 0.399 s/s against 0.406."""
+        self.assertLess(separation.NORMAL_OVERLAP, self.ROFORMER_CHUNK_SECONDS)
         option = next(
             item for item in separation.ARCHITECTURE_OPTIONS["MDXC"]
             if item.name == "mdxc_overlap"
         )
-        # A preset that reduced to the model's own default would be a rename,
-        # not a trade-off.
-        self.assertLess(separation.QUALITY_OVERLAP, option.default)
-        self.assertNotIn("Higher is better", option.help)
+        # Still a step up from High quality, or it would not be a preset.
+        self.assertGreater(separation.NORMAL_OVERLAP, option.default)
 
-    def test_a_torch_only_build_routes_the_fast_model_through_torch(self):
-        """audio-separator opens an ONNX Runtime session only while the segment
-        size equals the model's own `dim_t`, and converts the graph to Torch
-        otherwise. Where ONNX Runtime cannot reach the GPU, that conversion is
-        the difference between separating on the GPU and on the CPU."""
-        fast = separation.preset(separation.FAST_MODE)
-        direct, through_torch = fast.resolve(), fast.resolve(prefers_torch=True)
-        # Same model either way, so no accelerator change costs a download.
-        self.assertEqual(direct.candidates, through_torch.candidates)
-        self.assertEqual(direct.architecture, through_torch.architecture)
-        self.assertNotIn("mdx_segment_size", direct.values)
-        self.assertEqual(through_torch.values["mdx_segment_size"],
-                         separation.MDX_TORCH_SEGMENT)
-
-    def test_the_torch_route_asks_for_a_segment_the_onnx_one_would_not(self):
-        """A segment size equal to `dim_t` is what keeps the ONNX session, and
-        `dim_t` is 256 for every candidate the fast preset names - which is
-        also the option's own default, so the ONNX path is the one taken by
-        doing nothing. The Torch route has to differ from it to exist."""
-        option = next(
-            item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
-            if item.name == "mdx_segment_size"
-        )
-        self.assertNotEqual(separation.MDX_TORCH_SEGMENT, option.default)
-        self.assertLessEqual(separation.MDX_TORCH_SEGMENT, option.maximum)
-
-    def test_a_build_that_accelerates_neither_runtime_keeps_onnx(self):
-        """With nothing to move the work to, the conversion only costs time."""
-        quality = separation.preset(separation.QUALITY_MODE)
-        # A roformer is Torch already, so nothing about the accelerator can
-        # change what the quality preset means.
-        self.assertIs(quality.resolve(prefers_torch=True), quality.resolve())
-        prefers = {
-            key: acceleration.prefers_torch
-            for key, acceleration in provisioning.ACCELERATIONS.items()
-        }
-        # ROCm has no ONNX GPU provider at all; on Apple Silicon CoreML lists
-        # one but splits the graph and leaves the work interleaved with the
-        # CPU. DirectML accelerates ONNX alone, CUDA both, and the CPU build
-        # neither - none of those want the conversion.
-        self.assertEqual({key for key, value in prefers.items() if value},
-                         {"rocm", "mps"})
+    def test_no_preset_overrides_a_model_segment_size(self):
+        """Every candidate runs at the segment size its own weights were
+        trained for. Naming another one used to be how the fast preset reached
+        the Torch runtime on Apple Silicon; the architecture split does that
+        now, so nothing has to run at a context the model never saw."""
+        for preset in separation.PRESETS:
+            for variant in (preset.torch, preset.onnx):
+                self.assertNotIn("mdx_segment_size", variant.values)
+                self.assertNotIn("mdxc_segment_size", variant.values)
+                self.assertNotIn("mdxc_override_model_segment_size", variant.values)
 
     def test_editing_a_parameter_demotes_the_preset_to_custom(self):
         settings = separation.apply_preset(
@@ -1351,8 +1449,8 @@ class QualityPresetTests(unittest.TestCase):
     def test_the_mode_survives_a_round_trip_through_disk(self):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / separation.SETTINGS_NAME
-            for mode in (separation.FAST_MODE, separation.QUALITY_MODE,
-                         separation.CUSTOM_MODE):
+            for mode in (separation.QUALITY_MODE, separation.NORMAL_MODE,
+                         separation.QUICK_MODE, separation.CUSTOM_MODE):
                 settings = separation.Settings(mode=mode)
                 separation.save_settings(path, settings)
                 self.assertEqual(separation.load_settings(path).mode, mode)

@@ -24,9 +24,15 @@ SETTINGS_NAME = "separation.json"
 DEFAULT_MODEL = "vocals_mel_band_roformer.ckpt"
 VOCAL_STEM = "Vocals"
 
-FAST_MODE = "fast"
 QUALITY_MODE = "quality"
+NORMAL_MODE = "normal"
+QUICK_MODE = "quick"
 CUSTOM_MODE = "custom"
+# Modes that older settings files hold, and what they mean now. `fast` named
+# the top of the ladder by the time it was retired - the roformer at the step
+# its own weights default to - so it reads as `quality` rather than as the
+# cheapest preset, which is what its name would otherwise suggest.
+LEGACY_MODES = {"fast": QUALITY_MODE}
 
 
 @dataclass(frozen=True)
@@ -160,43 +166,67 @@ ARCHITECTURE_OPTIONS: dict[str, tuple[Option, ...]] = {
 
 
 # The roformer family, best vocal SDR first, which is what the catalogue's own
-# scores say and all this project claims about it.
+# scores say and all this project claims about it. These are PyTorch
+# checkpoints, so they reach the GPU wherever PyTorch does and nowhere else.
 ROFORMER_CANDIDATES: tuple[str, ...] = (
     DEFAULT_MODEL,
     "mel_band_roformer_kim_ft_unwa.ckpt",
     "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
 )
-# The MDX-Net family, which is what "fast" means here. These are ONNX models of
-# a few tens of megabytes against the roformer's several hundred, and they cost
-# roughly a third of its inference for 10.2 dB of vocal SDR against 12.6 - the
-# gap a DJ hears as a little more instrument left in the acapella, on a stem
-# whose other side is reconstructed on the deck anyway. They are band-limited
-# where the roformer is not, so what survives the reconstruction is the very
-# top of the sibilance rather than anything with pitch in it.
+# The MDX-Net family: ONNX models of a few tens of megabytes against the
+# roformer's several hundred, for 10.2 dB of vocal SDR against 12.6. They are
+# also band-limited - `dim_f` 3072 over an `n_fft` of 7680 puts the wall at
+# 17.6 kHz - so nothing above that is ever separated, and the air of a vocal
+# stays in the instrumental the deck reconstructs.
+#
+# They are kept for the builds that cannot run a roformer on the GPU at all,
+# not as a speed trade-off: see `PRESETS`.
 MDX_CANDIDATES: tuple[str, ...] = (
     "Kim_Vocal_2.onnx",
     "UVR-MDX-NET-Voc_FT.onnx",
     "UVR-MDX-NET_Main_406.onnx",
 )
-# An MDX model is an ONNX file, but which runtime executes it is not fixed:
-# audio-separator only opens an ONNX Runtime session when the segment size
-# equals the model's own `dim_t`, and otherwise converts the graph with
-# onnx2torch and runs it on the Torch device. Every candidate above has a
-# `dim_t` of 256 - which is exactly what the option defaults to, so the ONNX
-# path is taken by accident rather than by choice - and 512 therefore selects
-# the Torch path while doubling the context each chunk is separated with.
+# Demucs, which is what "very fast" means where PyTorch reaches the GPU. A
+# waveform model rather than a transformer, and measured on this project's
+# reference machine at 0.161 s of computation per second of audio against the
+# roformer's 0.526 - the only real step down in cost the catalogue offers.
 #
-# That is the whole answer on a build whose GPU covers PyTorch and not ONNX
-# Runtime. On Apple Silicon it was measured at 3.5x quicker end to end, 42.6 s
-# against 12.1 s on a minute of audio; on ROCm, where ONNX Runtime has no GPU
-# provider at all, it is the difference between the GPU and the CPU.
-MDX_TORCH_SEGMENT = 512
-# `mdxc_overlap`, despite the name, is a hop divisor: it sets how far the
-# prediction window advances each step, so a lower value stitches the result
-# from more passes over the audio. More passes is more inference. How much
-# more, in seconds, depends on the model, the device and the machine's load, so
-# nothing here predicts it - `estimate` measures it per run instead.
-QUALITY_OVERLAP = 4
+# `htdemucs` and not `htdemucs_ft`: the fine-tuned variant runs four sub-models
+# and was measured at 0.502 s/s, which is the roformer's cost for 1.8 dB less.
+# Being full-band, this gives up SDR without giving up the top of the spectrum
+# the way an MDX-Net does.
+DEMUCS_CANDIDATES: tuple[str, ...] = (
+    "htdemucs.yaml",
+    "hdemucs_mmi.yaml",
+)
+# Demucs averages predictions over randomly shifted copies of the input. Two is
+# the separator's own default and doubles the work for a fraction of a dB,
+# which is not the trade this preset exists to make.
+QUICK_SHIFTS = 1
+# `mdxc_overlap` on a roformer is a step in seconds, not a divisor: the chunk
+# is `stft_hop_length * (dim_t - 1)` samples and the window advances
+# `min(overlap * sample_rate, chunk)` each time, so a lower value stitches the
+# result from more passes. For `vocals_mel_band_roformer` the chunk is 11.0 s,
+# which makes the option's own default of 8 a 27% overlap over 1.38 passes.
+#
+# `quality` therefore keeps the default rather than naming a value: a preset
+# that restated the default would only be noise in the stored settings.
+#
+# `normal` is the largest step that still leaves a crossfade. At the chunk
+# length and above - 11 and up here - the step is clamped to the chunk and the
+# passes stop overlapping at all, which was measured as a discontinuity every
+# 11.0 s reaching 25x the surrounding sample-to-sample difference, against 0.7x
+# away from a boundary. That is a click, and the deck subtracts the stem from
+# the mix, so it lands in the instrumental too. One second of overlap removes
+# it and costs nothing measurable: 0.399 s/s at 10 against 0.406 at 11, both
+# against 0.526 at the default.
+NORMAL_OVERLAP = 10
+# The same ladder for the MDX architecture, whose `mdx_overlap` is a real
+# fraction and does read the way its name suggests. Three presets have to mean
+# three things on a build that can only run this one architecture, so they are
+# expressed as three amounts of overlap on one model rather than three models.
+MDX_QUALITY_OVERLAP = 0.5
+MDX_QUICK_OVERLAP = 0.1
 
 
 @dataclass(frozen=True)
@@ -208,10 +238,17 @@ class Variant:
     not this project's to pin. The first candidate the catalogue actually
     offers wins, and a catalogue that offers none of them still resolves to
     something sensible.
+
+    `summary` belongs to the variant rather than to the preset because the two
+    variants of one preset are not the same offer: on a build that runs neither
+    architecture on the GPU, `fast` is a weaker model rather than a cheaper
+    setting, and the interface has to say so instead of promising one quality
+    everywhere.
     """
 
     architecture: str
     candidates: tuple[str, ...]
+    summary: str
     values: dict[str, Any] = field(default_factory=dict)
 
 
@@ -224,49 +261,83 @@ class Preset:
     its runtime's accelerator is slower than a heavier one that reaches it. A
     preset therefore names the trade-off and lets the machine pick the variant
     that expresses it here.
+
+    The split is between the two runtimes, and it is not the same split on
+    every platform. PyTorch reaches the GPU through CUDA, Apple Silicon MPS and
+    ROCm; ONNX Runtime reaches it through CUDA and DirectML, and on Apple
+    Silicon CoreML lists a provider but takes only 151 of an MDX-Net's 178
+    nodes across 28 partitions, so the run spends its time handing tensors back
+    to the CPU. A roformer is a Torch checkpoint and an MDX-Net is an ONNX
+    graph, so where PyTorch is accelerated the roformer is both the better and
+    the faster answer, and where it is not - DirectML, and any CPU-only build -
+    an MDX-Net is the only one that reaches the hardware at all.
     """
 
     key: str
     label: str
-    summary: str
-    variant: Variant
-    # Used instead of `variant` where PyTorch is accelerated and ONNX Runtime
-    # is not. Absent on a preset whose own variant is a Torch model already.
-    torch_variant: Variant | None = None
+    # Where PyTorch reaches the GPU, which is also where the better model runs.
+    torch: Variant
+    # Where it does not, and the work has to go through ONNX Runtime instead.
+    onnx: Variant
 
-    def resolve(self, *, prefers_torch: bool = False) -> Variant:
-        if prefers_torch and self.torch_variant is not None:
-            return self.torch_variant
-        return self.variant
+    def resolve(self, *, accelerates_torch: bool = True) -> Variant:
+        return self.torch if accelerates_torch else self.onnx
 
 
+# Best first, which is the order the interface offers them in.
+#
+# No ratio is quoted in any summary on purpose: how much quicker one preset is
+# than another depends on the model, the device and the machine's load, and the
+# status line answers it from this machine's own measured throughput.
+#
+# The top two are one model at two steps, so moving between them downloads
+# nothing and gives up no SDR. Only `quick` trades the model itself, because
+# below the roformer every architecture in the catalogue lands within a quarter
+# of the same cost - there is no third speed class to build a preset on.
 PRESETS: tuple[Preset, ...] = (
-    Preset(
-        key=FAST_MODE,
-        label="Fast",
-        # No ratio is quoted here on purpose: how much quicker depends on the
-        # model, the device and the machine's load, and the status line answers
-        # it from this machine's own measured throughput.
-        summary="A lighter model. Much quicker, with a little more bleed into the vocal.",
-        variant=Variant(architecture="MDX", candidates=MDX_CANDIDATES),
-        # The same model, taken through PyTorch instead of ONNX Runtime. Only
-        # the route changes, so switching accelerator never downloads anything.
-        torch_variant=Variant(
-            architecture="MDX",
-            candidates=MDX_CANDIDATES,
-            values={"mdx_segment_size": MDX_TORCH_SEGMENT},
-        ),
-    ),
     Preset(
         key=QUALITY_MODE,
         label="High quality",
-        summary="The best model in the catalogue, over more passes. The cleanest, and slower.",
-        # A roformer is a Torch model, so it is already the answer on a build
-        # that only accelerates Torch, and no second variant applies.
-        variant=Variant(
-            architecture="MDXC",
-            candidates=ROFORMER_CANDIDATES,
-            values={"mdxc_overlap": QUALITY_OVERLAP},
+        torch=Variant(
+            architecture="MDXC", candidates=ROFORMER_CANDIDATES,
+            summary="The cleanest, and the slowest.",
+        ),
+        # "runs at all" rather than "runs on the GPU": these variants also
+        # serve the CPU-only build, where there is no GPU to be the better of.
+        onnx=Variant(
+            architecture="MDX", candidates=MDX_CANDIDATES,
+            summary="A lighter model, the only kind this build runs at a usable speed, "
+                    "over more passes. Nothing is separated above 17.6 kHz.",
+            values={"mdx_overlap": MDX_QUALITY_OVERLAP},
+        ),
+    ),
+    Preset(
+        key=NORMAL_MODE,
+        label="Normal",
+        torch=Variant(
+            architecture="MDXC", candidates=ROFORMER_CANDIDATES,
+            summary="The same model. Noticeably quicker, with almost no difference in quality.",
+            values={"mdxc_overlap": NORMAL_OVERLAP},
+        ),
+        onnx=Variant(
+            architecture="MDX", candidates=MDX_CANDIDATES,
+            summary="The same lighter model at its own default overlap. "
+                    "Nothing is separated above 17.6 kHz.",
+        ),
+    ),
+    Preset(
+        key=QUICK_MODE,
+        label="Very fast",
+        torch=Variant(
+            architecture="Demucs", candidates=DEMUCS_CANDIDATES,
+            summary="A waveform model. Several times quicker, with noticeably more instrument left in the vocal.",
+            values={"demucs_shifts": QUICK_SHIFTS},
+        ),
+        onnx=Variant(
+            architecture="MDX", candidates=MDX_CANDIDATES,
+            summary="The same lighter model, over fewer passes. As quick as possible,"
+                    " and the least clean.",
+            values={"mdx_overlap": MDX_QUICK_OVERLAP},
         ),
     ),
 )
@@ -475,14 +546,14 @@ def apply_preset(
     item: Preset,
     catalogue: Catalogue,
     *,
-    prefers_torch: bool = False,
+    accelerates_torch: bool = True,
 ) -> Settings:
     """Return `settings` reconfigured for one preset, discarding hand tuning.
 
-    `prefers_torch` is `Acceleration.prefers_torch` for the machine this will
-    run on; it decides which variant expresses the preset here.
+    `accelerates_torch` is `Acceleration.accelerates_torch` for the machine
+    this will run on; it decides which variant expresses the preset here.
     """
-    variant = item.resolve(prefers_torch=prefers_torch)
+    variant = item.resolve(accelerates_torch=accelerates_torch)
     model = resolve_preset_model(variant, catalogue)
     architecture = catalogue.architecture_of(model) or variant.architecture
     applicable = {
@@ -507,7 +578,7 @@ def load_settings(path: pathlib.Path) -> Settings:
     model = data.get("model")
     accelerator = data.get("accelerator")
     values = data.get("values")
-    mode = data.get("mode")
+    mode = LEGACY_MODES.get(data.get("mode"), data.get("mode"))
     known = set(known_option_names())
     return Settings(
         model=model if isinstance(model, str) and model else DEFAULT_MODEL,
@@ -516,7 +587,12 @@ def load_settings(path: pathlib.Path) -> Settings:
         values={key: value for key, value in (values or {}).items() if key in known}
         if isinstance(values, dict) else {},
         # Settings written before presets existed carry no mode, and describing
-        # them as a preset would misreport what they hold.
+        # them as a preset would misreport what they hold. A renamed preset is
+        # the other case: the mode is still a preset, just not under the name
+        # it was stored as, and `LEGACY_MODES` above maps it back. The values
+        # stored beside it can be the previous preset's rather than the current
+        # one's, which `apply_preset` replaces wholesale on the next
+        # reconciliation.
         mode=mode if mode in {item.key for item in PRESETS} | {CUSTOM_MODE} else CUSTOM_MODE,
     )
 

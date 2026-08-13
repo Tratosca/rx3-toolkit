@@ -21,24 +21,38 @@ used to leave the operator guessing at.
   appearances, and follows a mid-session appearance change.
 - The progress line says which track is being worked on — *track 3 of 20* —
   rather than how many are behind it, which read one short of reality.
-- The **Fast** preset trades a model rather than a parameter. It used to run the
-  same roformer as **High quality** with fewer passes, which is the same heavy
-  transformer either way; it now runs an MDX-Net model — roughly a third of the
-  inference for about 2.4 dB less vocal SDR, which is audible as a little more
-  instrument left in the acapella. Switching to it downloads a few tens of
-  megabytes on first use. **High quality** is unchanged.
-- On Apple Silicon and AMD ROCm, **Fast** runs its model through PyTorch rather
-  than ONNX Runtime. On a Mac, CoreML is offered and enabled but cannot take an
-  MDX-Net graph whole — it claims 151 of 178 nodes across 28 partitions, so the
-  work stays interleaved with the CPU, which is what the activity monitor was
-  showing. Taking the same model through Metal instead separated a minute of
-  audio in 12.1 s against 42.6 s. On ROCm, ONNX Runtime has no GPU provider at
-  all and the conversion is the difference between the GPU and the CPU. It is
-  the same model file either way, so no accelerator change costs a download.
+- A preset resolves to an architecture rather than to a fixed model, and picks it
+  from what the machine accelerates. The best models in the catalogue are
+  roformers, which are PyTorch checkpoints; the ones that reach a GPU without
+  PyTorch are MDX-Net, which are ONNX graphs. Where PyTorch runs on the GPU —
+  CUDA, Apple Silicon, ROCm — both presets now run the roformer, and **Fast** is
+  the same model over fewer passes rather than a weaker one. Where it does not —
+  DirectML, whose PyTorch backend is pinned far behind what a roformer needs, and
+  any CPU-only build — both run MDX-Net, giving up about 2.4 dB of vocal SDR to
+  reach the hardware that is there. The summary under the selector states which
+  of the two you are getting, because one preset is no longer one offer.
+- **Fast** no longer overrides the segment size. It used to ask for 512 against
+  the model's own 256 on Apple Silicon and ROCm, which is what selected the
+  PyTorch route for an ONNX model — at the cost of running it at double the
+  context its weights were trained for, blurring the mask in both directions. The
+  architecture split does that job now, so every model runs at its own segment
+  size. On a Mac, this also lifts MDX-Net's 17.6 kHz band limit, above which
+  nothing was ever separated and the air of a vocal stayed in the instrumental.
+- CoreML is still not used on a Mac: it is offered and enabled, but cannot take
+  an MDX-Net graph whole — it claims 151 of 178 nodes across 28 partitions, so
+  the work stays interleaved with the CPU, which is what the activity monitor was
+  showing. An Intel Mac reaches no GPU at all, since audio-separator gates MPS on
+  the processor being ARM.
 - The `mdxc_overlap` help text said "Higher is better and slower". It is the
-  opposite: the option is a hop divisor, so a higher value steps the prediction
-  window further and stitches the result from fewer passes. Anyone who raised it
-  for quality was lowering it.
+  opposite on a roformer: the option is a step in seconds, so a higher value
+  advances the prediction window further and stitches the result from fewer
+  passes. For `vocals_mel_band_roformer` the chunk is 11.0 s, which makes the
+  default of 8 a 27% overlap and anything from 11 up a single pass with none at
+  all. Anyone who raised it for quality was lowering it.
+- Measured throughput is keyed by preset as well as by architecture and
+  accelerator. Both presets run the same model on most machines and differ by
+  roughly a factor of two in passes, so one shared rate was wrong for each of
+  them in turn. Rates recorded under the old key are re-measured.
 - Modules sit at one level, `runtime/modules/<id>/<firmware>/`, named after the
   `id` their manifest declares. Three of them were a level deeper, under an
   `access/`, `buffer/` or `beatjump/` category that no document described, so

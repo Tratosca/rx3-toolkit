@@ -77,23 +77,16 @@ class Acceleration:
     # done on the GPU with. Not derivable from `extra`, and not answered by
     # asking ONNX Runtime what providers it has: a provider it lists can still
     # leave the work on the CPU. These record the measured outcome instead.
+    #
+    # `accelerates_torch` also chooses the architecture a preset resolves to,
+    # because the best models in the catalogue are Torch checkpoints and the
+    # ones that reach a GPU without PyTorch are not. See `separation.Preset`.
     accelerates_torch: bool = True
     accelerates_onnx: bool = True
 
     @property
     def requirement(self) -> str:
         return f"audio-separator[{self.extra}]"
-
-    @property
-    def prefers_torch(self) -> bool:
-        """Whether an ONNX model should be run through PyTorch on this build.
-
-        True where the GPU covers PyTorch and not ONNX Runtime, which is where
-        the ONNX runtime would leave the work on the CPU. Where neither is
-        accelerated there is nothing to move the work to, so ONNX Runtime -
-        which is the quicker of the two on a CPU - is kept.
-        """
-        return self.accelerates_torch and not self.accelerates_onnx
 
 
 AUTOMATIC = "auto"
@@ -120,10 +113,14 @@ ACCELERATIONS: dict[str, Acceleration] = {
     # time handing tensors back and forth with the CPU. Measured on an M-series
     # Mac, the same model was 3.5x quicker converted to Torch and run on Metal,
     # which is why this build is not treated as accelerating ONNX.
+    #
+    # audio-separator gates this on `system_info.processor == "arm"`, so an
+    # Intel Mac never reaches it even where PyTorch itself supports MPS on an
+    # AMD card. Those machines resolve to `cpu` below, which is what they get.
     "mps": Acceleration(
         "mps", "Apple Silicon (Metal)",
         "Metal Performance Shaders on ARM Macs, selected automatically. "
-        "ONNX models are run through PyTorch rather than CoreML.",
+        "Only PyTorch models reach the GPU; ONNX ones are left to CoreML.",
         "cpu", None, accelerates_onnx=False,
     ),
     "cpu": Acceleration(

@@ -1,7 +1,7 @@
 {
   "id": "telnet",
-  "name": "Diagnostic Telnet access",
-  "description": "Enables Telnet access to the device for diagnostic purposes (through the USB to computer port on 169.254.X.Y network).",
+  "name": " Telnet access",
+  "description": "Enables Telnet access to the device (through the USB to computer port on 169.254.X.Y network). Only use this if you know what you are doing.",
   "firmware": "1.19",
   "default": false,
   "order": 90,
