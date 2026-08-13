@@ -2,12 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 """Change the RX3 Beat Jump outer pads from +/-8 to +/-32 beats."""
 
-import pathlib
-import sys
+from tools.rx3_patcher.patchlib import run
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-from patchlib import run  # noqa: E402
-
+MODULE_ID = "beatjump-32bars"
 
 PATCHES = [
     # Negative-path magnitude conversion in single precision.

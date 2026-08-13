@@ -22,11 +22,6 @@ STEMS_FEATURE = (
 KEYSHIFT_FEATURE = (
     REPOSITORY / "runtime/modules/keyshift/1.19/rx3_keyshift_feature.h"
 ).read_text()
-PATCH_32_BARS = (REPOSITORY / "runtime/modules/beatjump/beatjump-32bars/1.19/patch.py").read_text()
-PATCH_32_BARS_MODULE = (REPOSITORY / "runtime/modules/beatjump/beatjump-32bars/1.19/module.sh").read_text()
-PATCH_NO_QUANTIZE = (REPOSITORY / "runtime/modules/beatjump/beatjump-no-quantize/1.19/patch.py").read_text()
-PATCH_NO_QUANTIZE_MODULE = (REPOSITORY / "runtime/modules/beatjump/beatjump-no-quantize/1.19/module.sh").read_text()
-DECODER_SLEEP_MODULE = (REPOSITORY / "runtime/modules/buffer/decoder-sleep/1.19/module.sh").read_text()
 
 
 def require(condition: bool, message: str) -> None:
@@ -57,26 +52,10 @@ require(
     and "a prepare hook failed; no guarded word was written" in AUTOEXEC,
     "module collisions and failed preparation must stop before executable writes",
 )
-require(
-    "register_patch 695764" in PATCH_NO_QUANTIZE_MODULE,
-    "the no-quantize runtime module must register its ARM NOP",
-)
-require(
-    len(PATCH_32_BARS.split("(0x")) - 1 == 12,
-    "the +/-32 offline patch must contain exactly twelve guarded words",
-)
-require(
-    '(0x0A9DD4, "3d00000a", "0000a0e1"' in PATCH_NO_QUANTIZE,
-    "the no-quantize patch must include the direct Beat Jump path",
-)
-require(
-    PATCH_32_BARS_MODULE.count("register_patch ") == 12,
-    "the +/-32 runtime module must register exactly twelve guarded words",
-)
-require(
-    "register_post_launch_hook decoder_sleep_apply" in DECODER_SLEEP_MODULE,
-    "the decoder-sleep adapter must register its post-launch hook",
-)
+# The beat jump tables and the decoder-sleep hook used to be asserted here.
+# They belong to those modules, not to the core: see
+# tests/test_module_consistency.py, which compares the offline and on-device
+# tables word by word, and tests/test_decoder_sleep_patch.py.
 
 # -- the core owns the binary, and only the binary ----------------------------
 

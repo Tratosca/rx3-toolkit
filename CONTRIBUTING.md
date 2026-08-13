@@ -32,9 +32,10 @@ runs on your computer.
 | `runtime/autoexec.sh` | On-device orchestrator: indexed module loading, validation, guarded writes, rollback, logging |
 | `runtime/lib/module-api.sh` | Registration contract shared by every on-device module |
 | `runtime/<firmware>/compatibility.sh` | Accepted `rbp` SHA-1 values for that firmware |
-| `runtime/modules/` | One directory per module, versioned by firmware |
+| `runtime/modules/<id>/<firmware>/` | One directory per module, named after its manifest `id`, versioned by firmware |
 | `apps/rx3-toolbox/` | The one Tkinter application: a tab over the build engine, a tab over the stem pipeline |
 | `tools/rx3_runtime/` | Build engine and its CLI |
+| `tools/rx3_patcher/` | Offline counterparts to the on-device byte patches, for an extracted `rbp` |
 | `tools/rx3_firmware/` | AES sector crypto, CRC32 trailer, ISO 9660 authoring |
 | `tools/rx3_stems/` | Rekordbox parsing, provisioning, separation, sidecar encoding |
 | `scripts/` | Release packaging and the publication preflight |
@@ -99,10 +100,20 @@ runtime change works:
 
 ## Adding a module
 
-Each runtime feature lives under a firmware version directory and provides a
-valid `manifest.json`. The GUI, the CLI and the release packager must keep
-discovering the same manifest rather than maintaining separate feature lists.
-The schema is in [docs/reference.md](docs/reference.md#module-manifests).
+Each module lives in `runtime/modules/<id>/<firmware>/`, where `<id>` is the
+`id` its `manifest.json` declares, and provides a valid `manifest.json`. The
+GUI, the CLI and the release packager must keep discovering the same manifest
+rather than maintaining separate feature lists. The schema is in
+[docs/reference.md](docs/reference.md#module-manifests).
+
+Nothing else needs editing to add a module: `make test` picks up a
+`test_regressions.py` placed beside the manifest, and `make hook` treats the
+module's headers as prerequisites.
+
+A module that also ships an offline patcher puts it in `tools/rx3_patcher/`,
+not under `runtime/` — everything under `runtime/` executes on the deck. The
+patcher declares `MODULE_ID` so `tests/test_module_consistency.py` can prove
+its table and the module's `register_patch` calls agree.
 
 Dependencies belong in `requires`; feature code must never probe for a sibling
 module to create an implicit dependency. The build rejects missing modules,

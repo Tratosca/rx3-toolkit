@@ -4,14 +4,15 @@ Changes the two outer Beat Jump pads from -8/+8 to -32/+32 on RX3 firmware
 1.19. The patch also updates the availability guard, LED threshold, and
 on-screen pad images.
 
-`patch.py` applies the guarded words offline. `module.sh` registers the same
-words with the volatile runtime orchestrator. The offsets in `patch.py` are the
-reference for both.
+`module.sh` registers the guarded words with the volatile runtime orchestrator.
+`tools/rx3_patcher/beatjump_32bars.py` applies the same words offline, to an
+extracted `rbp` on a workstation. The two tables are compared word by word by
+`tests/test_module_consistency.py`, so neither is the reference: they must agree.
 
 ```sh
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp --check
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp -o rbp.32bars
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp.32bars \
+python3 -m tools.rx3_patcher.beatjump_32bars rbp --check
+python3 -m tools.rx3_patcher.beatjump_32bars rbp -o rbp.32bars
+python3 -m tools.rx3_patcher.beatjump_32bars rbp.32bars \
   --revert -o rbp.restored
 ```
 

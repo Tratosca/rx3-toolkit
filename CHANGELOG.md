@@ -39,6 +39,16 @@ used to leave the operator guessing at.
   opposite: the option is a hop divisor, so a higher value steps the prediction
   window further and stitches the result from fewer passes. Anyone who raised it
   for quality was lowering it.
+- Modules sit at one level, `runtime/modules/<id>/<firmware>/`, named after the
+  `id` their manifest declares. Three of them were a level deeper, under an
+  `access/`, `buffer/` or `beatjump/` category that no document described, so
+  the path could not be guessed from a `requires` entry. Manifests are
+  unchanged and the on-device layout is unaffected.
+- The offline beat jump patchers moved out of `runtime/` to
+  `tools/rx3_patcher/`, invoked as `python3 -m tools.rx3_patcher.<name>`. They
+  run on a workstation, not on the deck, which is the line `runtime/` draws.
+- `make hook` and `make test` discover module headers and regression guards
+  instead of listing them. Adding a module no longer means editing the Makefile.
 
 ### Added
 

@@ -102,17 +102,17 @@ Both operate on a host copy of `rbp`. Neither includes nor retrieves it. Apply
 in this order when both are needed:
 
 ```sh
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp -o rbp.32bars
-python3 runtime/modules/beatjump/beatjump-no-quantize/1.19/patch.py rbp.32bars -o rbp.patched
+python3 -m tools.rx3_patcher.beatjump_32bars rbp -o rbp.32bars
+python3 -m tools.rx3_patcher.beatjump_no_quantize rbp.32bars -o rbp.patched
 ```
 
 Inspect or revert each separately:
 
 ```sh
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp.32bars --check
-python3 runtime/modules/beatjump/beatjump-no-quantize/1.19/patch.py rbp.patched \
+python3 -m tools.rx3_patcher.beatjump_32bars rbp.32bars --check
+python3 -m tools.rx3_patcher.beatjump_no_quantize rbp.patched \
   --revert -o rbp.32bars
-python3 runtime/modules/beatjump/beatjump-32bars/1.19/patch.py rbp.32bars \
+python3 -m tools.rx3_patcher.beatjump_32bars rbp.32bars \
   --revert -o rbp.restored
 ```
 
@@ -297,7 +297,9 @@ Guarded 32-bit words cover five related effects:
 | E | quantized branch replaced by an ARM NOP, selecting the direct path |
 
 Groups A to D belong to `beatjump-32bars`; group E is `beatjump-no-quantize`.
-The offsets in each module's `patch.py` are the reference.
+Each module states its offsets twice: in `module.sh` for the device, and in
+`tools/rx3_patcher/` for offline use. `tests/test_module_consistency.py` fails
+if the two ever disagree.
 
 `32.0` cannot be encoded by the VFP immediate used at the target site. The patch
 loads the IEEE-754 value through `r5`, moves it to `s16`, and converts the
@@ -323,7 +325,7 @@ That calls `playengine::Player::setDecoderSleep` for each deck, changing the
 decoder-thread sleep interval from the stock 1 ms to 0.1 ms. The setting is
 volatile and alters neither NAND nor the `rbp` executable. It costs CPU, and it
 does not guarantee any fixed reduction in end-to-end audio latency. See the
-[module documentation](../runtime/modules/buffer/decoder-sleep/1.19/README.md).
+[module documentation](../runtime/modules/decoder-sleep/1.19/README.md).
 
 ## Stems internals
 
