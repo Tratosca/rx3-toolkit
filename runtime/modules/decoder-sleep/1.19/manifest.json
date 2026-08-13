@@ -4,7 +4,7 @@
   "description": "Drastically reduces wait time between beatjumps, allowing for almost indefinitely instant beatjumping.",
   "firmware": "1.19",
   "default": true,
-  "order": 30,
+  "order": 8,
   "runtime_directory": "decoder-sleep",
   "namespace": "decoder_sleep",
   "requires": [],

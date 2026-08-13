@@ -319,6 +319,46 @@ def resolve_patches(
     return ordered
 
 
+def required_closure(
+    definitions: Iterable[PatchDefinition], patch_ids: Iterable[str]
+) -> set[str]:
+    """Every module the given selection pulls in, transitively, plus itself.
+
+    `resolve_patches` answers the same question but refuses an internal module
+    and an empty selection, because it guards a build. A checkbox being ticked
+    is not a build, so the interface needs the bare graph.
+    """
+    by_id = {patch.patch_id: patch for patch in definitions}
+    closure: set[str] = set()
+    pending = [identifier for identifier in patch_ids if identifier in by_id]
+    while pending:
+        identifier = pending.pop()
+        if identifier in closure:
+            continue
+        closure.add(identifier)
+        pending.extend(by_id[identifier].requires)
+    return closure
+
+
+def dependent_closure(
+    definitions: Iterable[PatchDefinition], patch_ids: Iterable[str]
+) -> set[str]:
+    """Every module that would be left with a missing dependency, plus itself."""
+    definitions = list(definitions)
+    by_id = {patch.patch_id: patch for patch in definitions}
+    closure: set[str] = set()
+    pending = [identifier for identifier in patch_ids if identifier in by_id]
+    while pending:
+        identifier = pending.pop()
+        if identifier in closure:
+            continue
+        closure.add(identifier)
+        pending.extend(
+            patch.patch_id for patch in definitions if identifier in patch.requires
+        )
+    return closure
+
+
 def available_versions(root: pathlib.Path | None = None) -> list[str]:
     return sorted({patch.firmware for patch in discover_patches(root)})
 

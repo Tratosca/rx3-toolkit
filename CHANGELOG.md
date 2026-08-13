@@ -49,6 +49,15 @@ used to leave the operator guessing at.
   run on a workstation, not on the deck, which is the line `runtime/` draws.
 - `make hook` and `make test` discover module headers and regression guards
   instead of listing them. Adding a module no longer means editing the Makefile.
+- Both Beat Jump modules now declare `requires: ["decoder-sleep"]`, so selecting
+  either one brings the faster decoder polling with it. `decoder-sleep` moves
+  from manifest order 30 to 8, because the build engine loads a dependency
+  before what needs it; it can still be selected on its own.
+- The feature list shows every module, including internal ones. The performance
+  core appears greyed out and ticks itself when Key Shift or Stems is selected.
+  Ticking a module ticks what it requires, and unticking one unticks whatever
+  would be left requiring it. The propagation reads the manifests, so a new
+  dependency needs no interface change.
 
 ### Added
 
