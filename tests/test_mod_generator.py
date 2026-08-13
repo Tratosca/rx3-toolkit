@@ -26,9 +26,11 @@ class ModGeneratorTests(unittest.TestCase):
             [patch.patch_id for patch in patches],
             [
                 "core",
+                # decoder-sleep precedes the beat jump modules that now require
+                # it: the build engine enforces dependency-first manifest order.
+                "decoder-sleep",
                 "beatjump-32bars",
                 "beatjump-no-quantize",
-                "decoder-sleep",
                 "keyshift",
                 "stems",
                 "telnet",
@@ -46,6 +48,11 @@ class ModGeneratorTests(unittest.TestCase):
             next(patch for patch in patches if patch.patch_id == "stems").requires,
             ("core",),
         )
+        for identifier in ("beatjump-32bars", "beatjump-no-quantize"):
+            self.assertEqual(
+                next(patch for patch in patches if patch.patch_id == identifier).requires,
+                ("decoder-sleep",),
+            )
 
     def test_dependency_resolution_is_explicit_and_stable(self):
         patches = discover_patches(REPOSITORY, "1.19")

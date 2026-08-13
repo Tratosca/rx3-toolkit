@@ -7,7 +7,7 @@
   "order": 10,
   "runtime_directory": "beatjump-32bars",
   "namespace": "beatjump_32bars",
-  "requires": [],
+  "requires": ["decoder-sleep"],
   "conflicts": [],
   "files": [
     {"source": "module.sh", "target": "module.sh", "executable": false}

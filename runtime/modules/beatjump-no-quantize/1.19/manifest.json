@@ -7,7 +7,7 @@
   "order": 20,
   "runtime_directory": "beatjump-no-quantize",
   "namespace": "beatjump_no_quantize",
-  "requires": [],
+  "requires": ["decoder-sleep"],
   "conflicts": [],
   "files": [
     {"source": "module.sh", "target": "module.sh", "executable": false}
