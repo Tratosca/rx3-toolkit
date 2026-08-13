@@ -79,10 +79,16 @@ def format_audio_length(seconds: float) -> str:
 
 @dataclass
 class Estimator:
-    """The rate for one (architecture, accelerator) pair, refined as it runs."""
+    """The rate for one (architecture, accelerator, tuning), refined as it runs."""
 
     architecture: str | None
     accelerator: str
+    # The preset the rate was measured under. Both presets now name the same
+    # model on a build that runs it, and differ only in how many passes it
+    # takes over the audio - roughly a factor of two. Sharing one rate between
+    # them would leave each estimate wrong by that factor in turn, and the
+    # blend would swing it back and forth as the operator alternated.
+    tuning: str = "unknown"
     rate: float = 0.0
     # False until a real separation has been timed on this machine, which is
     # what separates a table lookup from a measurement.
@@ -94,7 +100,7 @@ class Estimator:
 
     @property
     def key(self) -> str:
-        return f"{self.architecture or 'unknown'}/{self.accelerator}"
+        return f"{self.architecture or 'unknown'}/{self.accelerator}/{self.tuning}"
 
     def remaining(self, audio_seconds: float) -> float | None:
         """Computation time left for `audio_seconds` of unprocessed audio.
@@ -147,10 +153,16 @@ def save_rates(path: pathlib.Path, rates: dict[str, float]) -> None:
 
 
 def estimator_for(
-    path: pathlib.Path, architecture: str | None, accelerator: str
+    path: pathlib.Path, architecture: str | None, accelerator: str,
+    tuning: str = "unknown",
 ) -> Estimator:
-    """Build an estimator, preferring what this machine measured previously."""
-    estimator = Estimator(architecture, accelerator)
+    """Build an estimator, preferring what this machine measured previously.
+
+    A rate recorded before `tuning` was part of the key simply does not match
+    and is left where it is: it averaged two settings that are a factor of two
+    apart, so re-measuring is better than carrying it forward.
+    """
+    estimator = Estimator(architecture, accelerator, tuning)
     measured = load_rates(path).get(estimator.key)
     if measured:
         estimator.rate = measured

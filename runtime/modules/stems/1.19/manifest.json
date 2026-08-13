@@ -1,7 +1,7 @@
 {
   "id": "stems",
-  "name": "Vocal and instrumental controls",
-  "description": "Use prepared RX3 sidecars from the STEMS tab and Slip Loop pads 7 and 8.",
+  "name": "Stems",
+  "description": "Enable the use of prepared stems (on screen and on Slip Loop pads 7-8). Prepared stems on a USB stick are automatically loaded by the player when you load the corresponding song on a deck.",
   "firmware": "1.19",
   "default": true,
   "order": 40,

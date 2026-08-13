@@ -1,7 +1,7 @@
 {
   "id": "beatjump-32bars",
-  "name": "Beat Jump +/-32",
-  "description": "Use pads 7 and 8 for -32 and +32 beat jumps.",
+  "name": "32 bars beat jumps",
+  "description": "Replaces 8 bars beat jump by 32 bars beat jumps.",
   "firmware": "1.19",
   "default": true,
   "order": 10,

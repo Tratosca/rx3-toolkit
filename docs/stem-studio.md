@@ -129,64 +129,91 @@ environment rather than completing it.
 
 The tab offers three settings.
 
-| Setting | Model | Use it when |
-|---|---|---|
-| **Fast** | MDX-Net, a few tens of megabytes | Auditioning a playlist, or a long queue has to finish tonight |
-| **High quality** | the best vocal roformer the catalogue offers, over more passes | The stems are going in a set |
-| **Custom** | whatever you set | You tuned something by hand |
+| Setting | Use it when |
+|---|---|
+| **High quality** | The stems are going in a set |
+| **Normal** | Most of the time |
+| **Very fast** | Auditioning a playlist, or a long queue has to finish tonight |
+| **Custom** | You tuned something by hand |
 
-The presets trade a model, not a parameter. The roformer high quality runs
-scores about 12.6 dB of vocal SDR; the MDX-Net model Fast runs scores about
-10.2 dB from roughly a third of the inference. What that gap sounds like is a
-little more instrument left in the acapella. MDX-Net models are band-limited
-where the roformer is not, so the residue the deck cannot cancel sits at the
-very top of the sibilance rather than anywhere with pitch in it.
+The top two are one model at two steps, so moving between them downloads nothing
+and gives up no SDR. Only **Very fast** trades the model itself, because below
+the roformer every architecture in the catalogue lands within a quarter of the
+same cost — measured on Apple Silicon, 0.526 s of computation per second of audio
+for the roformer against 0.161 for Demucs, 0.179 for MDX-Net and 0.142 for VR.
+There is no third speed class to build a preset on.
 
-High quality also asks for more passes than the model would take on its own,
-through `mdxc_overlap`. Despite the name it is a hop divisor rather than an
-amount of overlap: lowering it steps the prediction window less far along the
-track, so the result is stitched from more passes and more inference is done.
-The preset sits at 4, below the model's own default of 8.
+Which models those are depends on what the build accelerates, and the summary
+under the selector states it for the machine you are on rather than in general.
+
+The knob between the top two is `mdxc_overlap`. Despite the name it is a step in
+seconds rather than an amount of overlap: the chunk is 11.0 s for
+`vocals_mel_band_roformer`, and the window advances `overlap` seconds each time,
+so a *lower* value stitches the result from more passes and more inference is
+done. High quality keeps the option's own default of 8 — a 27% overlap over 1.38
+passes; Normal steps to 10, which is 9% overlap and 0.399 s/s.
+
+Normal stops one short of 11 on purpose. At the chunk length and above the step
+is clamped to the chunk and the passes stop overlapping at all, which measured as
+a discontinuity every 11.0 s reaching 25× the surrounding sample-to-sample
+difference, against 0.7× away from a boundary. That is a click, and since the
+deck reconstructs the instrumental by subtracting the stem, it lands in the
+instrumental too. The second of overlap that removes it costs nothing measurable:
+0.399 s/s at 10 against 0.406 at 11.
 
 How much time either actually costs depends on the model, the device and what
 else the machine is doing, so nothing in the interface quotes a ratio. The
 estimate under the selector answers it from this machine's own measured
-throughput instead.
+throughput instead, timed separately for each preset.
 
 A preset names a candidate list rather than a single filename, because the model
 catalogue comes from audio-separator and can change upstream. The first
 candidate the catalogue actually offers is used; if none of them survive, the
 best-scoring model of that preset's architecture is.
 
-### Which runtime the fast model is executed by
+### Which model a preset resolves to
 
-An MDX-Net model is an ONNX file, but that does not decide what executes it.
-audio-separator opens an ONNX Runtime session only while the segment size equals
-the model's own internal `dim_t`; otherwise it converts the graph to PyTorch and
-runs it on the Torch device. Both routes run the same network. Which one is
-quicker depends on the machine:
+The best models in the catalogue are roformers, which are PyTorch checkpoints;
+the ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs.
+Neither runtime is accelerated everywhere, and the split is not the same on every
+platform:
 
-| Accelerator | PyTorch | ONNX Runtime | Fast is routed through |
-|---|---|---|---|
-| NVIDIA CUDA | GPU | GPU | ONNX Runtime |
-| Apple Silicon | GPU (Metal) | CoreML, **mostly on the CPU** | PyTorch |
-| DirectML | CPU | GPU | ONNX Runtime |
-| AMD ROCm | GPU | **CPU** | PyTorch |
-| CPU only | CPU | CPU | ONNX Runtime |
+| Accelerator | PyTorch | ONNX Runtime | High quality / Normal | Very fast |
+|---|---|---|---|---|
+| NVIDIA CUDA | GPU | GPU | roformer, 12.6 dB | Demucs, 9.9 dB |
+| Apple Silicon | GPU (Metal) | CoreML, **mostly on the CPU** | roformer, 12.6 dB | Demucs, 9.9 dB |
+| AMD ROCm | GPU | **CPU** | roformer, 12.6 dB | Demucs, 9.9 dB |
+| DirectML | **CPU** | GPU | MDX-Net, 10.2 dB | MDX-Net, 10.2 dB |
+| CPU only | CPU | CPU | MDX-Net, 10.2 dB | MDX-Net, 10.2 dB |
+
+On the first three the roformer is both the better and the quicker answer, so
+there is nothing to trade at the top of the ladder. On the last two it is
+neither: DirectML's PyTorch backend is pinned far behind what a roformer needs,
+and a CPU-only build has nothing to move the work to, where ONNX Runtime is the
+quicker of the two. Those machines give up 2.4 dB of vocal SDR to run on the
+hardware they have, and their three presets are one model at three overlaps
+rather than a ladder of models. MDX-Net is also band-limited — `dim_f` 3072 over
+an `n_fft` of 7680 puts the wall at 17.6 kHz — so above that nothing is separated
+at all and the air of a vocal stays in the instrumental the deck reconstructs.
+
+**Very fast** uses `htdemucs` and not `htdemucs_ft`: the fine-tuned variant runs
+four sub-models and was measured at 0.502 s/s, which is the roformer's cost for
+1.8 dB less. Being a waveform model, Demucs gives up SDR without giving up the
+top of the spectrum the way the band-limited ONNX fallback does.
 
 Apple Silicon is the case worth explaining, because CoreML looks like it works.
 It is offered, it is enabled, and it does take most of the model — but it cannot
 take the graph whole. On an MDX-Net model it claims 151 of 178 nodes and splits
 them into 28 partitions, so the run spends its time passing tensors back and
-forth with the CPU, which is what shows up in Activity Monitor. Converted to
-PyTorch and run on Metal instead, the same model separated a minute of audio in
-12.1 s against 42.6 s.
+forth with the CPU, which is what shows up in Activity Monitor. That is why an
+ONNX model is not the answer there even though a provider is listed.
 
-The preset therefore asks for a segment size of 512 rather than the model's own
-256 on those two accelerators, which is what selects the PyTorch route — and
-incidentally doubles the context each chunk is separated with. It is the same
-model file on every accelerator, so changing accelerator never downloads
-anything, and never changes the preset you chose.
+An Intel Mac never reaches Metal at all: audio-separator gates MPS on the
+processor being ARM, so those machines resolve to the CPU build even where
+PyTorch itself would support MPS on an AMD card.
+
+Changing accelerator can therefore change the model without changing the preset
+you chose, which is what the reconciliation on the Runtime tab is for.
 
 Changing a model or a parameter in Advanced options switches the setting to
 **Custom**. A preset therefore always describes exactly one configuration, and
@@ -199,8 +226,10 @@ and how long separation should take. The first estimate comes from a table of
 typical speeds per architecture and accelerator and is marked *(rough)*. As soon
 as a track finishes, the real speed of this machine replaces it, and the
 estimate is refined again at every progress tick. The measured speed is written
-to `throughput.json` per architecture and accelerator, so later runs start
-calibrated rather than guessing.
+to `throughput.json` per architecture, accelerator and preset, so later runs
+start calibrated rather than guessing. The preset is part of that key because
+both presets now run the same model and differ only in passes over the audio: one
+shared rate would be wrong for each of them in turn.
 
 A run estimated at more than ten minutes asks for confirmation first, because it
 will occupy the machine: keep the computer plugged in and awake, and close other

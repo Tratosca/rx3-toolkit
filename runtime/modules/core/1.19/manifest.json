@@ -1,7 +1,7 @@
 {
   "id": "core",
-  "name": "Performance core",
-  "description": "On-screen tabs, touch handling and the hook the performance features load into.",
+  "name": "On-screen key shift & stems",
+  "description": "On-screen features for key shift and stems.",
   "firmware": "1.19",
   "default": false,
   "selectable": false,

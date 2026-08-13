@@ -1,7 +1,7 @@
 {
   "id": "beatjump-no-quantize",
   "name": "Immediate Beat Jump",
-  "description": "Remove the stock half-bar wait between repeated Beat Jumps.",
+  "description": "Remove the half-bar wait between repeated Beat Jumps.",
   "firmware": "1.19",
   "default": true,
   "order": 20,

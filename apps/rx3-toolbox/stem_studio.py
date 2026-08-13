@@ -665,7 +665,7 @@ class StemStudioPane(ttk.Frame):
         if preset is not None:
             self.apply_settings(separation.apply_preset(
                 self.settings, preset, self.catalogue,
-                prefers_torch=self._prefers_torch(),
+                accelerates_torch=self._accelerates_torch(),
             ))
             if self.advanced is not None and self.advanced.winfo_exists():
                 self.advanced.refresh()
@@ -684,14 +684,20 @@ class StemStudioPane(ttk.Frame):
             return
         resolved = separation.apply_preset(
             self.settings, preset, self.catalogue,
-            prefers_torch=self._prefers_torch(),
+            accelerates_torch=self._accelerates_torch(),
         )
         if resolved != self.settings:
             self.apply_settings(resolved)
 
-    def _prefers_torch(self) -> bool:
-        """Whether this machine's build accelerates PyTorch but not ONNX."""
-        return provisioning.resolve_acceleration(self.settings.accelerator).prefers_torch
+    def _accelerates_torch(self) -> bool:
+        """Whether this machine's build runs PyTorch models on the GPU.
+
+        Which is what decides the architecture a preset resolves to, so it is
+        also what decides how good the preset can be here.
+        """
+        return provisioning.resolve_acceleration(
+            self.settings.accelerator
+        ).accelerates_torch
 
     def refresh_runtime(self) -> None:
         """Show the setup panel only while separation cannot run at all."""
@@ -706,9 +712,16 @@ class StemStudioPane(ttk.Frame):
         self._describe_forecast()
 
     def _describe_mode(self) -> None:
+        """What the chosen preset means on this machine, not in general.
+
+        The same preset resolves to a different architecture depending on what
+        this build accelerates, so the summary is taken from the variant that
+        will actually run rather than from the preset's name.
+        """
         preset = separation.preset(self.settings.mode)
         self.mode_summary.configure(
-            text=preset.summary if preset else "Set by hand in Advanced options."
+            text=preset.resolve(accelerates_torch=self._accelerates_torch()).summary
+            if preset else "Set by hand in Advanced options."
         )
 
     def _describe_footer(self) -> None:
@@ -728,6 +741,7 @@ class StemStudioPane(ttk.Frame):
             provisioning.data_directory() / estimate.THROUGHPUT_NAME,
             self.catalogue.architecture_of(self.settings.model),
             provisioning.resolve_acceleration(self.settings.accelerator).key,
+            self.settings.mode,
         )
 
     def _selected_playlist(self):
@@ -1019,7 +1033,7 @@ class StemStudioPane(ttk.Frame):
         self.status.set(summary)
         messagebox.showinfo(
             "Done",
-            f"{summary}.\n\nCopy RX3_STEMS to the root of the Rekordbox USB drive.",
+            f"{summary}.\n\nCopy RX3_STEMS folder to the root of your Rekordbox USB drive if you chose another location.",
             parent=window,
         )
 
@@ -1073,9 +1087,10 @@ def self_test() -> None:
         # The quality presets must resolve to something runnable even with no
         # catalogue, which is the state before the runtime is installed.
         for preset in PRESETS:
-            for prefers_torch in (False, True):
+            for accelerates_torch in (False, True):
                 resolved = separation.apply_preset(
-                    Settings(), preset, Catalogue(), prefers_torch=prefers_torch
+                    Settings(), preset, Catalogue(),
+                    accelerates_torch=accelerates_torch,
                 )
                 if not resolved.model or resolved.mode != preset.key:
                     raise RuntimeError(f"Preset {preset.key} did not resolve to a model")

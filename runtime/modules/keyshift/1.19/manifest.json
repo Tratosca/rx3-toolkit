@@ -1,7 +1,7 @@
 {
   "id": "keyshift",
-  "name": "Per-deck key shift",
-  "description": "Shift each deck by up to twelve semitones from the KEY tab.",
+  "name": "Key shifting",
+  "description": "Enables per-deck key shifting on screen by up to twelve semitones.",
   "firmware": "1.19",
   "default": true,
   "order": 35,

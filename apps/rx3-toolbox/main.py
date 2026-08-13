@@ -43,8 +43,8 @@ class ToolboxApp(tk.Tk):
         notebook.pack(fill="both", expand=True, padx=12, pady=12)
         self.runtime_pane = mod_generator.ModGeneratorPane(notebook)
         self.stems_pane = stem_studio.StemStudioPane(notebook)
-        notebook.add(self.runtime_pane, text="USB Runtime")
-        notebook.add(self.stems_pane, text="Vocal Stems")
+        notebook.add(self.runtime_pane, text="Modules installation")
+        notebook.add(self.stems_pane, text="Stems preparation")
 
         self._restyle(palette)
         theme.follow_appearance(self, self._restyle)

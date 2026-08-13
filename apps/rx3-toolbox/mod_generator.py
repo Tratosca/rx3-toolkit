@@ -55,12 +55,12 @@ class ModGeneratorPane(ttk.Frame):
         container.columnconfigure(0, weight=1)
         container.rowconfigure(4, weight=1)
 
-        ttk.Label(container, text="Build an RX3 modding USB", style="Title.TLabel").grid(
+        ttk.Label(container, text="Install the mods on your USB", style="Title.TLabel").grid(
             row=0, column=0, sticky="w"
         )
         theme.wrapping(ttk.Label(
             container,
-            text="Nothing is installed permanently on the player. Power cycling without the modded USB disables all mods.",
+            text="Nothing is installed permanently on the player. If anything goes wrong, remove the USB and power cycle the system to get back to normal.",
         ), inset=PANE_INSET).grid(row=1, column=0, sticky="w", pady=(4, 20))
 
         version_row = ttk.Frame(container)
@@ -120,7 +120,7 @@ class ModGeneratorPane(ttk.Frame):
                     for other in self._patches
                     if patch.patch_id in other.requires
                 )
-                description = f"{description} Added automatically by {', '.join(dependents)}."
+                description = f"{description} Required by {', '.join(dependents)}."
             theme.wrapping(ttk.Label(
                 self.patch_frame, text=description, style="Muted.TLabel",
             ), inset=PANE_INSET + 40).grid(
@@ -179,7 +179,7 @@ class ModGeneratorPane(ttk.Frame):
             self.key_path.set(selected)
 
     def _choose_output(self) -> None:
-        selected = filedialog.askdirectory(title="Choose the USB drive or output folder", mustexist=True)
+        selected = filedialog.askdirectory(title="Choose the USB drive or output folder that should contain the mods", mustexist=True)
         if selected:
             self.output_path.set(selected)
 
@@ -197,7 +197,7 @@ class ModGeneratorPane(ttk.Frame):
         output = pathlib.Path(self.output_path.get()).expanduser()
         if not selected:
             messagebox.showerror(
-                "No feature selected", "Select at least one feature to build.", parent=window
+                "No feature selected", "Select at least one mod.", parent=window
             )
             return
         if not key.is_file():
@@ -207,12 +207,12 @@ class ModGeneratorPane(ttk.Frame):
             return
         if not output.is_dir():
             messagebox.showerror(
-                "Output not found", "Choose an existing folder or mounted USB drive.", parent=window
+                "Output not found", "Choose an existing folder or USB drive.", parent=window
             )
             return
         destination = output / "autoexec.bin"
         if destination.exists() and not messagebox.askyesno(
-            "Replace autoexec.bin?", f"{destination} already exists. Replace it?", parent=window
+            "Replace the mod file ", f"{destination} already exists. Replace it?", parent=window
         ):
             return
 
@@ -253,8 +253,8 @@ class ModGeneratorPane(ttk.Frame):
             return
         self.status.set(f"Ready: {result.output}")
         messagebox.showinfo(
-            "Runtime ready",
-            f"autoexec.bin was written to:\n{result.output}\n\n"
+            "Mods are ready",
+            f"The mod file was written to:\n{result.output}\n\n"
             "Eject the USB drive cleanly before inserting it into the RX3.",
             parent=window,
         )

@@ -1,6 +1,6 @@
 {
   "id": "decoder-sleep",
-  "name": "No more wait between beatjumps",
+  "name": "Infinite beatjumping",
   "description": "Drastically reduces wait time between beatjumps, allowing for almost indefinitely instant beatjumping.",
   "firmware": "1.19",
   "default": true,
