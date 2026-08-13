@@ -1,7 +1,8 @@
-# Stem Studio
+# Vocal stems
 
-Generating stems, choosing a model, and managing the separation runtime. For a
-first run, follow the [Quick Start](quickstart.md) instead.
+The **Vocal Stems** tab of XDJ-RX3 Toolkit: generating stems, choosing a quality
+preset, and managing the separation runtime. For a first run, follow the
+[Quick Start](quickstart.md) instead.
 
 Separation happens on your computer. The RX3 never separates anything, and your
 audio never leaves the machine.
@@ -10,16 +11,16 @@ audio never leaves the machine.
 
 1. Export your Rekordbox collection as XML.
 2. Select the XML file and the playlist to process.
-3. Select a destination and start.
+3. Select a destination, pick a quality preset, and start.
 
-Stem Studio writes an `RX3_STEMS` directory and a JSON manifest. Copy
+The tab writes an `RX3_STEMS` directory and a JSON manifest. Copy
 `RX3_STEMS` to the root of the Rekordbox USB drive, or select the drive as the
 destination and skip the copy.
 
 A sidecar is matched to a track by exact basename, so `Artist - Title.mp3` needs
 `Artist - Title.rx3stem`. Rekordbox shortens long filenames when it exports a
 track to a drive, keeping the first 44 characters, and the deck only ever knows
-the shortened name; Stem Studio names the sidecar the same way, from the library
+the shortened name; the sidecar is named the same way, from the library
 file it separated. Two tracks that end up with the same name are rejected rather
 than guessed at, because the RX3 load interface exposes nothing that would tell
 them apart.
@@ -29,7 +30,8 @@ where it stopped. A track that fails is reported and the queue continues. If the
 destination is a mount point and it disappears mid-job, the run stops with an
 explicit error instead of writing to a stale path.
 
-Stem Studio never installs `autoexec.bin` and never writes to the RX3.
+This tab never installs `autoexec.bin` and never writes to the RX3. That is
+the **USB Runtime** tab's job.
 
 ## Where things are stored
 
@@ -39,8 +41,11 @@ Stem Studio never installs `autoexec.bin` and never writes to the RX3.
 | Windows | `%LOCALAPPDATA%\RX3 Stem Studio` |
 | Linux | `$XDG_DATA_HOME/rx3-stem-studio`, or `~/.local/share/rx3-stem-studio` |
 
-`RX3_STEM_STUDIO_HOME` overrides that location. Model choices and tuning live in
-`separation.json` beside the runtime.
+`RX3_STEM_STUDIO_HOME` overrides that location. The directory keeps the name the
+separate Stem Studio application used, so a runtime installed by that version is
+still found rather than downloaded again. Model choices and tuning live in
+`separation.json` beside the runtime; measured separation speeds live in
+`throughput.json`.
 
 ## The separation runtime
 
@@ -120,9 +125,124 @@ turns the button into **Reinstall**. Separation keeps running on the installed
 one until you do. Reinstalling for a different accelerator rebuilds the
 environment rather than completing it.
 
+## Quality presets
+
+The tab offers three settings.
+
+| Setting | Use it when |
+|---|---|
+| **High quality** | The stems are going in a set |
+| **Normal** | Most of the time |
+| **Very fast** | Auditioning a playlist, or a long queue has to finish tonight |
+| **Custom** | You tuned something by hand |
+
+The top two are one model at two steps, so moving between them downloads nothing
+and gives up no SDR. Only **Very fast** trades the model itself, because below
+the roformer every architecture in the catalogue lands within a quarter of the
+same cost — measured on Apple Silicon, 0.526 s of computation per second of audio
+for the roformer against 0.161 for Demucs, 0.179 for MDX-Net and 0.142 for VR.
+There is no third speed class to build a preset on.
+
+Which models those are depends on what the build accelerates, and the summary
+under the selector states it for the machine you are on rather than in general.
+
+The knob between the top two is `mdxc_overlap`. Despite the name it is a step in
+seconds rather than an amount of overlap: the chunk is 11.0 s for
+`vocals_mel_band_roformer`, and the window advances `overlap` seconds each time,
+so a *lower* value stitches the result from more passes and more inference is
+done. High quality keeps the option's own default of 8 — a 27% overlap over 1.38
+passes; Normal steps to 10, which is 9% overlap and 0.399 s/s.
+
+Normal stops one short of 11 on purpose. At the chunk length and above the step
+is clamped to the chunk and the passes stop overlapping at all, which measured as
+a discontinuity every 11.0 s reaching 25× the surrounding sample-to-sample
+difference, against 0.7× away from a boundary. That is a click, and since the
+deck reconstructs the instrumental by subtracting the stem, it lands in the
+instrumental too. The second of overlap that removes it costs nothing measurable:
+0.399 s/s at 10 against 0.406 at 11.
+
+How much time either actually costs depends on the model, the device and what
+else the machine is doing, so nothing in the interface quotes a ratio. The
+estimate under the selector answers it from this machine's own measured
+throughput instead, timed separately for each preset.
+
+A preset names a candidate list rather than a single filename, because the model
+catalogue comes from audio-separator and can change upstream. The first
+candidate the catalogue actually offers is used; if none of them survive, the
+best-scoring model of that preset's architecture is.
+
+### Which model a preset resolves to
+
+The best models in the catalogue are roformers, which are PyTorch checkpoints;
+the ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs.
+Neither runtime is accelerated everywhere, and the split is not the same on every
+platform:
+
+| Accelerator | PyTorch | ONNX Runtime | High quality / Normal | Very fast |
+|---|---|---|---|---|
+| NVIDIA CUDA | GPU | GPU | roformer, 12.6 dB | Demucs, 9.9 dB |
+| Apple Silicon | GPU (Metal) | CoreML, **mostly on the CPU** | roformer, 12.6 dB | Demucs, 9.9 dB |
+| AMD ROCm | GPU | **CPU** | roformer, 12.6 dB | Demucs, 9.9 dB |
+| DirectML | **CPU** | GPU | MDX-Net, 10.2 dB | MDX-Net, 10.2 dB |
+| CPU only | CPU | CPU | MDX-Net, 10.2 dB | MDX-Net, 10.2 dB |
+
+On the first three the roformer is both the better and the quicker answer, so
+there is nothing to trade at the top of the ladder. On the last two it is
+neither: DirectML's PyTorch backend is pinned far behind what a roformer needs,
+and a CPU-only build has nothing to move the work to, where ONNX Runtime is the
+quicker of the two. Those machines give up 2.4 dB of vocal SDR to run on the
+hardware they have, and their three presets are one model at three overlaps
+rather than a ladder of models. MDX-Net is also band-limited — `dim_f` 3072 over
+an `n_fft` of 7680 puts the wall at 17.6 kHz — so above that nothing is separated
+at all and the air of a vocal stays in the instrumental the deck reconstructs.
+
+**Very fast** uses `htdemucs` and not `htdemucs_ft`: the fine-tuned variant runs
+four sub-models and was measured at 0.502 s/s, which is the roformer's cost for
+1.8 dB less. Being a waveform model, Demucs gives up SDR without giving up the
+top of the spectrum the way the band-limited ONNX fallback does.
+
+Apple Silicon is the case worth explaining, because CoreML looks like it works.
+It is offered, it is enabled, and it does take most of the model — but it cannot
+take the graph whole. On an MDX-Net model it claims 151 of 178 nodes and splits
+them into 28 partitions, so the run spends its time passing tensors back and
+forth with the CPU, which is what shows up in Activity Monitor. That is why an
+ONNX model is not the answer there even though a provider is listed.
+
+An Intel Mac never reaches Metal at all: audio-separator gates MPS on the
+processor being ARM, so those machines resolve to the CPU build even where
+PyTorch itself would support MPS on an AMD card.
+
+Changing accelerator can therefore change the model without changing the preset
+you chose, which is what the reconciliation on the Runtime tab is for.
+
+Changing a model or a parameter in Advanced options switches the setting to
+**Custom**. A preset therefore always describes exactly one configuration, and
+hand tuning is never quietly relabelled as something it is not.
+
+## How long it takes
+
+Once a playlist is selected, the tab states its track count, its total audio,
+and how long separation should take. The first estimate comes from a table of
+typical speeds per architecture and accelerator and is marked *(rough)*. As soon
+as a track finishes, the real speed of this machine replaces it, and the
+estimate is refined again at every progress tick. The measured speed is written
+to `throughput.json` per architecture, accelerator and preset, so later runs
+start calibrated rather than guessing. The preset is part of that key because
+both presets now run the same model and differ only in passes over the audio: one
+shared rate would be wrong for each of them in turn.
+
+A run estimated at more than ten minutes asks for confirmation first, because it
+will occupy the machine: keep the computer plugged in and awake, and close other
+demanding applications. Shorter runs start without asking.
+
+While the job runs, the status line names the stage, the track, its position in
+the playlist — *track 3 of 20*, counting the one being worked on, not the ones
+behind it — and the time remaining.
+
 ## Advanced options
 
-The main window carries only the export, the playlist and the destination.
+The main window carries the export, the playlist, the destination and the
+quality preset.
 Everything else sits behind **Advanced options…**, in three tabs. The runtime
 panel appears in the main window only while the runtime is missing, since
 nothing can run without it.
@@ -138,8 +258,7 @@ locally so startup does not reach the network; **Refresh list** re-reads it. Onl
 the model in use is ever downloaded. Choosing another one fetches it on first
 use, or immediately with **Download**. **Delete** frees a model's files.
 
-The default is the best-scoring vocal model in the catalogue, so the list can be
-ignored entirely.
+The quality presets pick from this list for you, so it can be ignored entirely.
 
 **Parameters** exposes the options that apply to the selected model: the common
 ones, plus the group belonging to its architecture. A parameter left at its

@@ -1,0 +1,26 @@
+{
+  "id": "keyshift",
+  "name": "Key shifting",
+  "description": "Enables per-deck key shifting on screen by up to twelve semitones.",
+  "firmware": "1.19",
+  "default": true,
+  "order": 35,
+  "runtime_directory": "keyshift",
+  "namespace": "keyshift",
+  "requires": ["core"],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_keyshift_decl.h",
+    "rx3_keyshift_feature.h",
+    "rx3_keyshift.h",
+    "rx3_keyshift_panel.h",
+    "rx3_pitch_shift.h"
+  ]
+}

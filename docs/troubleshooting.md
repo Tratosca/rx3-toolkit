@@ -9,7 +9,7 @@ marker. Clear the marker on the unpacked `.app`, wherever you actually put it,
 not on the `.zip`:
 
 ```sh
-xattr -rc "/path/to/RX3 Mod Generator.app"
+xattr -rc "/path/to/XDJ-RX3 Toolkit.app"
 ```
 
 Control-click then Open used to be enough. Recent macOS releases no longer offer

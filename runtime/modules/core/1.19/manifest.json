@@ -1,0 +1,47 @@
+{
+  "id": "core",
+  "name": "On-screen key shift & stems",
+  "description": "On-screen features for key shift and stems.",
+  "firmware": "1.19",
+  "default": false,
+  "selectable": false,
+  "order": 5,
+  "runtime_directory": "core",
+  "namespace": "core",
+  "requires": [],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    },
+    {
+      "source": "assets/key-selected.rgb565",
+      "target": "key-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/stems-selected.rgb565",
+      "target": "stems-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/none-selected.rgb565",
+      "target": "none-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/status-none-selected.rgb565",
+      "target": "status-none-selected.rgb565",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_feature_api.h"
+  ],
+  "arm_hook": {
+    "source": "rx3_core_hook.c",
+    "target": "librx3_core.so"
+  }
+}

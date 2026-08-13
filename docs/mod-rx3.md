@@ -5,13 +5,20 @@ behind. For a first run, follow the [Quick Start](quickstart.md) instead.
 
 ## The modules
 
-| Module | Id | What changes | On by default |
-|---|---|---|:--:|
-| Beat Jump ±32 | `beatjump-32bars` | Beat Jump pads 7 and 8 become -32 and +32 beats instead of -8 and +8. The availability guard, the LED threshold and the pad images follow. | yes |
-| Immediate Beat Jump | `beatjump-no-quantize` | Repeated jumps fire at once instead of waiting for the stock half-bar grid quantization. Global Quantize, Hot Cues, loops and Beat FX are untouched. | yes |
-| Faster decoder polling | `decoder-sleep` | The decoder thread checks for decoded audio every 0.1 ms instead of every 1 ms, so large jumps can be repeated sooner. No control, no display. | yes |
-| Vocal and instrumental controls | `stems` | Slip Loop pads 7 and 8 become independent instrumental and vocal switches on tracks that have a `.rx3stem` sidecar. | yes |
-| Diagnostic Telnet access | `telnet` | Starts a BusyBox telnet service for inspection. | no |
+| Module | Id | What changes | Needs | On by default |
+|---|---|---|---|:--:|
+| Beat Jump ±32 | `beatjump-32bars` | Beat Jump pads 7 and 8 become -32 and +32 beats instead of -8 and +8. The availability guard, the LED threshold and the pad images follow. | `decoder-sleep` | yes |
+| Immediate Beat Jump | `beatjump-no-quantize` | Repeated jumps fire at once instead of waiting for the stock half-bar grid quantization. Global Quantize, Hot Cues, loops and Beat FX are untouched. | `decoder-sleep` | yes |
+| No more wait between beatjumps | `decoder-sleep` | The decoder thread checks for decoded audio every 0.1 ms instead of every 1 ms, so large jumps can be repeated sooner. No control, no display. | — | yes |
+| Per-deck key shift | `keyshift` | Shift each deck by up to twelve semitones from the KEY tab. | `core` | yes |
+| Vocal and instrumental controls | `stems` | Slip Loop pads 7 and 8 become independent instrumental and vocal switches on tracks that have a `.rx3stem` sidecar. | `core` | yes |
+| Diagnostic Telnet access | `telnet` | Starts a BusyBox telnet service for inspection. | — | no |
+| Performance core | `core` | Owns the shared object, the guarded executable writes, deck identity, rendering and touch routing. Not selectable on its own. | — | — |
+
+The **Needs** column is enforced, not advisory. Ticking either Beat Jump module
+in the application also ticks *No more wait between beatjumps*, and unticking
+that one unticks both Beat Jump modules; it can still be selected on its own.
+The performance core is shown greyed out and follows Key Shift and Stems.
 
 Tracks without a matching sidecar keep their normal dotted Slip Loop behaviour.
 
@@ -55,7 +62,7 @@ Reinserting a drive on a session that is already patched costs nothing. The
 orchestrator restarts `rbp` only for a word still holding its stock value, or a
 module whose runtime part is not already live, so the interface neither freezes
 nor rescans the drive. That run logs `nothing to apply: rbp already runs every
-selected module`. A drive carrying a newer build of the stems component, or a
+selected module`. A drive carrying a newer build of the performance core, or a
 different `RX3_STEMS` location, is applied normally.
 
 ## Reading the session log
@@ -74,8 +81,9 @@ computer.
 On `STOP:` or `FAILED:`, delete `autoexec.bin` from the drive before using the
 RX3 again, then see [Troubleshooting](troubleshooting.md#the-session-log-says-stop-or-failed).
 
-The stems component keeps its own log on the device at `/tmp/rx3-stems.log`,
-which is only reachable with the Telnet module enabled.
+The performance core currently keeps its diagnostic log at
+`/tmp/rx3-stems.log` for compatibility with existing tooling. It is only
+reachable with the Telnet module enabled.
 
 ## Before it touches anything
 

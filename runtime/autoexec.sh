@@ -8,14 +8,21 @@ LOG="$OUT/session.txt"
 RBP=/root/pdj/rbp
 TMP=/tmp/rx3-runtime
 PATCH_TABLE=""
+PATCH_OFFSETS=""
 SUPPORTED_SHA1=""
 PREPARE_HOOKS=""
 AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
 RBP_PRELOAD=""
+RBP_READY_FILES=""
+RBP_DIAGNOSTIC_FILES=""
 PREVIOUS_PRELOAD=""
 NEED_RBP_RESTART=0
+LOADED_MODULES=""
+CURRENT_MODULE=""
+CURRENT_NAMESPACE=""
+MODULE_LOAD_FAILED=0
 
 mkdir -p "$OUT" 2>/dev/null
 : > "$LOG"
@@ -25,55 +32,56 @@ say()
     echo "$@" >> "$LOG" 2>&1
 }
 
-register_patch()
-{
-    PATCH_TABLE="${PATCH_TABLE}
-$1 $2 $3 $4"
+MODULE_API=/mnt/iso/lib/module-api.sh
+[ -r "$MODULE_API" ] || {
+    say "STOP: runtime module API is missing."
+    sync; exit 1
+}
+. "$MODULE_API" || {
+    say "STOP: runtime module API could not be loaded."
+    sync; exit 1
 }
 
-request_rbp_restart() { NEED_RBP_RESTART=1; }
-
-# Read one variable out of the running rbp environment. A module uses this to
-# tell an already-applied runtime from one that still has to be installed.
-rbp_environment_value()
+load_module()
 {
-    [ -n "$PID" ] || return 1
-    tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n "s/^$1=//p" | head -1
-}
-
-preload_contains()
-{
-    case ":$PREVIOUS_PRELOAD:" in
-        *":$1:"*) return 0 ;;
-        *) return 1 ;;
+    runtime_directory=$1
+    case "$runtime_directory" in
+        ""|*[!a-z0-9-]*)
+            say "FAILED: unsafe runtime module directory [$runtime_directory]"
+            MODULE_LOAD_FAILED=1
+            return
+            ;;
     esac
+    module=/mnt/iso/modules/$runtime_directory/module.sh
+    [ -r "$module" ] || {
+        say "FAILED: indexed module is missing: $runtime_directory"
+        MODULE_LOAD_FAILED=1
+        return
+    }
+    CURRENT_MODULE=""
+    CURRENT_NAMESPACE=""
+    . "$module" || MODULE_LOAD_FAILED=1
+    [ -n "$CURRENT_MODULE" ] || {
+        say "FAILED: $runtime_directory did not declare a module contract"
+        MODULE_LOAD_FAILED=1
+    }
 }
 
-register_rbp_sha1()
-{
-    case " $SUPPORTED_SHA1 " in
-        *" $1 "*) ;;
-        *) SUPPORTED_SHA1="$SUPPORTED_SHA1 $1" ;;
-    esac
+if [ -r /mnt/iso/modules/index ]; then
+    while IFS= read -r runtime_directory; do
+        [ -n "$runtime_directory" ] || continue
+        load_module "$runtime_directory"
+    done < /mnt/iso/modules/index
+else
+    say "FAILED: deterministic module index is missing"
+    MODULE_LOAD_FAILED=1
+fi
+
+[ "$MODULE_LOAD_FAILED" = "0" ] || {
+    say "STOP: one or more runtime modules violate their contract."
+    sync; exit 1
 }
-
-register_prepare_hook()      { PREPARE_HOOKS="$PREPARE_HOOKS $1"; }
-register_after_launch_hook() { AFTER_LAUNCH_HOOKS="$AFTER_LAUNCH_HOOKS $1"; }
-register_post_launch_hook()  { POST_LAUNCH_HOOKS="$POST_LAUNCH_HOOKS $1"; }
-register_report_hook()       { REPORT_HOOKS="$REPORT_HOOKS $1"; }
-
-run_hooks()
-{
-    hooks=$1
-    for hook in $hooks; do
-        "$hook"
-    done
-}
-
-for module in /mnt/iso/modules/*/module.sh; do
-    [ -r "$module" ] || continue
-    . "$module"
-done
+say "loaded modules:${LOADED_MODULES:- none}"
 
 say "=== RX3 volatile runtime, uid $(id -u) ==="
 say "firmware revision: $(cat /tmp/smdj2.rev 2>/dev/null || cat /tmp/smdj.rev 2>/dev/null)"
@@ -169,20 +177,25 @@ RBP_PRELOAD=$PREVIOUS_PRELOAD
 say "rbp pid=$PID options=[$ARGS] cwd=$CWD"
 say "existing preload: ${PREVIOUS_PRELOAD:-none}"
 
-run_hooks "$PREPARE_HOOKS"
+run_hooks "$PREPARE_HOOKS" || {
+    say "STOP: a prepare hook failed; no guarded word was written."
+    rm -rf "$TMP"; sync; exit 1
+}
 
 if [ "$NEED_RBP_RESTART" = "0" ]; then
+    echo patched > /tmp/rx3-patch.state
     say "nothing to apply: rbp already runs every selected module"
     NEW=$PID
-    run_hooks "$AFTER_LAUNCH_HOOKS"
-    run_hooks "$POST_LAUNCH_HOOKS"
-    run_hooks "$REPORT_HOOKS"
+    run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
+    run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"
+    run_hooks "$REPORT_HOOKS" || say "WARNING: a report hook failed"
     rm -rf "$TMP"
     sync
     say "=== complete ==="
     exit 0
 fi
 
+echo applying > /tmp/rx3-patch.state
 say "stopping rbp"
 kill "$PID" 2>/dev/null
 i=0
@@ -227,6 +240,15 @@ launch_rbp()
     NEW=$!
 }
 
+append_diagnostics()
+{
+    for diagnostic_file in $RBP_DIAGNOSTIC_FILES; do
+        [ -r "$diagnostic_file" ] || continue
+        say "--- diagnostic $diagnostic_file before rollback ---"
+        cat "$diagnostic_file" >> "$LOG" 2>&1
+    done
+}
+
 write_words patched
 FAILED=$(verify_words patched)
 if [ "$FAILED" != "0" ]; then
@@ -234,6 +256,7 @@ if [ "$FAILED" != "0" ]; then
     cat "$TMP/failed" >> "$LOG" 2>&1
     write_words previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
+    echo patched > /tmp/rx3-patch.state
     launch_rbp "$OUT/rbp_restore.txt"
     say "previous rbp restarted, pid=$NEW"
     rm -rf "$TMP"; sync; exit 1
@@ -244,17 +267,35 @@ launch_rbp "$OUT/rbp_stdout.txt"
 sleep 8
 if [ ! -d "/proc/$NEW" ]; then
     say "FAILED: replacement rbp exited; restoring previous bytes"
+    append_diagnostics
     write_words previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
+    echo patched > /tmp/rx3-patch.state
+    launch_rbp "$OUT/rbp_restore.txt"
+    say "previous rbp restarted, pid=$NEW"
+    rm -rf "$TMP"; sync; exit 1
+fi
+MISSING_READY=""
+for ready_file in $RBP_READY_FILES; do
+    [ -s "$ready_file" ] || MISSING_READY="$MISSING_READY $ready_file"
+done
+if [ -n "$MISSING_READY" ]; then
+    say "FAILED: replacement rbp missed readiness:${MISSING_READY}; restoring previous bytes"
+    append_diagnostics
+    kill "$NEW" 2>/dev/null
+    write_words previous
+    RBP_PRELOAD=$PREVIOUS_PRELOAD
+    echo patched > /tmp/rx3-patch.state
     launch_rbp "$OUT/rbp_restore.txt"
     say "previous rbp restarted, pid=$NEW"
     rm -rf "$TMP"; sync; exit 1
 fi
 say "OK: rbp active, pid=$NEW"
+echo patched > /tmp/rx3-patch.state
 
-run_hooks "$AFTER_LAUNCH_HOOKS"
-run_hooks "$POST_LAUNCH_HOOKS"
-run_hooks "$REPORT_HOOKS"
+run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
+run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"
+run_hooks "$REPORT_HOOKS" || say "WARNING: a report hook failed"
 
 rm -rf "$TMP"
 sync

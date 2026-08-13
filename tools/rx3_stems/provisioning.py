@@ -73,6 +73,16 @@ class Acceleration:
     extra: str
     torch_index: str | None
     separation_flags: tuple[str, ...] = ()
+    # Which of the two inference runtimes this build actually gets its work
+    # done on the GPU with. Not derivable from `extra`, and not answered by
+    # asking ONNX Runtime what providers it has: a provider it lists can still
+    # leave the work on the CPU. These record the measured outcome instead.
+    #
+    # `accelerates_torch` also chooses the architecture a preset resolves to,
+    # because the best models in the catalogue are Torch checkpoints and the
+    # ones that reach a GPU without PyTorch are not. See `separation.Preset`.
+    accelerates_torch: bool = True
+    accelerates_onnx: bool = True
 
     @property
     def requirement(self) -> str:
@@ -89,22 +99,35 @@ ACCELERATIONS: dict[str, Acceleration] = {
     "rocm": Acceleration(
         "rocm", "AMD ROCm",
         "PyTorch built for AMD GPUs on Linux. ONNX models still run on the CPU.",
-        "cpu", ROCM_WHEEL_INDEX,
+        "cpu", ROCM_WHEEL_INDEX, accelerates_onnx=False,
     ),
     "directml": Acceleration(
         "directml", "DirectML",
-        "Experimental acceleration for AMD and Intel GPUs on Windows.",
-        "dml", CPU_WHEEL_INDEX, ("--use_directml",),
+        "Experimental acceleration for AMD and Intel GPUs on Windows. "
+        "Only ONNX models reach the GPU; PyTorch ones run on the CPU.",
+        "dml", CPU_WHEEL_INDEX, ("--use_directml",), accelerates_torch=False,
     ),
+    # ONNX Runtime does offer CoreML here, and audio-separator does enable it,
+    # but CoreML cannot take the graph whole: on an MDX-Net model it claims 151
+    # of 178 nodes and splits them across 28 partitions, so the run spends its
+    # time handing tensors back and forth with the CPU. Measured on an M-series
+    # Mac, the same model was 3.5x quicker converted to Torch and run on Metal,
+    # which is why this build is not treated as accelerating ONNX.
+    #
+    # audio-separator gates this on `system_info.processor == "arm"`, so an
+    # Intel Mac never reaches it even where PyTorch itself supports MPS on an
+    # AMD card. Those machines resolve to `cpu` below, which is what they get.
     "mps": Acceleration(
         "mps", "Apple Silicon (Metal)",
-        "Metal Performance Shaders and CoreML, selected automatically on ARM Macs.",
-        "cpu", None,
+        "Metal Performance Shaders on ARM Macs, selected automatically. "
+        "Only PyTorch models reach the GPU; ONNX ones are left to CoreML.",
+        "cpu", None, accelerates_onnx=False,
     ),
     "cpu": Acceleration(
         "cpu", "CPU only",
         "No GPU acceleration. Works everywhere and is the slowest option.",
         "cpu", CPU_WHEEL_INDEX,
+        accelerates_torch=False, accelerates_onnx=False,
     ),
 }
 
