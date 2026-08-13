@@ -4,9 +4,9 @@ Adds ±32 beat jumps, faster decoder polling, and vocal/instrumental pad control
 to a Pioneer DJ XDJ-RX3, from a file on your USB drive. Nothing is flashed. A
 power cycle restores the stock system.
 
-Two applications ship with it. RX3 Mod Generator writes the file the RX3 reads.
-RX3 Stem Studio prepares the stems, which are the separated vocal and
-instrumental parts of a track.
+One application ships with it, XDJ-RX3 Toolkit, with a tab for each half of the
+job. **USB Runtime** writes the file the RX3 reads. **Vocal Stems** prepares the
+stems, which are the separated vocal and instrumental parts of a track.
 
 ## What you need
 
@@ -51,7 +51,7 @@ do wish you the opportunity to play the $50k gig tho.
 This project is not affiliated with, endorsed by, or connected to Pioneer DJ or
 AlphaTheta. Product names identify the tested hardware and nothing more.
 
-Stem Studio separates the tracks you feed it, on your computer. What you are
+The Vocal Stems tab separates the tracks you feed it, on your computer. What you are
 entitled to do with those tracks, and with the stems that come out, is your
 responsibility and depends on where you live and what you licensed.
 
@@ -77,28 +77,27 @@ not recognise. AlphaTheta documents the update procedure
 
 Close Utility and power the RX3 off.
 
-### 2. Download RX3 Mod Generator & Stem Studio 
+### 2. Download XDJ-RX3 Toolkit
 
-Go to the [Releases page](../../releases) and download the RX3 Mod Generator
+Go to the [Releases page](../../releases) and download the XDJ-RX3 Toolkit
 archive matching your computer: Windows x64, macOS Apple Silicon, macOS Intel,
 or Linux x64. Unpack it wherever you keep applications.
 
-Do the same for Stem Studio if you want to generate stems.
+Both halves are in that one application: there is nothing else to download.
 
 ### 3. Clear the macOS quarantine attribute
 
 Skip this step on Windows and Linux.
 
-Both applications are unsigned, so macOS refuses to open them and often reports
-them as damaged. The **quarantine attribute** is a marker your browser attaches
-to anything it downloads, and clearing it is what lets an unsigned application
-run. In the terminal from step 2, type the two lines below, replacing each path
-with the real location of the unpacked application. Drag the application onto
-the terminal window to insert its path.
+The application is unsigned, so macOS refuses to open it and often reports it as
+damaged. The **quarantine attribute** is a marker your browser attaches to
+anything it downloads, and clearing it is what lets an unsigned application run.
+In the terminal from step 2, type the line below, replacing the path with the
+real location of the unpacked application. Drag the application onto the
+terminal window to insert its path.
 
 ```sh
-xattr -rc "/Applications/RX3 Mod Generator.app"
-xattr -rc "/Applications/RX3 Stem Studio.app"
+xattr -rc "/Applications/XDJ-RX3 Toolkit.app"
 ```
 
 **If it does not work:** `No such file or directory` means the path is wrong.
@@ -116,20 +115,20 @@ In Rekordbox, generate a playlist with the name you want and put all the songs y
 
 #### b. Export your Rekordbox collection as XML
 
-In Rekordbox, use the collection XML export. Stem Studio reads this file to find
-where your audio files live on disk and which tracks belong to which playlist.
+In Rekordbox, use the collection XML export. The Vocal Stems tab reads this file
+to find where your audio files live on disk and which tracks belong to which
+playlist.
 
 **If it does not work:** the option lives in Rekordbox preferences, under the
 Advanced or View section depending on your version. It is a different thing from
 exporting to a drive, which you did at step 6.
 
-#### c. Open RX3 Stem Studio
+#### c. Open the Vocal Stems tab
 
-Launch the Stem Studio application you downloaded.
+Launch XDJ-RX3 Toolkit and select the **Vocal Stems** tab.
 
 **If it does not work:** on macOS, a "damaged" or "cannot be opened" dialog
-means step 5 did not take effect on this application. Repeat it against this
-exact `.app`.
+means step 3 did not take effect. Repeat it against this exact `.app`.
 
 #### d. Install the separation runtime
 
@@ -137,9 +136,8 @@ Select **Set up…**, then **Install**.
 
 Separation needs a large amount of software that is not in the download:
 audio-separator, PyTorch and FFmpeg together weigh far more than the
-application. Stem Studio installs them into a **virtual environment**, which is
-a private folder of Python packages that does not touch the rest of your
-computer.
+application, which installs them into a **virtual environment**: a private
+folder of Python packages that does not touch the rest of your computer.
 
 **What you should see:** a progress log, then the setup panel disappearing.
 This needs an internet connection, about 1.5 GB of disk space, and a Python
@@ -152,29 +150,45 @@ environment that already exists rather than starting over.
 
 #### e. Load the XML file, the playlist and the destination
 
-In the main window, select the XML file, then the playlist to
+In the Vocal Stems tab, select the XML file, then the playlist to
 convert stems from, then your USB drive that contains the original songs you're converting.
 
 > Exporting the stem dedicated playlist to USB is not necessary. The RX3 matches the stems with original songs via filename.
 
 
-#### f. Generate the stems
+#### f. Choose the quality, then generate
+
+Pick **Fast** or **High quality**. Both use the best-scoring separation model;
+the difference is how many overlapping passes it makes over each track. Fast
+makes fewer, so it finishes sooner and leaves a little more instrumental in the
+vocal. **Custom** is what the setting becomes if you tune anything by hand in
+Advanced options.
+
+Once a playlist is selected the tab shows an estimate — track count, total
+audio, and how long the run should take on your hardware. The first estimate is
+rough; it is corrected as soon as the first track finishes, and the measured
+speed is remembered for the next run.
 
 Start the job.
 
 Each track is decoded, separated, and written as one `.rx3stem` file. That file
 is a **sidecar**: it sits beside the audio and carries the vocal part, and the
 RX3 subtracts it from the mix to produce the instrumental. Separation is the
-slow phase, a few minutes per track, and it will keep your machine busy. If your computer has a GPU, it will be much faster.
+slow phase, a few minutes per track, and it will keep your machine busy: keep
+the computer plugged in and awake, and close other demanding applications. If
+your computer has a GPU, it will be much faster.
+
+While it runs, the status line names the track being worked on, its position in
+the playlist, and the time remaining.
 
 **If it does not work:** a track that fails is reported and the queue carries
 on, so let it finish and read the log. If every track fails immediately, the
 runtime is incomplete: use **Install** again in Advanced options, Runtime tab.
 Details in [Troubleshooting](troubleshooting.md#every-track-fails).
 
-### 5. Generate the mod RX3 Mod Generator
+### 5. Generate the mod
 
-Open RX3 Mod Generator you downloaded from step 3, and select firmware `1.19`.
+Open the **USB Runtime** tab, and select firmware `1.19`.
 
 Select your RX3 encryption key file.
 
@@ -255,7 +269,7 @@ that for good, delete `autoexec.bin` from the drive.
 |---|---|
 | [Extracting the initramfs](docs/extract-initramfs.md) | How to extract the initramfs of the XDJ-RX3 from Pioneer GPL
 | [The RX3 mod](docs/mod-rx3.md) | Modules, applying, removing, reading the session log |
-| [Stem Studio](docs/stem-studio.md) | Models, accelerators, tuning, managing the runtime |
+| [Vocal stems](docs/stem-studio.md) | Quality presets, models, accelerators, tuning, managing the runtime |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms and fixes |
 | [Reference](docs/reference.md) | Commands, formats, addresses, hardware findings |
 | [Contributing](CONTRIBUTING.md) | Building from source, tests, adding a module |

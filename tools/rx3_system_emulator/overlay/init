@@ -1,0 +1,12 @@
+#!/bin/sh
+
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+mount -n -t proc proc /proc
+mount -n -t sysfs sysfs /sys
+mount -n -t tmpfs -o mode=1777,size=32m tmpfs /tmp
+mkdir -p /dev/pts /run /root/rx3emu
+mount -n -t devpts devpts /dev/pts 2>/dev/null || true
+
+echo "RX3EMU: external rootfs ready"
+exec /sbin/init

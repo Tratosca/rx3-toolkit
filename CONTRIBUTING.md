@@ -29,11 +29,11 @@ runs on your computer.
 
 | Path | Contents |
 |---|---|
-| `runtime/autoexec.sh` | On-device orchestrator: discovery, validation, guarded writes, rollback, logging |
+| `runtime/autoexec.sh` | On-device orchestrator: indexed module loading, validation, guarded writes, rollback, logging |
+| `runtime/lib/module-api.sh` | Registration contract shared by every on-device module |
 | `runtime/<firmware>/compatibility.sh` | Accepted `rbp` SHA-1 values for that firmware |
 | `runtime/modules/` | One directory per module, versioned by firmware |
-| `apps/rx3-mod-generator/` | Tkinter interface over the build engine |
-| `apps/rx3-stem-studio/` | Tkinter interface over the stem pipeline |
+| `apps/rx3-toolbox/` | The one Tkinter application: a tab over the build engine, a tab over the stem pipeline |
 | `tools/rx3_runtime/` | Build engine and its CLI |
 | `tools/rx3_firmware/` | AES sector crypto, CRC32 trailer, ISO 9660 authoring |
 | `tools/rx3_stems/` | Rekordbox parsing, provisioning, separation, sidecar encoding |
@@ -58,8 +58,7 @@ Clang and LLD are required to compile the ARM component. CI runs on Python 3.12.
 Run either interface from the repository:
 
 ```sh
-make gui
-make stems-gui
+make app
 ```
 
 Build `autoexec.bin` from the terminal. Without `MODULES`, the manifest defaults
@@ -80,7 +79,7 @@ make preflight
 make hook
 ```
 
-`make hook` compiles the ARM component and asserts the resulting ELF is
+`make hook` compiles the ARM performance core and asserts the resulting ELF is
 `ELF 32-bit LSB shared object, ARM, EABI5`. `make test` runs the runtime
 regression guards and the unit tests. `make preflight` inspects every publishable
 tracked or untracked file.
@@ -104,6 +103,19 @@ Each runtime feature lives under a firmware version directory and provides a
 valid `manifest.json`. The GUI, the CLI and the release packager must keep
 discovering the same manifest rather than maintaining separate feature lists.
 The schema is in [docs/reference.md](docs/reference.md#module-manifests).
+
+Dependencies belong in `requires`; feature code must never probe for a sibling
+module to create an implicit dependency. The build rejects missing modules,
+cycles and conflicts, then writes the resolved order to `modules/index`.
+
+Every `module.sh` starts with `module_begin <id> <namespace>`. Its lifecycle
+function names must start with that namespace. Sourcing a module may register
+contracts only; device mutation belongs in a registered lifecycle hook.
+
+The performance core owns executable hook installation. Optional features own
+their state and hook group, depend only on core services, and must remove only
+their own hooks on failure. See
+[ADR-001](docs/architecture/ADR-001-modular-runtime.md).
 
 ## Supporting another firmware build
 

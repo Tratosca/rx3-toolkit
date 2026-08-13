@@ -17,7 +17,7 @@ licenses of the bundled dependencies.
 
 ## Separation runtime
 
-RX3 Stem Studio does not redistribute a separation runtime. On request it
+XDJ-RX3 Toolkit does not redistribute a separation runtime. On request it
 installs audio-separator (MIT), PyTorch (BSD-3-Clause), librosa (ISC), soundfile
 (BSD-3-Clause, binding the LGPL-2.1 libsndfile), and imageio-ffmpeg
 (BSD-2-Clause, carrying an FFmpeg build under its own terms) from the Python

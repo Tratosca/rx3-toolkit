@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
 
+from tools.rx3_stems.estimate import Estimator
 from tools.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from tools.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
 from tools.rx3_stems.separation import VOCAL_STEM, Settings, input_normalization
@@ -92,8 +93,16 @@ class JobState:
     current: str = ""
     progress: int = 0
     track_progress: int = 0
+    # How many tracks are finished, which is what the closing summary counts.
     completed: int = 0
+    # Which track `current` is, counting from one. Reporting `completed` beside
+    # the name of the track being worked on reads as an off-by-one, because it
+    # answers a different question.
+    position: int = 0
     total: int = 0
+    # Computation left, from a rate this machine measured where it could.
+    eta_seconds: float | None = None
+    elapsed_seconds: float = 0.0
     output: pathlib.Path | None = None
     manifest: pathlib.Path | None = None
     fatal: str = ""
@@ -120,6 +129,7 @@ class StemJob:
         settings: Settings | None = None,
         architecture: str | None = None,
         acceleration: Acceleration | None = None,
+        estimator: Estimator | None = None,
         observer: Callable[[JobState], None] = lambda state: None,
     ) -> None:
         self.runtime = runtime
@@ -129,11 +139,16 @@ class StemJob:
         self.settings = settings or Settings()
         self.architecture = architecture
         self.acceleration = acceleration or resolve_acceleration(self.settings.accelerator)
+        self.estimator = estimator or Estimator(architecture, self.acceleration.key)
         self.observer = observer
         self._lock = threading.Lock()
         self._state = JobState()
         self._process: subprocess.Popen[str] | None = None
         self._cancelled = False
+        self._started = 0.0
+        # Audio the current track carries, and audio every track after it does.
+        self._current_audio = 0.0
+        self._later_audio = 0.0
 
     @property
     def state(self) -> JobState:
@@ -160,6 +175,19 @@ class StemJob:
     def _checkpoint(self) -> None:
         if self._cancelled:
             raise Cancelled("Cancelled")
+
+    def _timings(self, track_fraction: float) -> dict[str, object]:
+        """Elapsed time, and the computation the rest of the playlist needs.
+
+        The current track contributes only the share of its audio that has not
+        been read yet, so the estimate falls smoothly rather than in steps.
+        """
+        remaining = self._later_audio + self._current_audio * max(0.0, 1.0 - track_fraction)
+        elapsed = time.monotonic() - self._started if self._started else 0.0
+        return {
+            "eta_seconds": self.estimator.remaining(remaining),
+            "elapsed_seconds": elapsed,
+        }
 
     def _notice(self, message: str) -> None:
         """Record a condition once, however many tracks reproduce it."""
@@ -227,7 +255,10 @@ class StemJob:
                     track_progress = min(int(match.group(1)), 95)
                     if track_progress != last:
                         overall = round(((index + track_progress / 100) / total) * 100)
-                        self._update(track_progress=track_progress, progress=overall)
+                        self._update(
+                            track_progress=track_progress, progress=overall,
+                            **self._timings(track_progress / 100),
+                        )
                         last = track_progress
             if self._cancelled:
                 break
@@ -338,7 +369,14 @@ class StemJob:
                     f"{output} could not be created: {error.strerror or error}. "
                     "Choose a writable output folder or mounted USB drive."
                 ) from error
-            self._update(state="running", total=len(tracks), output=output, stage="Preparing")
+            self._started = time.monotonic()
+            durations = [float(max(0, track.duration or 0)) for track in tracks]
+            self._current_audio = 0.0
+            self._later_audio = sum(durations)
+            self._update(
+                state="running", total=len(tracks), output=output, stage="Preparing",
+                **self._timings(0.0),
+            )
 
             results: list[TrackResult] = []
             errors: list[TrackError] = []
@@ -350,21 +388,35 @@ class StemJob:
                         f"The output directory disappeared: {output}. "
                         "The USB drive was most likely unmounted."
                     )
+                self._current_audio = durations[index]
+                self._later_audio = sum(durations[index + 1:])
                 self._update(
-                    current=track.label, completed=index, track_progress=0,
-                    progress=round(index / len(tracks) * 100), stage="Checking",
+                    current=track.label, completed=index, position=index + 1,
+                    track_progress=0, progress=round(index / len(tracks) * 100),
+                    stage="Checking", **self._timings(0.0),
                 )
+                track_started = time.monotonic()
                 try:
-                    results.append(self._process_track(track, index, len(tracks), output, used_names))
+                    result = self._process_track(track, index, len(tracks), output, used_names)
+                    results.append(result)
+                    # Only a separation that actually ran says anything about
+                    # how fast this machine separates; a resumed sidecar is
+                    # instantaneous and would collapse the rate to nothing.
+                    if result.status == "created":
+                        self.estimator.observe(
+                            durations[index], time.monotonic() - track_started
+                        )
                     self._update(results=tuple(results))
                 except Cancelled:
                     raise
                 except Exception as error:
                     errors.append(TrackError(track=track.label, error=str(error)))
                     self._update(errors=tuple(errors))
+                self._current_audio = 0.0
                 self._update(
                     completed=index + 1, track_progress=100,
                     progress=round((index + 1) / len(tracks) * 100),
+                    **self._timings(1.0),
                 )
 
             manifest = self.output_root / MANIFEST_NAME
@@ -377,7 +429,8 @@ class StemJob:
             }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             self._update(
                 state="done", stage="Finished", current="", progress=100,
-                completed=len(tracks), manifest=manifest,
+                completed=len(tracks), position=len(tracks), manifest=manifest,
+                eta_seconds=0.0, elapsed_seconds=time.monotonic() - self._started,
             )
         except Cancelled:
             self._update(state="cancelled", stage="Cancelled", current="")

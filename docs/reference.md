@@ -13,10 +13,12 @@ and no console script. Every entry point is invoked as a path.
 | Target | Effect |
 |---|---|
 | `make help` | Print the target list. The default goal. |
-| `make hook` | Cross-compile the ARM stems component and assert the resulting ELF. |
+| `make hook` | Cross-compile the ARM performance core and assert the resulting ELF. |
 | `make autoexec KEY=<path>` | Build `autoexec.bin`. `KEY` is required and must exist. |
-| `make gui` | Run RX3 Mod Generator from source. |
-| `make stems-gui` | Run RX3 Stem Studio from source. |
+| `make app` | Run XDJ-RX3 Toolkit from source. |
+| `make emulate` | Run `rbp` with a visible, clickable virtual framebuffer. |
+| `make emulate-system` | Probe the genuine RX3 U-Boot and kernel on QEMU i.MX6Q. |
+| `make emulate-system-fast` | Boot the genuine kernel through `init`, `apl_start` and `rbp`. |
 | `make test` | Run the runtime regression guards, then the unit tests. |
 | `make preflight` | Inspect every publishable tracked or untracked file. |
 | `make clean` | Remove `build/` and nothing else. |
@@ -51,7 +53,7 @@ module whose manifest sets `default: true` is selected. `--key` and `--output`
 are required. `--prebuilt-hook` accepts an already-compiled ARM component
 instead of invoking Clang.
 
-Both desktop applications call the same engine. Module discovery, ARM
+Both panes of the desktop application call the same engines. Module discovery, ARM
 compilation, ISO creation, encryption and verification are not duplicated in
 either GUI.
 
@@ -121,15 +123,15 @@ byte.
 ### Release plumbing
 
 ```sh
-python3 scripts/package_release.py "dist/RX3 Mod Generator" out.zip --include LICENSE
+python3 scripts/package_release.py "dist/XDJ-RX3 Toolkit" out.zip --include LICENSE
 ```
 
 ```sh
-python3 scripts/smoke_desktop_app.py "dist/RX3 Mod Generator"
+python3 scripts/smoke_desktop_app.py "dist/XDJ-RX3 Toolkit"
 ```
 
 ```sh
-python3 scripts/check_macos_bundle.py "dist/RX3 Mod Generator.app"
+python3 scripts/check_macos_bundle.py "dist/XDJ-RX3 Toolkit.app"
 ```
 
 ```sh
@@ -494,6 +496,28 @@ Each runtime feature lives under a firmware version directory and provides a
 `manifest.json`. The GUI, the CLI and the release packager all discover the same
 manifest rather than maintaining separate feature lists.
 
+| Field | Meaning |
+|---|---|
+| `id` | Stable lowercase module identifier. |
+| `firmware` | Exact compatible firmware revision; it must match the directory. |
+| `runtime_directory` | Single safe directory name written into the ISO. |
+| `namespace` | Unique POSIX-shell prefix for every lifecycle callback. |
+| `default` | Selected by default when the module is user-selectable. |
+| `selectable` | `false` for an internal service such as `core`; direct selection is rejected. Defaults to `true`. |
+| `order` | Stable load order; dependencies must have a lower order. |
+| `requires` | Transitive module dependencies. |
+| `conflicts` | Modules that cannot appear in the same runtime. |
+| `files` | Source-to-runtime file mappings and executable bits. |
+| `build_files` | Module-owned headers or other compile-time-only sources. |
+| `arm_hook` | Optional ARM source and ELF target owned by this module. |
+
+The build resolves dependencies, rejects cycles/conflicts and writes the exact
+device load order to `modules/index`. Thus `--patch keyshift` packages `core`
+and `keyshift`, while `--patch decoder-sleep` remains standalone. `BuildResult`
+reports this effective selection.
+
+### Example
+
 ```json
 {
   "id": "decoder-sleep",
@@ -503,6 +527,9 @@ manifest rather than maintaining separate feature lists.
   "default": true,
   "order": 30,
   "runtime_directory": "decoder-sleep",
+  "namespace": "decoder_sleep",
+  "requires": [],
+  "conflicts": [],
   "files": [
     {"source": "module.sh", "target": "module.sh", "executable": false},
     {"source": "apply.sh", "target": "apply.sh", "executable": true}
@@ -510,6 +537,7 @@ manifest rather than maintaining separate feature lists.
 }
 ```
 
-A `stems`-style module adds an `arm_hook` object naming a C source and the
-shared object it compiles to. The directory name must equal the `firmware`
-field, and ids must be unique across the tree.
+The internal `core` module adds an `arm_hook` object naming its composition root
+and the shared object it compiles to. Feature headers stay in their owning
+module's `build_files`. The directory name must equal the `firmware` field, and
+ids, runtime directories and shell namespaces must be unique for that firmware.

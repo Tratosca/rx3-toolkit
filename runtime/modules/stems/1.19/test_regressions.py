@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Static guards for hardware-confirmed runtime behavior."""
+"""Static guards for the stems module."""
 
 from pathlib import Path
+import json
 
 
 ROOT = Path(__file__).resolve().parent
 REPOSITORY = ROOT.parents[3]
-AUTOEXEC = (REPOSITORY / "runtime/autoexec.sh").read_text()
-HOOK = (ROOT / "rx3_stems_hook.c").read_text()
-STEMS_MODULE = (ROOT / "module.sh").read_text()
-PATCH_32_BARS = (REPOSITORY / "runtime/modules/beatjump/beatjump-32bars/1.19/patch.py").read_text()
-PATCH_32_BARS_MODULE = (REPOSITORY / "runtime/modules/beatjump/beatjump-32bars/1.19/module.sh").read_text()
-PATCH_NO_QUANTIZE = (REPOSITORY / "runtime/modules/beatjump/beatjump-no-quantize/1.19/patch.py").read_text()
-PATCH_NO_QUANTIZE_MODULE = (REPOSITORY / "runtime/modules/beatjump/beatjump-no-quantize/1.19/module.sh").read_text()
-DECODER_SLEEP = (REPOSITORY / "runtime/modules/buffer/decoder-sleep/1.19/apply.sh").read_text()
-DECODER_SLEEP_MODULE = (REPOSITORY / "runtime/modules/buffer/decoder-sleep/1.19/module.sh").read_text()
+MODULE = (ROOT / "module.sh").read_text()
+MANIFEST = json.loads((ROOT / "manifest.json").read_text())
+HOOK = (REPOSITORY / "runtime/modules/core/1.19/rx3_core_hook.c").read_text()
+FEATURE = (ROOT / "rx3_stems_feature.h").read_text()
+PANEL = (ROOT / "rx3_stems_panel.h").read_text()
+SOURCE = HOOK + FEATURE + PANEL
 
 
 def require(condition: bool, message: str) -> None:
@@ -24,46 +22,64 @@ def require(condition: bool, message: str) -> None:
 
 
 require(
-    "for module in /mnt/iso/modules/*/module.sh" in AUTOEXEC,
-    "autoexec must discover packaged modules instead of embedding features",
-)
-require(
-    "register_patch" in AUTOEXEC and "write_words patched" in AUTOEXEC,
-    "the runtime orchestrator must apply guarded module registrations",
-)
-require(
-    "uint32_t channel = *(const uint32_t *)(led + 4u);" in HOOK
-    and "if (channel != deck_channel)" in HOOK,
-    "LED writes must be filtered by the channel embedded in each uif::Led",
-)
-require(
-    "register_patch 695764" in PATCH_NO_QUANTIZE_MODULE,
-    "the no-quantize runtime module must register its ARM NOP",
-)
-require(
-    len(PATCH_32_BARS.split("(0x")) - 1 == 12,
-    "the +/-32 offline patch must contain exactly twelve guarded words",
-)
-require(
-    '(0x0A9DD4, "3d00000a", "0000a0e1"' in PATCH_NO_QUANTIZE,
-    "the no-quantize patch must include the direct Beat Jump path",
-)
-require(
-    PATCH_32_BARS_MODULE.count("register_patch ") == 12,
-    "the +/-32 runtime module must register exactly twelve guarded words",
-)
-require(
-    "register_prepare_hook stems_prepare" in STEMS_MODULE
-    and "register_after_launch_hook stems_after_launch" in STEMS_MODULE,
+    "register_prepare_hook stems_prepare" in MODULE
+    and "register_after_launch_hook stems_after_launch" in MODULE
+    and "export RX3_STEMS_DIR" in MODULE,
     "stem lifecycle logic must remain owned by the stems module",
 )
 require(
-    "register_post_launch_hook decoder_sleep_apply" in DECODER_SLEEP_MODULE,
-    "the decoder-sleep adapter must register its post-launch hook",
+    MANIFEST["requires"] == ["core"] and MANIFEST["conflicts"] == [],
+    "the stems dependency must be expressed by its manifest",
 )
 require(
-    'bufsleep "$deck" "$NANOSECONDS"' in DECODER_SLEEP,
-    "the decoder-sleep patch must apply the interval independently to each deck",
+    set(MANIFEST["build_files"]) == {
+        "rx3_stems_decl.h", "rx3_stems_feature.h", "rx3_stems_panel.h"
+    },
+    "the module must own and publish its lifecycle and panel sources",
+)
+require(
+    "librx3_core.so" in MODULE,
+    "the module must decline when the performance core is not selected",
+)
+require(
+    "librx3" not in MODULE.replace("librx3_core.so", ""),
+    "the stems module must no longer install a shared object of its own",
+)
+require(
+    "uint32_t channel = *(const uint32_t *)(led + 4u);" in FEATURE
+    and "if (channel != deck_channel)" in FEATURE,
+    "LED writes must be filtered by the channel embedded in each uif::Led",
+)
+require(
+    'memcmp(header.magic, "RX3STM1", 7)' in HOOK
+    and "header.sample_rate != 44100" in HOOK,
+    "the sidecar must be validated against PcmReader's own time domain",
+)
+require(
+    "(void)mprotect(block, payload, PROT_READ);" in HOOK,
+    "a resident stem must be read-only so an audio-thread write fails loudly",
+)
+require(
+    "if (output[i].left == 0.0f && output[i].right == 0.0f)" in HOOK,
+    "a partially zero-filled block must never become inverted vocal audio",
+)
+require(
+    "key_code < 0x411du || key_code > 0x411eu" in FEATURE,
+    "only Slip Loop pads 7 and 8 may be captured",
+)
+stream_body = FEATURE.split("static unsigned long hooked_get_stream", 1)[1].split(
+    "\nstatic ", 1
+)[0]
+require(
+    "apply_mix(context, position, output, frames, selected)" in stream_body,
+    "stems must be mixed inside getStreamAt, where the read is addressed by "
+    "position and therefore indifferent to the reader's out-of-order access",
+)
+require(
+    '#include "../../stems/1.19/rx3_stems_feature.h"' in HOOK
+    and "stems_feature_install" in FEATURE
+    and "keyshift" not in FEATURE.lower(),
+    "stems must implement only its own core lifecycle and hook group",
 )
 
-print("Runtime regression guards: OK")
+print("Stems regression guards: OK")

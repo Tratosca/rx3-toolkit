@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Volatile firmware 1.19 diagnostic access for manual runtime inspection.
 
+module_begin telnet telnet
+
 telnet_start()
 {
     if [ -f /etc/securetty ] && ! grep -q '^pts/0$' /etc/securetty 2>/dev/null; then
@@ -23,4 +25,6 @@ telnet_start()
     fi
 }
 
-register_post_launch_hook telnet_start
+# Start before rbp is replaced. Diagnostic access then survives a guarded
+# rollback and exposes the core log when a candidate preload exits early.
+register_prepare_hook telnet_start

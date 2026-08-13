@@ -55,7 +55,7 @@ Reinserting a drive on a session that is already patched costs nothing. The
 orchestrator restarts `rbp` only for a word still holding its stock value, or a
 module whose runtime part is not already live, so the interface neither freezes
 nor rescans the drive. That run logs `nothing to apply: rbp already runs every
-selected module`. A drive carrying a newer build of the stems component, or a
+selected module`. A drive carrying a newer build of the performance core, or a
 different `RX3_STEMS` location, is applied normally.
 
 ## Reading the session log
@@ -74,8 +74,9 @@ computer.
 On `STOP:` or `FAILED:`, delete `autoexec.bin` from the drive before using the
 RX3 again, then see [Troubleshooting](troubleshooting.md#the-session-log-says-stop-or-failed).
 
-The stems component keeps its own log on the device at `/tmp/rx3-stems.log`,
-which is only reachable with the Telnet module enabled.
+The performance core currently keeps its diagnostic log at
+`/tmp/rx3-stems.log` for compatibility with existing tooling. It is only
+reachable with the Telnet module enabled.
 
 ## Before it touches anything
 

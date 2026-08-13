@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Tkinter interface for generating RX3 vocal sidecars from a Rekordbox export.
+"""The vocal stems pane: generate RX3 sidecars from a Rekordbox export.
 
-The main window carries only what preparing stems requires: an export, a
-playlist, a destination. The separation runtime, the model, and the tuning
-parameters live behind Advanced options, and surface on their own only when
-the runtime is missing and nothing can run without it.
+The pane carries only what preparing stems requires: an export, a playlist, a
+destination, and how much quality to trade for speed. The separation runtime,
+the model catalogue, and the per-architecture tuning live behind Advanced
+options, and surface on their own only when the runtime is missing and nothing
+can run without it.
 """
 
 from __future__ import annotations
@@ -19,16 +20,33 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-
-from tools.rx3_stems import provisioning, separation
+from tools.rx3_stems import estimate, provisioning, separation
 from tools.rx3_stems.job import JobState, StemJob
 from tools.rx3_stems.rekordbox import Collection, parse_collection
-from tools.rx3_stems.separation import Catalogue, Model, Option, Settings
+from tools.rx3_stems.separation import (
+    CUSTOM_MODE,
+    PRESETS,
+    Catalogue,
+    Model,
+    Option,
+    Settings,
+)
 
-GREY = "#555555"
-WARNING = "#a04000"
+import theme
+
+
+# Above this, a run is long enough that being told so before it starts is worth
+# one dialog; below it the confirmation would only be in the way. Saying it here
+# rather than in a standing banner keeps the warning where it is acted on.
+LONG_RUN_SECONDS = 600
+WORKLOAD_NOTICE = "Keep the computer plugged in and awake, and close other heavy apps."
+# Label column of every field row, in characters. One value, or nothing aligns.
+FIELD = 14
+# What a reflowing label loses to the padding around it: the pane's own padding
+# on both sides, and the dialog tab's. Text is measured against the width it is
+# actually given, so these only have to account for the chrome outside it.
+PANE_INSET = 48
+TAB_INSET = 64
 
 
 def reveal(path: pathlib.Path) -> None:
@@ -50,13 +68,16 @@ def readable(size: int) -> str:
 class AdvancedDialog(tk.Toplevel):
     """Runtime manager, model manager, and separation parameters."""
 
-    def __init__(self, app: "StemStudioApp"):
-        super().__init__(app)
+    def __init__(self, app: "StemStudioPane"):
+        window = app.winfo_toplevel()
+        super().__init__(window)
         self.app = app
         self.title("Advanced options")
         self.geometry("860x680")
-        self.minsize(760, 600)
-        self.transient(app)
+        # Small enough to be usable on a 768-tall laptop screen; every tab
+        # scrolls or reflows rather than clipping.
+        self.minsize(520, 380)
+        self.transient(window)
         self.busy = False
         self.status = tk.StringVar(value="")
         self.accelerator_choice = tk.StringVar()
@@ -78,11 +99,12 @@ class AdvancedDialog(tk.Toplevel):
 
         footer = ttk.Frame(self, padding=(16, 0, 16, 16))
         footer.pack(fill="x")
-        ttk.Label(footer, textvariable=self.status, foreground=GREY, wraplength=640).pack(
-            side="left", fill="x", expand=True
-        )
+        theme.wrapping(
+            ttk.Label(footer, textvariable=self.status, style="Muted.TLabel"), inset=120
+        ).pack(side="left", fill="x", expand=True)
         ttk.Button(footer, text="Close", command=self._close).pack(side="right")
         self.protocol("WM_DELETE_WINDOW", self._close)
+        theme.follow_width(self)
         self.refresh()
 
     # Runtime tab
@@ -90,12 +112,14 @@ class AdvancedDialog(tk.Toplevel):
     def _build_runtime_tab(self) -> None:
         frame = self.runtime_tab
         frame.columnconfigure(1, weight=1)
-        ttk.Label(frame, text="Separation runtime", font=("TkDefaultFont", 14, "bold")).grid(
+        ttk.Label(frame, text="Separation software", style="Heading.TLabel").grid(
             row=0, column=0, columnspan=3, sticky="w"
         )
-        self.runtime_state = ttk.Label(frame, wraplength=760)
+        self.runtime_state = theme.wrapping(ttk.Label(frame), inset=TAB_INSET)
         self.runtime_state.grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 2))
-        self.runtime_location = ttk.Label(frame, foreground=GREY, wraplength=760)
+        self.runtime_location = theme.wrapping(
+            ttk.Label(frame, style="Muted.TLabel"), inset=TAB_INSET
+        )
         self.runtime_location.grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 16))
 
         ttk.Label(frame, text="Acceleration", width=16).grid(row=3, column=0, sticky="w")
@@ -104,9 +128,13 @@ class AdvancedDialog(tk.Toplevel):
         )
         self.accelerator_box.grid(row=3, column=1, sticky="w")
         self.accelerator_box.bind("<<ComboboxSelected>>", self._accelerator_selected)
-        self.acceleration_detail = ttk.Label(frame, foreground=GREY, wraplength=760)
+        self.acceleration_detail = theme.wrapping(
+            ttk.Label(frame, style="Muted.TLabel"), inset=TAB_INSET
+        )
         self.acceleration_detail.grid(row=4, column=0, columnspan=3, sticky="w", pady=(6, 4))
-        self.reinstall_notice = ttk.Label(frame, foreground=WARNING, wraplength=760)
+        self.reinstall_notice = theme.wrapping(
+            ttk.Label(frame, style="Warning.TLabel"), inset=TAB_INSET
+        )
         self.reinstall_notice.grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 16))
 
         buttons = ttk.Frame(frame)
@@ -116,30 +144,33 @@ class AdvancedDialog(tk.Toplevel):
         self.uninstall_button = ttk.Button(buttons, text="Uninstall", command=self._uninstall)
         self.uninstall_button.pack(side="left", padx=(8, 0))
 
-        ttk.Label(
+        theme.wrapping(ttk.Label(
             frame,
             text=(
-                "The runtime is a Python virtual environment holding the audio separator and its dependancies."
-                " Uninstalling removes it and keeps the downloaded models."
+                "A private Python environment holding the separator. Uninstalling "
+                "removes it and keeps the downloaded models."
             ),
-            foreground=GREY, wraplength=760,
-        ).grid(row=7, column=0, columnspan=3, sticky="w", pady=(16, 0))
+            style="Muted.TLabel",
+        ), inset=TAB_INSET).grid(row=7, column=0, columnspan=3, sticky="w", pady=(16, 0))
 
     def _accelerator_selected(self, _event=None) -> None:
         key = self._accelerator_labels.get(self.accelerator_choice.get(), provisioning.AUTOMATIC)
         if key != self.app.settings.accelerator:
             self.app.apply_settings(self.app.settings.with_accelerator(key))
+            # A preset names a trade-off, and which model expresses it depends
+            # on which inference runtime this build accelerates. Changing the
+            # accelerator can therefore change the model without changing the
+            # preset the operator chose.
+            self.app.reconcile_preset()
         self.refresh()
 
     def _install(self) -> None:
         acceleration = provisioning.resolve_acceleration(self.app.settings.accelerator)
         if not messagebox.askyesno(
             "Install the separation software ?",
-            f"audio-separator, PyTorch ({acceleration.label}), and FFmpeg will be "
-            f"installed into\n{provisioning.data_directory()}\n\n"
-            "An existing environment is reused and completed rather than rebuilt, unless "
-            "it was built for another processor (GPU and CPU needs different installations). This needs an internet connection and "
-            "1.5 GB or more of disk space. Continue ?",
+            f"audio-separator, PyTorch ({acceleration.label}) and FFmpeg go into\n"
+            f"{provisioning.data_directory()}\n\n"
+            "Needs an internet connection and 1.5 GB of disk. Continue?",
             parent=self,
         ):
             return
@@ -153,9 +184,9 @@ class AdvancedDialog(tk.Toplevel):
     def _uninstall(self) -> None:
         if not messagebox.askyesno(
             "Remove the separation software?",
-            f"The environment under\n{provisioning.data_directory() / 'software'}\nwill be deleted. "
-            "Downloaded models are kept and can be removed from the Models tab.\n\n"
-            "Separation is unavailable until the separation software is installed again. Continue ?",
+            f"Deletes\n{provisioning.data_directory() / 'software'}\n\n"
+            "Models are kept. Separation stops working until you install again. "
+            "Continue?",
             parent=self,
         ):
             return
@@ -167,26 +198,30 @@ class AdvancedDialog(tk.Toplevel):
         frame = self.models_tab
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(2, weight=1)
-        ttk.Label(frame, text="Separation models", font=("TkDefaultFont", 14, "bold")).grid(
+        ttk.Label(frame, text="Separation models", style="Heading.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w"
         )
-        ttk.Label(
+        theme.wrapping(ttk.Label(
             frame,
             text=(
-                "Only the model in use is downloaded. Selecting another one downloads it on "
-                "its first use. Click Download to download it now."
+                "Only the model in use is downloaded. Choosing another fetches it on "
+                "first use and switches Quality to Custom."
             ),
-            foreground=GREY, wraplength=760,
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
+            style="Muted.TLabel",
+        ), inset=TAB_INSET).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 12))
 
         columns = ("state", "sdr", "architecture", "filename")
         self.models_view = ttk.Treeview(frame, columns=columns, show="headings", height=14)
-        for column, heading, width in (
-            ("state", "Local", 130), ("sdr", "Vocal SDR", 90),
-            ("architecture", "Architecture", 110), ("filename", "Model", 400),
+        # Only the model name grows: the other three hold values of a known
+        # size, and widening them would just push the name out of view.
+        for column, heading, width, stretch in (
+            ("state", "Local", 130, False), ("sdr", "Vocal SDR", 90, False),
+            ("architecture", "Architecture", 110, False), ("filename", "Model", 260, True),
         ):
             self.models_view.heading(column, text=heading)
-            self.models_view.column(column, width=width, anchor="w")
+            self.models_view.column(
+                column, width=width, minwidth=70, stretch=stretch, anchor="w"
+            )
         self.models_view.grid(row=2, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.models_view.yview)
         scrollbar.grid(row=2, column=1, sticky="ns")
@@ -204,7 +239,9 @@ class AdvancedDialog(tk.Toplevel):
         ttk.Button(buttons, text="Refresh list", command=self._refresh_catalogue).pack(
             side="left", padx=(8, 0)
         )
-        self.models_summary = ttk.Label(frame, foreground=GREY, wraplength=760)
+        self.models_summary = theme.wrapping(
+            ttk.Label(frame, style="Muted.TLabel"), inset=TAB_INSET
+        )
         self.models_summary.grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
     def _selected_model(self) -> Model | None:
@@ -235,8 +272,8 @@ class AdvancedDialog(tk.Toplevel):
         runtime = self.app.runtime
         if model.filename == self.app.settings.model and not messagebox.askyesno(
             "Delete the model in use ?",
-            f"{model.filename} is the model the separation software currently uses. It will be "
-            "downloaded again on the next run. Delete it anyway?",
+            f"{model.filename} is in use and would be downloaded again on the next "
+            "run. Delete anyway?",
             parent=self,
         ):
             return
@@ -254,10 +291,13 @@ class AdvancedDialog(tk.Toplevel):
         frame = self.parameters_tab
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(1, weight=1)
-        self.parameters_header = ttk.Label(frame, wraplength=760)
+        self.parameters_header = theme.wrapping(ttk.Label(frame), inset=TAB_INSET)
         self.parameters_header.grid(row=0, column=0, sticky="w", pady=(0, 12))
-        self.parameters_body = ttk.Frame(frame)
-        self.parameters_body.grid(row=1, column=0, sticky="nsew")
+        # VR alone contributes eleven options with their help text, which does
+        # not fit any window this dialog is allowed to be.
+        self.parameters_scroll = theme.ScrollFrame(frame)
+        self.parameters_scroll.grid(row=1, column=0, sticky="nsew")
+        self.parameters_body = self.parameters_scroll.body
         buttons = ttk.Frame(frame)
         buttons.grid(row=2, column=0, sticky="w", pady=(12, 0))
         ttk.Button(buttons, text="Apply", command=self._apply_parameters).pack(side="left")
@@ -272,10 +312,8 @@ class AdvancedDialog(tk.Toplevel):
         settings = self.app.settings
         architecture = self.app.catalogue.architecture_of(settings.model)
         self.parameters_header.configure(text=(
-            f"Model: {settings.model}\n" + (
-                f"Architecture: {architecture}" if architecture else
-                "Architecture unknown - only the common options are shown."
-            )
+            f"{settings.model} · {architecture or 'architecture unknown, common options only'}"
+            "\nApplying a change switches Quality to Custom."
         ))
         for title, options in settings.options(architecture):
             group = ttk.LabelFrame(self.parameters_body, text=title, padding=12)
@@ -283,6 +321,7 @@ class AdvancedDialog(tk.Toplevel):
             group.columnconfigure(1, weight=1)
             for index, option in enumerate(options):
                 self._option_row(group, index * 2, option, settings)
+        theme.reflow(self)
 
     def _option_row(self, parent: ttk.Frame, row: int, option: Option, settings: Settings) -> None:
         value = settings.value(option)
@@ -295,9 +334,10 @@ class AdvancedDialog(tk.Toplevel):
             variable = tk.StringVar(value=str(value))
             ttk.Label(parent, text=option.label, width=26).grid(row=row, column=0, sticky="w")
             ttk.Entry(parent, textvariable=variable, width=14).grid(row=row, column=1, sticky="w")
-        ttk.Label(parent, text=option.help, foreground=GREY, wraplength=680).grid(
-            row=row + 1, column=0, columnspan=2, sticky="w", padx=(20, 0), pady=(0, 8)
-        )
+        # Indented under its control, inside a group box, inside the scroller.
+        theme.wrapping(
+            ttk.Label(parent, text=option.help, style="Muted.TLabel"), inset=TAB_INSET + 90
+        ).grid(row=row + 1, column=0, columnspan=2, sticky="w", padx=(20, 0), pady=(0, 8))
         self.variables[option.name] = (option, variable)
 
     def _restore_parameters(self) -> None:
@@ -317,6 +357,7 @@ class AdvancedDialog(tk.Toplevel):
             settings = settings.with_value(option, value)
         self.app.apply_settings(settings)
         self.status.set("Separation parameters saved.")
+        self.refresh()
 
     # Shared state
 
@@ -418,7 +459,7 @@ class AdvancedDialog(tk.Toplevel):
                 self.models_view.see(row)
         if not models:
             self.models_summary.configure(
-                text="The model list is unavailable. Install the runtime, then Refresh list."
+                text="No model list. Install the runtime, then Refresh list."
             )
         else:
             total = sum(m.size(directory) for m in models if m.is_downloaded(directory))
@@ -450,20 +491,15 @@ class AdvancedDialog(tk.Toplevel):
 
     def _close(self) -> None:
         if self.busy:
-            messagebox.showinfo(
-                "Task running", "Wait for the current task to finish.", parent=self
-            )
+            messagebox.showinfo("Busy", "Wait for the current task to finish.", parent=self)
             return
         self.app.advanced = None
         self.destroy()
 
 
-class StemStudioApp(tk.Tk):
-    def __init__(self) -> None:
-        super().__init__()
-        self.title("RX3 Stem Studio")
-        self.geometry("880x800")
-        self.minsize(760, 700)
+class StemStudioPane(ttk.Frame):
+    def __init__(self, parent: tk.Misc) -> None:
+        super().__init__(parent)
         self.runtime = provisioning.detect()
         self.settings = separation.load_settings(
             provisioning.data_directory() / separation.SETTINGS_NAME
@@ -476,46 +512,49 @@ class StemStudioApp(tk.Tk):
         self.output_path = tk.StringVar()
         self.playlist_choice = tk.StringVar()
         self.setup_status = tk.StringVar()
+        self.mode_choice = tk.StringVar(value=self.settings.mode)
         self.status = tk.StringVar(value="Choose a Rekordbox XML export to begin.")
         self._playlist_labels: dict[str, str] = {}
+        self._forecast = estimate.Forecast()
+        # The status line is shared, so it has to know who is speaking.
+        self._running = False
         self._build_interface()
+        theme.follow_width(self)
         self.refresh_runtime()
         self.load_catalogue()
 
     # Interface construction
 
     def _build_interface(self) -> None:
-        container = ttk.Frame(self, padding=24)
+        """Four fields, one status line, one button.
+
+        Everything the operator has to decide sits in one aligned column. What
+        the run is doing is one line, not four scattered labels, and anything
+        explanatory belongs where it is acted on rather than on screen at all
+        times.
+        """
+        container = ttk.Frame(self, padding=20)
         container.pack(fill="both", expand=True)
         container.columnconfigure(0, weight=1)
-        container.rowconfigure(11, weight=1)
+        container.rowconfigure(7, weight=1)
         self.container = container
 
-        ttk.Label(container, text="Prepare RX3 vocal stems", font=("TkDefaultFont", 20, "bold")).grid(
-            row=0, column=0, sticky="w"
-        )
-        ttk.Label(
-            container,
-            text="Audio files and separation stay on this computer.",
-            wraplength=800,
-        ).grid(row=1, column=0, sticky="w", pady=(4, 16))
-
         # Shown only while separation cannot run at all.
-        self.setup_frame = ttk.LabelFrame(container, text="Separation software", padding=12)
+        self.setup_frame = ttk.LabelFrame(container, text="Separation software", padding=10)
         self.setup_frame.columnconfigure(0, weight=1)
-        ttk.Label(self.setup_frame, textvariable=self.setup_status, wraplength=600).grid(
-            row=0, column=0, sticky="w"
-        )
+        theme.wrapping(
+            ttk.Label(self.setup_frame, textvariable=self.setup_status), inset=PANE_INSET + 140
+        ).grid(row=0, column=0, sticky="w")
         ttk.Button(
             self.setup_frame, text="Set up...", command=self.open_advanced
         ).grid(row=0, column=1, padx=(12, 0))
 
-        self._path_row(container, 3, "Rekordbox XML export", self.xml_path, self._choose_xml)
+        theme.path_row(container, 1, "Rekordbox XML", self.xml_path, self._choose_xml, width=FIELD)
 
         playlist_row = ttk.Frame(container)
-        playlist_row.grid(row=4, column=0, sticky="ew", pady=4)
+        playlist_row.grid(row=2, column=0, sticky="ew", pady=3)
         playlist_row.columnconfigure(1, weight=1)
-        ttk.Label(playlist_row, text="Playlist", width=25).grid(row=0, column=0, sticky="w")
+        ttk.Label(playlist_row, text="Playlist", width=FIELD).grid(row=0, column=0, sticky="w")
         self.playlist_box = ttk.Combobox(
             playlist_row, textvariable=self.playlist_choice, state="disabled"
         )
@@ -523,65 +562,80 @@ class StemStudioApp(tk.Tk):
         self.playlist_box.bind("<<ComboboxSelected>>", self._playlist_selected)
         ttk.Button(playlist_row, text="Reload", command=self._load_collection).grid(row=0, column=2)
 
-        self._path_row(container, 5, "Output folder or USB drive", self.output_path, self._choose_output)
-        ttk.Label(
-            container,
-            text=(
-                "Copy the generated RX3_STEMS directory to the root of the Rekordbox USB drive if"
-                " you didn't specify it as the output folder."
-            ),
-            wraplength=800,
-        ).grid(row=6, column=0, sticky="w", pady=(8, 18))
+        theme.path_row(container, 3, "Output", self.output_path, self._choose_output, width=FIELD)
+        self._build_quality_row(container, 4)
 
-        self.overall = ttk.Progressbar(container, maximum=100)
-        self.overall.grid(row=7, column=0, sticky="ew")
-        self.track = ttk.Progressbar(container, maximum=100)
-        self.track.grid(row=8, column=0, sticky="ew", pady=(6, 0))
-        ttk.Label(container, textvariable=self.status, wraplength=800).grid(
-            row=9, column=0, sticky="w", pady=(8, 12)
-        )
+        progress = ttk.Frame(container)
+        progress.grid(row=5, column=0, sticky="ew", pady=(18, 0))
+        progress.columnconfigure(0, weight=1)
+        self.overall = ttk.Progressbar(progress, maximum=100)
+        self.overall.grid(row=0, column=0, sticky="ew")
+        self.track = ttk.Progressbar(progress, maximum=100)
+        self.track.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        # One line for the whole state of things: the forecast before a run,
+        # the position and time left during one, the outcome after.
+        theme.wrapping(
+            ttk.Label(progress, textvariable=self.status), inset=PANE_INSET
+        ).grid(row=2, column=0, sticky="w", pady=(6, 0))
 
         buttons = ttk.Frame(container)
-        buttons.grid(row=10, column=0, sticky="ew")
+        buttons.grid(row=6, column=0, sticky="ew", pady=(12, 0))
         buttons.columnconfigure(0, weight=1)
-        buttons.columnconfigure(1, weight=1)
         self.start_button = ttk.Button(buttons, text="Generate stems", command=self._start_job)
-        self.start_button.grid(row=0, column=0, sticky="ew", ipady=8, padx=(0, 6))
+        self.start_button.grid(row=0, column=0, sticky="ew", ipady=6)
         self.cancel_button = ttk.Button(
             buttons, text="Cancel", command=self._cancel_job, state="disabled"
         )
-        self.cancel_button.grid(row=0, column=1, sticky="ew", ipady=8, padx=(6, 0))
+        self.cancel_button.grid(row=0, column=1, padx=(8, 0), ipady=6)
 
         log_frame = ttk.Frame(container)
-        log_frame.grid(row=11, column=0, sticky="nsew", pady=(16, 0))
+        log_frame.grid(row=7, column=0, sticky="nsew", pady=(12, 0))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log_view = tk.Text(log_frame, height=8, wrap="word", state="disabled")
+        self.log_view = tk.Text(log_frame, height=6, wrap="word", state="disabled")
         self.log_view.grid(row=0, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_view.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_view.configure(yscrollcommand=scrollbar.set)
 
         footer = ttk.Frame(container)
-        footer.grid(row=12, column=0, sticky="ew", pady=(12, 0))
+        footer.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         footer.columnconfigure(1, weight=1)
         self.reveal_button = ttk.Button(
-            footer, text="Show output folder", command=self._reveal_output, state="disabled"
+            footer, text="Show output", command=self._reveal_output, state="disabled"
         )
         self.reveal_button.grid(row=0, column=0, sticky="w")
-        self.footer_detail = ttk.Label(footer, foreground=GREY, wraplength=520)
+        self.footer_detail = theme.wrapping(
+            ttk.Label(footer, style="Muted.TLabel"), inset=PANE_INSET + 260
+        )
         self.footer_detail.grid(row=0, column=1, sticky="w", padx=(12, 0))
-        ttk.Button(footer, text="Advanced options...", command=self.open_advanced).grid(
+        ttk.Button(footer, text="Advanced...", command=self.open_advanced).grid(
             row=0, column=2, sticky="e"
         )
 
-    def _path_row(self, parent, row: int, label: str, variable: tk.StringVar, command) -> None:
+    def _build_quality_row(self, parent: ttk.Frame, row: int) -> None:
+        """One more row in the same column, not a boxed section of its own."""
         frame = ttk.Frame(parent)
-        frame.grid(row=row, column=0, sticky="ew", pady=4)
+        frame.grid(row=row, column=0, sticky="ew", pady=3)
         frame.columnconfigure(1, weight=1)
-        ttk.Label(frame, text=label, width=25).grid(row=0, column=0, sticky="w")
-        ttk.Entry(frame, textvariable=variable).grid(row=0, column=1, sticky="ew", padx=8)
-        ttk.Button(frame, text="Choose...", command=command).grid(row=0, column=2)
+        ttk.Label(frame, text="Quality", width=FIELD).grid(row=0, column=0, sticky="w")
+        choices = ttk.Frame(frame)
+        choices.grid(row=0, column=1, sticky="w", padx=8)
+        for index, preset in enumerate((*PRESETS, None)):
+            ttk.Radiobutton(
+                choices,
+                text=preset.label if preset else "Custom",
+                value=preset.key if preset else CUSTOM_MODE,
+                variable=self.mode_choice, command=self._mode_selected,
+            ).grid(row=0, column=index, sticky="w", padx=(0, 16))
+        self.mode_summary = theme.wrapping(
+            ttk.Label(frame, style="Muted.TLabel"), inset=PANE_INSET + FIELD * 9
+        )
+        self.mode_summary.grid(row=1, column=1, sticky="w", padx=8, pady=(2, 0))
+
+    def restyle(self, colors: theme.Palette) -> None:
+        """Recolour what ttk styles cannot reach after an appearance change."""
+        theme.restyle_text(self.log_view, colors)
 
     def log(self, message: str) -> None:
         self.log_view.configure(state="normal")
@@ -593,10 +647,51 @@ class StemStudioApp(tk.Tk):
 
     def apply_settings(self, settings: Settings) -> None:
         self.settings = settings
+        self.mode_choice.set(settings.mode)
         separation.save_settings(
             provisioning.data_directory() / separation.SETTINGS_NAME, settings
         )
         self.refresh_runtime()
+
+    def _mode_selected(self) -> None:
+        """Switch preset, or hand the operator over to Advanced options."""
+        chosen = self.mode_choice.get()
+        if chosen == CUSTOM_MODE:
+            if self.settings.mode != CUSTOM_MODE:
+                self.apply_settings(self.settings.as_custom())
+            self.open_advanced()
+            return
+        preset = separation.preset(chosen)
+        if preset is not None:
+            self.apply_settings(separation.apply_preset(
+                self.settings, preset, self.catalogue,
+                prefers_torch=self._prefers_torch(),
+            ))
+            if self.advanced is not None and self.advanced.winfo_exists():
+                self.advanced.refresh()
+
+    def reconcile_preset(self) -> None:
+        """Re-derive a preset's model once the catalogue can confirm it.
+
+        Before the runtime is installed there is no catalogue, so a preset
+        resolves to its first candidate on faith. When the real list arrives
+        the choice is made again, which is also what picks up a model that was
+        renamed or withdrawn upstream, and what follows a change of accelerator
+        to the variant that expresses the preset on the new one.
+        """
+        preset = separation.preset(self.settings.mode)
+        if preset is None or not self.catalogue.models:
+            return
+        resolved = separation.apply_preset(
+            self.settings, preset, self.catalogue,
+            prefers_torch=self._prefers_torch(),
+        )
+        if resolved != self.settings:
+            self.apply_settings(resolved)
+
+    def _prefers_torch(self) -> bool:
+        """Whether this machine's build accelerates PyTorch but not ONNX."""
+        return provisioning.resolve_acceleration(self.settings.accelerator).prefers_torch
 
     def refresh_runtime(self) -> None:
         """Show the setup panel only while separation cannot run at all."""
@@ -605,18 +700,60 @@ class StemStudioApp(tk.Tk):
             self.setup_frame.grid_forget()
         else:
             self.setup_status.set(self.runtime.summary)
-            self.setup_frame.grid(row=2, column=0, sticky="ew", pady=(0, 16))
+            self.setup_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        self._describe_mode()
         self._describe_footer()
+        self._describe_forecast()
+
+    def _describe_mode(self) -> None:
+        preset = separation.preset(self.settings.mode)
+        self.mode_summary.configure(
+            text=preset.summary if preset else "Set by hand in Advanced options."
+        )
 
     def _describe_footer(self) -> None:
+        """The model in use, and only what is wrong with it."""
         model = self.catalogue.by_filename(self.settings.model)
-        name = model.filename if model else self.settings.model
-        detail = f"Model: {name}"
+        parts = [self.settings.model]
         if model is not None and not model.is_downloaded(self.runtime.models):
-            detail += " (downloads on first use)"
+            parts.append("downloads on first use")
         if provisioning.needs_reinstall(self.settings.accelerator, self.runtime):
-            detail += " · runtime needs reinstallation"
-        self.footer_detail.configure(text=detail)
+            parts.append("runtime needs reinstallation")
+        self.footer_detail.configure(text=" · ".join(parts))
+
+    # Duration estimate
+
+    def _estimator(self) -> estimate.Estimator:
+        return estimate.estimator_for(
+            provisioning.data_directory() / estimate.THROUGHPUT_NAME,
+            self.catalogue.architecture_of(self.settings.model),
+            provisioning.resolve_acceleration(self.settings.accelerator).key,
+        )
+
+    def _selected_playlist(self):
+        playlist_id = self._playlist_labels.get(self.playlist_choice.get())
+        if self.collection is None or playlist_id is None:
+            return None
+        return self.collection.playlist(playlist_id)
+
+    def _describe_forecast(self) -> None:
+        """Put what this playlist will cost on the shared status line.
+
+        Only while idle: during a run that line is reporting the run, which is
+        the more useful answer to the same question.
+        """
+        if self._running:
+            return
+        playlist = self._selected_playlist()
+        if playlist is None or not playlist.tracks:
+            self._forecast = estimate.Forecast()
+            self.status.set("Choose an export and a playlist.")
+            return
+        self._forecast = estimate.forecast(playlist.tracks, self._estimator())
+        parts = [self._forecast.summary]
+        if playlist.missing_count:
+            parts.append(f"{playlist.missing_count} missing")
+        self.status.set(" · ".join(part for part in parts if part))
 
     def open_advanced(self) -> None:
         if self.advanced is not None and self.advanced.winfo_exists():
@@ -651,7 +788,10 @@ class StemStudioApp(tk.Tk):
         self.catalogue = catalogue
         if error:
             self.log(f"Model list unavailable: {error}")
+        self.reconcile_preset()
+        self._describe_mode()
         self._describe_footer()
+        self._describe_forecast()
         if done is not None:
             done()
 
@@ -680,34 +820,41 @@ class StemStudioApp(tk.Tk):
         is the read-only volume root for an application launched from a
         desktop shell.
         """
+        window = self.winfo_toplevel()
         raw = self.output_path.get().strip()
         if not raw:
             messagebox.showerror(
-                "No output folder", "Choose the output folder or the USB drive to write to."
+                "No output folder", "Choose the output folder or the USB drive to write to.",
+                parent=window,
             )
             return None
         output = pathlib.Path(raw).expanduser()
         if not output.is_dir():
             messagebox.showerror(
-                "Output not found", f"{output} is not an existing folder or mounted drive."
+                "Output not found", f"{output} is not an existing folder or mounted drive.",
+                parent=window,
             )
             return None
         if not os.access(output, os.W_OK):
             messagebox.showerror(
-                "Output not writable", f"{output} cannot be written to. Choose another folder."
+                "Output not writable", f"{output} cannot be written to. Choose another folder.",
+                parent=window,
             )
             return None
         return output
 
     def _load_collection(self) -> None:
+        window = self.winfo_toplevel()
         path = pathlib.Path(self.xml_path.get()).expanduser()
         if not path.is_file():
-            messagebox.showerror("Export not found", "Choose an existing Rekordbox XML export.")
+            messagebox.showerror(
+                "Export not found", "Choose an existing Rekordbox XML export.", parent=window
+            )
             return
         try:
             collection = parse_collection(path)
         except Exception as error:
-            messagebox.showerror("Export cannot be read", str(error))
+            messagebox.showerror("Export cannot be read", str(error), parent=window)
             return
         self.collection = collection
         self._playlist_labels = {
@@ -724,62 +871,73 @@ class StemStudioApp(tk.Tk):
 
     def _playlist_selected(self, _event=None) -> None:
         """Report the selected playlist, not the whole collection."""
-        if self.collection is None:
-            return
-        playlist_id = self._playlist_labels.get(self.playlist_choice.get())
-        if playlist_id is None:
-            self.status.set("Select a playlist to process.")
-            return
-        playlist = self.collection.playlist(playlist_id)
-        detail = f"{playlist.path}: {len(playlist.tracks)} tracks"
-        if playlist.missing_count:
-            detail += f", {playlist.missing_count} with a missing source file"
-        self.status.set(detail)
+        if self.collection is not None:
+            self._describe_forecast()
 
     # Job control
 
+    def _confirm_long_run(self) -> bool:
+        """Warn before a run long enough to tie the machine up for a while."""
+        seconds = self._forecast.seconds
+        if seconds is None or seconds < LONG_RUN_SECONDS:
+            return True
+        rough = "" if self._forecast.measured else " (rough)"
+        return messagebox.askyesno(
+            "This will take a while",
+            f"{self._forecast.tracks} tracks, {estimate.format_duration(seconds)}"
+            f"{rough}.\n\n{WORKLOAD_NOTICE}\n\nStart?",
+            parent=self.winfo_toplevel(),
+        )
+
     def _start_job(self) -> None:
+        window = self.winfo_toplevel()
         if self.collection is None:
-            messagebox.showerror("No export loaded", "Load a Rekordbox XML export first.")
+            messagebox.showerror(
+                "No export loaded", "Load a Rekordbox XML export first.", parent=window
+            )
             return
-        playlist_id = self._playlist_labels.get(self.playlist_choice.get())
-        if playlist_id is None:
-            messagebox.showerror("No playlist selected", "Select a playlist to process.")
+        playlist = self._selected_playlist()
+        if playlist is None:
+            messagebox.showerror(
+                "No playlist selected", "Select a playlist to process.", parent=window
+            )
             return
         output = self._output_directory()
         if output is None:
             return
         self.refresh_runtime()
         if not self.runtime.ready:
-            messagebox.showerror("Runtime missing", self.runtime.summary)
+            messagebox.showerror("Runtime missing", self.runtime.summary, parent=window)
             self.open_advanced()
             return
         if provisioning.needs_reinstall(self.settings.accelerator, self.runtime) and not messagebox.askyesno(
             "Runtime needs reinstallation",
-            "The runtime was installed for another accelerator. Separation will run on the "
-            "installed one until it is reinstalled.\n\nContinue anyway?",
+            "The runtime was installed for another processor type (CPU or GPU). Separation will run on the "
+            "installed one until it is reinstalled.\n\nContinue anyway ?",
+            parent=window,
         ):
             self.open_advanced()
+            return
+        if not self._confirm_long_run():
             return
 
         acceleration = provisioning.resolve_acceleration(self.settings.accelerator)
         self.job = StemJob(
             self.runtime,
             self.collection,
-            self.collection.playlist(playlist_id),
+            playlist,
             output,
             settings=self.settings,
             architecture=self.catalogue.architecture_of(self.settings.model),
             acceleration=acceleration,
+            estimator=self._estimator(),
             observer=lambda state: self.after(0, self._job_progress, state),
         )
+        self._running = True
         self.start_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.reveal_button.configure(state="disabled")
-        self.log(
-            f"Generating into {output / 'RX3_STEMS'} "
-            f"with {self.settings.model} on {acceleration.label}"
-        )
+        self.log(f"{output / 'RX3_STEMS'} · {self.settings.model} · {acceleration.label}")
         threading.Thread(target=self._job_worker, daemon=True).start()
 
     def _job_worker(self) -> None:
@@ -799,17 +957,26 @@ class StemStudioApp(tk.Tk):
         self.after(0, self._job_finished, state)
 
     def _model_download_failed(self, error: str) -> None:
+        self._running = False
         self.start_button.configure(state="normal")
         self.cancel_button.configure(state="disabled")
         self.status.set("The model could not be downloaded.")
         self.log(error)
-        messagebox.showerror("Model unavailable", error)
+        messagebox.showerror("Model unavailable", error, parent=self.winfo_toplevel())
 
     def _job_progress(self, state: JobState) -> None:
         self.overall["value"] = state.progress
         self.track["value"] = state.track_progress
-        detail = f"{state.completed}/{state.total}" if state.total else ""
-        self.status.set(" - ".join(part for part in (state.stage, state.current, detail) if part))
+        # `position`, not `completed`: this sits beside the name of the track
+        # being worked on, and answers which one it is.
+        position = f"{state.position}/{state.total}" if state.position else ""
+        remaining = (
+            f"{estimate.format_duration(state.eta_seconds)} left"
+            if state.eta_seconds else ""
+        )
+        self.status.set(" · ".join(
+            part for part in (position, state.current, state.stage, remaining) if part
+        ))
 
     def _cancel_job(self) -> None:
         if self.job is not None:
@@ -818,8 +985,17 @@ class StemStudioApp(tk.Tk):
             self.job.cancel()
 
     def _job_finished(self, state: JobState) -> None:
+        window = self.winfo_toplevel()
+        self._running = False
         self.start_button.configure(state="normal")
         self.cancel_button.configure(state="disabled")
+        if self.job is not None:
+            # What this machine measured is worth more than the seeded table,
+            # and is what makes the next run's estimate meaningful.
+            estimate.remember(
+                provisioning.data_directory() / estimate.THROUGHPUT_NAME,
+                self.job.estimator,
+            )
         self.refresh_runtime()
         for result in state.results:
             verb = "kept" if result.status == "existing" else "created"
@@ -831,17 +1007,20 @@ class StemStudioApp(tk.Tk):
         if state.output is not None:
             self.reveal_button.configure(state="normal")
         if state.state == "failed":
-            self.status.set("Generation failed.")
-            messagebox.showerror("Generation failed", state.fatal)
+            self.status.set("Failed.")
+            messagebox.showerror("Generation failed", state.fatal, parent=window)
             return
         if state.state == "cancelled":
-            self.status.set("Cancelled. Completed sidecars were kept.")
+            self.status.set("Cancelled · finished stems kept.")
             return
-        self.status.set(f"Finished: {len(state.results)} sidecars, {len(state.errors)} failures.")
+        summary = f"{len(state.results)} stems in {estimate.format_duration(state.elapsed_seconds)}"
+        if state.errors:
+            summary += f" · {len(state.errors)} failed"
+        self.status.set(summary)
         messagebox.showinfo(
-            "Sidecars ready",
-            f"{len(state.results)} sidecars are in:\n{state.output}\n\n"
-            "Copy RX3_STEMS to the root of the Rekordbox USB drive.",
+            "Done",
+            f"{summary}.\n\nCopy RX3_STEMS to the root of the Rekordbox USB drive.",
+            parent=window,
         )
 
     def _reveal_output(self) -> None:
@@ -887,17 +1066,16 @@ def self_test() -> None:
         ).run()
         if state.state != "done" or state.results[0].status != "existing":
             raise RuntimeError(f"Generation self-test did not resume: {state.state}")
+        if state.position != 1 or state.total != 1:
+            raise RuntimeError("Generation self-test reported the wrong track position")
         if not (output / "rx3-stems-manifest.json").is_file():
             raise RuntimeError("Generation self-test did not write a manifest")
-
-
-def main() -> None:
-    if "--self-test" in sys.argv:
-        self_test()
-        return
-    app = StemStudioApp()
-    app.mainloop()
-
-
-if __name__ == "__main__":
-    main()
+        # The quality presets must resolve to something runnable even with no
+        # catalogue, which is the state before the runtime is installed.
+        for preset in PRESETS:
+            for prefers_torch in (False, True):
+                resolved = separation.apply_preset(
+                    Settings(), preset, Catalogue(), prefers_torch=prefers_torch
+                )
+                if not resolved.model or resolved.mode != preset.key:
+                    raise RuntimeError(f"Preset {preset.key} did not resolve to a model")

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Runtime registration for the firmware 1.19 direct Beat Jump execution path.
 
+module_begin beatjump-no-quantize beatjump_no_quantize
+
 register_patch 695764 '\075\000\000\012' '\000\000\240\341' quantized_BeatJump_to_direct_path
 
 beatjump_no_quantize_report()

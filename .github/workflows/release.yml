@@ -24,10 +24,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: runtime-assets-arm-hook
-          path: build/librx3_stems.so
+          path: build/librx3_core.so
           if-no-files-found: error
 
-  mod-generator:
+  toolkit:
     name: Build XDJ-RX3 Toolkit (${{ matrix.platform }})
     needs: arm-hook
     strategy:
@@ -36,28 +36,28 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: Linux x64
-            artifact: xdj-rx3-mod-generator-linux-x64
-            target: dist/RX3 Mod Generator
-            executable: dist/RX3 Mod Generator
-            archive: XDJ-RX3-Mod-Generator-Linux-x64.tar.gz
+            artifact: xdj-rx3-toolkit-linux-x64
+            target: dist/XDJ-RX3 Toolkit
+            executable: dist/XDJ-RX3 Toolkit
+            archive: XDJ-RX3-Toolkit-Linux-x64.tar.gz
           - runner: windows-2025
             platform: Windows x64
-            artifact: xdj-rx3-mod-generator-windows-x64
-            target: dist/RX3 Mod Generator.exe
-            executable: dist/RX3 Mod Generator.exe
-            archive: XDJ-RX3-Mod-Generator-Windows-x64.zip
+            artifact: xdj-rx3-toolkit-windows-x64
+            target: dist/XDJ-RX3 Toolkit.exe
+            executable: dist/XDJ-RX3 Toolkit.exe
+            archive: XDJ-RX3-Toolkit-Windows-x64.zip
           - runner: macos-15-intel
             platform: macOS Intel
-            artifact: xdj-rx3-mod-generator-macos-intel
-            target: dist/RX3 Mod Generator.app
-            executable: dist/RX3 Mod Generator.app/Contents/MacOS/RX3 Mod Generator
-            archive: XDJ-RX3-Mod-Generator-macOS-Intel.zip
+            artifact: xdj-rx3-toolkit-macos-intel
+            target: dist/XDJ-RX3 Toolkit.app
+            executable: dist/XDJ-RX3 Toolkit.app/Contents/MacOS/XDJ-RX3 Toolkit
+            archive: XDJ-RX3-Toolkit-macOS-Intel.zip
           - runner: macos-latest
             platform: macOS Apple Silicon
-            artifact: xdj-rx3-mod-generator-macos-apple-silicon
-            target: dist/RX3 Mod Generator.app
-            executable: dist/RX3 Mod Generator.app/Contents/MacOS/RX3 Mod Generator
-            archive: XDJ-RX3-Mod-Generator-macOS-Apple-Silicon.zip
+            artifact: xdj-rx3-toolkit-macos-apple-silicon
+            target: dist/XDJ-RX3 Toolkit.app
+            executable: dist/XDJ-RX3 Toolkit.app/Contents/MacOS/XDJ-RX3 Toolkit
+            archive: XDJ-RX3-Toolkit-macOS-Apple-Silicon.zip
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -73,10 +73,12 @@ jobs:
         run: python -m pip install -r requirements-release.txt
       - name: Test the portable build engine
         run: python -m unittest discover -s tests -p test_mod_generator.py
+      - name: Test the separation engine
+        run: python -m unittest discover -s tests -p test_stem_studio.py
       - name: Build the desktop application
         env:
-          RX3_PREBUILT_HOOK: ${{ github.workspace }}/prebuilt/librx3_stems.so
-        run: pyinstaller --noconfirm --clean apps/rx3-mod-generator/mod_generator.spec
+          RX3_PREBUILT_HOOK: ${{ github.workspace }}/prebuilt/librx3_core.so
+        run: pyinstaller --noconfirm --clean apps/rx3-toolbox/rx3_toolbox.spec
       - name: Check the packaged OpenSSL libraries
         if: runner.os == 'macOS'
         run: python scripts/check_macos_bundle.py "${{ matrix.target }}"
@@ -95,68 +97,10 @@ jobs:
           path: release/${{ matrix.archive }}
           if-no-files-found: error
 
-  stem-studio:
-    name: Build RX3 Stem Studio (${{ matrix.platform }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            platform: Linux x64
-            artifact: xdj-rx3-stem-studio-linux-x64
-            target: dist/RX3 Stem Studio
-            executable: dist/RX3 Stem Studio
-            archive: XDJ-RX3-Stem-Studio-Linux-x64.tar.gz
-          - runner: windows-2025
-            platform: Windows x64
-            artifact: xdj-rx3-stem-studio-windows-x64
-            target: dist/RX3 Stem Studio.exe
-            executable: dist/RX3 Stem Studio.exe
-            archive: XDJ-RX3-Stem-Studio-Windows-x64.zip
-          - runner: macos-15-intel
-            platform: macOS Intel
-            artifact: xdj-rx3-stem-studio-macos-intel
-            target: dist/RX3 Stem Studio.app
-            executable: dist/RX3 Stem Studio.app/Contents/MacOS/RX3 Stem Studio
-            archive: XDJ-RX3-Stem-Studio-macOS-Intel.zip
-          - runner: macos-latest
-            platform: macOS Apple Silicon
-            artifact: xdj-rx3-stem-studio-macos-apple-silicon
-            target: dist/RX3 Stem Studio.app
-            executable: dist/RX3 Stem Studio.app/Contents/MacOS/RX3 Stem Studio
-            archive: XDJ-RX3-Stem-Studio-macOS-Apple-Silicon.zip
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install release dependencies
-        run: python -m pip install -r requirements-release.txt
-      - name: Test the separation engine
-        run: python -m unittest discover -s tests -p test_stem_studio.py
-      - name: Build the desktop application
-        run: pyinstaller --noconfirm --clean apps/rx3-stem-studio/stem_studio.spec
-      - name: Test the packaged application
-        run: python scripts/smoke_desktop_app.py "${{ matrix.executable }}"
-      - name: Package the application
-        run: >-
-          python scripts/package_release.py
-          "${{ matrix.target }}"
-          "release/${{ matrix.archive }}"
-          --include LICENSE
-          --include THIRD_PARTY_NOTICES.md
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: release/${{ matrix.archive }}
-          if-no-files-found: error
-
   publish:
     name: Publish XDJ-RX3 Toolkit
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [mod-generator, stem-studio]
+    needs: [toolkit]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Runtime adapter for the firmware 1.19 decoder sleep setting.
 
+module_begin decoder-sleep decoder_sleep
+
 DECODER_SLEEP_NS=${DECODER_SLEEP_NS:-100000}
 DECODER_SLEEP_SCRIPT=/mnt/iso/modules/decoder-sleep/apply.sh
 
