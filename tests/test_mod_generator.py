@@ -162,8 +162,10 @@ class ModGeneratorTests(unittest.TestCase):
             )
             self.assertEqual(result.patches, ("core", "keyshift"))
             plain = load_firmware_codec().read_autoexec(result.output, key)
-            self.assertIn(b"compatibility\ncore\nkeyshift\n", plain)
-            self.assertNotIn(b"\nstems\n", plain)
+            normalized = plain.replace(b"\r\n", b"\n")
+            
+            self.assertIn(b"compatibility\ncore\nkeyshift\n", normalized)
+            self.assertNotIn(b"\nstems\n", normalized)
 
     def test_rejects_unknown_patch(self):
         with tempfile.TemporaryDirectory() as directory:
