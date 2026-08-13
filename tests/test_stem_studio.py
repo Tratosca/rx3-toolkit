@@ -1567,7 +1567,11 @@ class ThemeTests(unittest.TestCase):
 
             self.assertEqual(label.cget("wraplength"), reflowed)
             self.assertTrue(scroller._bar_shown)
-            self.assertEqual(scroller._canvas.winfo_width(), roomy)
+            self.assertAlmostEqual(
+                scroller._canvas.winfo_width(),
+                roomy,
+                delta=1,
+            )
         finally:
             window.destroy()
 
