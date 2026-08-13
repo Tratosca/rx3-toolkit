@@ -13,7 +13,7 @@ instrumental parts of a track.
 | | |
 |---|---|
 | Device | XDJ-RX3, any hardware revision |
-| Firmware | `1.19`, and only `1.19` |
+| Firmware | `1.19` |
 | Computer | Windows x64, macOS (Intel or Apple Silicon), or Linux x64 |
 | USB drive | FAT32 or exFAT, exported from Rekordbox |
 | Key | An RX3 encryption key file, which this project does not distribute |
@@ -24,8 +24,7 @@ per track. An NVIDIA, AMD or Apple Silicon GPU changes that by an order of
 magnitude.
 
 The encryption key is not in this repository and never will be. It exists in
-source code Pioneer published publicly. Finding it, and deciding whether you may
-use it, is on you.
+source code Pioneer published publicly. Finding it, **and deciding whether you may use it, is on you**. However, the Pioneer-distributed archives `pioneerdj_xdj_rx3.tar.bz2.00` and `pioneerdj_xdj_rx3.tar.bz2.01` available on the [Pioneer GPL/LGPL source code site](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/) does contain the material to compile the RX3's Linux `initramfs`, which does happen to expose the key in `/usr/local/pdj/aes256.key`. See [Extracting the initramfs](docs/extract-initramfs.md).
 
 ## Before you start
 
