@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Runtime registration for the firmware 1.19 Beat Jump +/-32 patch.
 
+module_begin beatjump-32bars beatjump_32bars
+
 register_patch 393376 '\310\212\267\356' '\310\212\260\356' guard_vcvt_f64_to_vabs_f32
 register_patch 393380 '\010\213\070\356' '\010\172\170\356' guard_vadd_f64_to_vadd_f32
 register_patch 393384 '\310\173\374\356' '\347\172\374\356' guard_vcvt_u32_f64_to_f32

@@ -24,6 +24,10 @@ SETTINGS_NAME = "separation.json"
 DEFAULT_MODEL = "vocals_mel_band_roformer.ckpt"
 VOCAL_STEM = "Vocals"
 
+FAST_MODE = "fast"
+QUALITY_MODE = "quality"
+CUSTOM_MODE = "custom"
+
 
 @dataclass(frozen=True)
 class Option:
@@ -127,8 +131,13 @@ ARCHITECTURE_OPTIONS: dict[str, tuple[Option, ...]] = {
                "Override model segment size",
                "Use the segment size above instead of the model's own default.",
                False, "flag"),
+        # Unlike the MDX and Demucs options of the same name, this one is a hop
+        # divisor, not an amount of overlap: raising it moves the prediction
+        # window further each step, so it separates from fewer passes. The
+        # direction is the opposite of what this help text used to state.
         Option("mdxc_overlap", "--mdxc_overlap", "Overlap",
-               "Overlap between prediction windows. Higher is better and slower.",
+               "Step between prediction windows. Lower stitches the result from "
+               "more passes over the audio: better, and considerably slower.",
                8, "integer", 2, 50),
         Option("mdxc_batch_size", "--mdxc_batch_size", "Batch size",
                "Larger uses more memory and may process slightly faster.", 1, "integer", 1, 64),
@@ -148,6 +157,123 @@ ARCHITECTURE_OPTIONS: dict[str, tuple[Option, ...]] = {
                "Default", "text"),
     ),
 }
+
+
+# The roformer family, best vocal SDR first, which is what the catalogue's own
+# scores say and all this project claims about it.
+ROFORMER_CANDIDATES: tuple[str, ...] = (
+    DEFAULT_MODEL,
+    "mel_band_roformer_kim_ft_unwa.ckpt",
+    "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+)
+# The MDX-Net family, which is what "fast" means here. These are ONNX models of
+# a few tens of megabytes against the roformer's several hundred, and they cost
+# roughly a third of its inference for 10.2 dB of vocal SDR against 12.6 - the
+# gap a DJ hears as a little more instrument left in the acapella, on a stem
+# whose other side is reconstructed on the deck anyway. They are band-limited
+# where the roformer is not, so what survives the reconstruction is the very
+# top of the sibilance rather than anything with pitch in it.
+MDX_CANDIDATES: tuple[str, ...] = (
+    "Kim_Vocal_2.onnx",
+    "UVR-MDX-NET-Voc_FT.onnx",
+    "UVR-MDX-NET_Main_406.onnx",
+)
+# An MDX model is an ONNX file, but which runtime executes it is not fixed:
+# audio-separator only opens an ONNX Runtime session when the segment size
+# equals the model's own `dim_t`, and otherwise converts the graph with
+# onnx2torch and runs it on the Torch device. Every candidate above has a
+# `dim_t` of 256 - which is exactly what the option defaults to, so the ONNX
+# path is taken by accident rather than by choice - and 512 therefore selects
+# the Torch path while doubling the context each chunk is separated with.
+#
+# That is the whole answer on a build whose GPU covers PyTorch and not ONNX
+# Runtime. On Apple Silicon it was measured at 3.5x quicker end to end, 42.6 s
+# against 12.1 s on a minute of audio; on ROCm, where ONNX Runtime has no GPU
+# provider at all, it is the difference between the GPU and the CPU.
+MDX_TORCH_SEGMENT = 512
+# `mdxc_overlap`, despite the name, is a hop divisor: it sets how far the
+# prediction window advances each step, so a lower value stitches the result
+# from more passes over the audio. More passes is more inference. How much
+# more, in seconds, depends on the model, the device and the machine's load, so
+# nothing here predicts it - `estimate` measures it per run instead.
+QUALITY_OVERLAP = 4
+
+
+@dataclass(frozen=True)
+class Variant:
+    """One model plus its tuning: what a preset means for one inference runtime.
+
+    Models are named as an ordered list rather than singly because the
+    catalogue is fetched from audio-separator at runtime and its contents are
+    not this project's to pin. The first candidate the catalogue actually
+    offers wins, and a catalogue that offers none of them still resolves to
+    something sensible.
+    """
+
+    architecture: str
+    candidates: tuple[str, ...]
+    values: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Preset:
+    """A named speed/quality trade-off, in the terms of the machine running it.
+
+    Which model is quicker is not a property of the model alone: a build
+    accelerates PyTorch, ONNX Runtime, both or neither, and a model that misses
+    its runtime's accelerator is slower than a heavier one that reaches it. A
+    preset therefore names the trade-off and lets the machine pick the variant
+    that expresses it here.
+    """
+
+    key: str
+    label: str
+    summary: str
+    variant: Variant
+    # Used instead of `variant` where PyTorch is accelerated and ONNX Runtime
+    # is not. Absent on a preset whose own variant is a Torch model already.
+    torch_variant: Variant | None = None
+
+    def resolve(self, *, prefers_torch: bool = False) -> Variant:
+        if prefers_torch and self.torch_variant is not None:
+            return self.torch_variant
+        return self.variant
+
+
+PRESETS: tuple[Preset, ...] = (
+    Preset(
+        key=FAST_MODE,
+        label="Fast",
+        # No ratio is quoted here on purpose: how much quicker depends on the
+        # model, the device and the machine's load, and the status line answers
+        # it from this machine's own measured throughput.
+        summary="A lighter model. Much quicker, with a little more bleed into the vocal.",
+        variant=Variant(architecture="MDX", candidates=MDX_CANDIDATES),
+        # The same model, taken through PyTorch instead of ONNX Runtime. Only
+        # the route changes, so switching accelerator never downloads anything.
+        torch_variant=Variant(
+            architecture="MDX",
+            candidates=MDX_CANDIDATES,
+            values={"mdx_segment_size": MDX_TORCH_SEGMENT},
+        ),
+    ),
+    Preset(
+        key=QUALITY_MODE,
+        label="High quality",
+        summary="The best model in the catalogue, over more passes. The cleanest, and slower.",
+        # A roformer is a Torch model, so it is already the answer on a build
+        # that only accelerates Torch, and no second variant applies.
+        variant=Variant(
+            architecture="MDXC",
+            candidates=ROFORMER_CANDIDATES,
+            values={"mdxc_overlap": QUALITY_OVERLAP},
+        ),
+    ),
+)
+
+
+def preset(key: str) -> Preset | None:
+    return next((item for item in PRESETS if item.key == key), None)
 
 
 @dataclass(frozen=True)
@@ -194,6 +320,13 @@ class Catalogue:
     def architecture_of(self, filename: str) -> str | None:
         model = self.by_filename(filename)
         return model.architecture if model else None
+
+    def best_of(self, architecture: str) -> Model | None:
+        """The highest-scoring vocal model of one architecture, if any."""
+        # `models` is already sorted best score first.
+        return next(
+            (model for model in self.models if model.architecture == architecture), None
+        )
 
 
 def parse_catalogue(data: dict[str, Any]) -> Catalogue:
@@ -262,14 +395,26 @@ class Settings:
     model: str = DEFAULT_MODEL
     accelerator: str = "auto"
     values: dict[str, Any] = field(default_factory=dict)
+    # Which quality preset produced `model` and `values`, or CUSTOM once either
+    # has been edited by hand. A preset therefore always names exactly one
+    # known configuration, and hand tuning is never silently relabelled.
+    mode: str = QUALITY_MODE
 
     def value(self, option: Option) -> Any:
         return self.values.get(option.name, option.default)
 
     def with_model(self, model: str) -> "Settings":
-        return replace(self, model=model)
+        return replace(self, model=model, mode=CUSTOM_MODE)
+
+    def as_custom(self) -> "Settings":
+        """Keep the configuration, stop claiming a preset produced it."""
+        return replace(self, mode=CUSTOM_MODE)
 
     def with_accelerator(self, accelerator: str) -> "Settings":
+        # Acceleration is a property of the machine, not of the quality traded
+        # for speed, so choosing it leaves the preset intact. Which model
+        # expresses that preset here does change with it, but resolving one
+        # takes the catalogue, so the caller reapplies the preset afterwards.
         return replace(self, accelerator=accelerator)
 
     def with_value(self, option: Option, value: Any) -> "Settings":
@@ -278,7 +423,9 @@ class Settings:
             values.pop(option.name, None)
         else:
             values[option.name] = value
-        return replace(self, values=values)
+        if values == self.values:
+            return self
+        return replace(self, values=values, mode=CUSTOM_MODE)
 
     def options(self, architecture: str | None) -> tuple[tuple[str, tuple[Option, ...]], ...]:
         groups = [("Common", COMMON_OPTIONS)]
@@ -303,6 +450,55 @@ class Settings:
         return arguments
 
 
+def resolve_preset_model(variant: Variant, catalogue: Catalogue) -> str:
+    """The model a preset variant means on this installation.
+
+    A candidate is preferred over the catalogue's own best because the
+    candidates are the models this pipeline has been tuned and measured
+    against; the architecture fallback only matters when every one of them has
+    been renamed or withdrawn upstream.
+    """
+    for candidate in variant.candidates:
+        if catalogue.by_filename(candidate) is not None:
+            return candidate
+    best = catalogue.best_of(variant.architecture)
+    if best is not None:
+        return best.filename
+    # No catalogue at all, which is the state before the runtime is installed.
+    # The first candidate is still the intended answer; it just cannot be
+    # confirmed yet, and is re-resolved once the catalogue loads.
+    return variant.candidates[0] if variant.candidates else DEFAULT_MODEL
+
+
+def apply_preset(
+    settings: Settings,
+    item: Preset,
+    catalogue: Catalogue,
+    *,
+    prefers_torch: bool = False,
+) -> Settings:
+    """Return `settings` reconfigured for one preset, discarding hand tuning.
+
+    `prefers_torch` is `Acceleration.prefers_torch` for the machine this will
+    run on; it decides which variant expresses the preset here.
+    """
+    variant = item.resolve(prefers_torch=prefers_torch)
+    model = resolve_preset_model(variant, catalogue)
+    architecture = catalogue.architecture_of(model) or variant.architecture
+    applicable = {
+        option.name: option
+        for _, options in Settings().options(architecture)
+        for option in options
+    }
+    # An override for another architecture must not reach the command line, and
+    # one that already matches the default is noise in the stored settings.
+    values = {
+        name: value for name, value in variant.values.items()
+        if name in applicable and value != applicable[name].default
+    }
+    return replace(settings, model=model, values=values, mode=item.key)
+
+
 def load_settings(path: pathlib.Path) -> Settings:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -311,6 +507,7 @@ def load_settings(path: pathlib.Path) -> Settings:
     model = data.get("model")
     accelerator = data.get("accelerator")
     values = data.get("values")
+    mode = data.get("mode")
     known = set(known_option_names())
     return Settings(
         model=model if isinstance(model, str) and model else DEFAULT_MODEL,
@@ -318,6 +515,9 @@ def load_settings(path: pathlib.Path) -> Settings:
         # A setting written by a later version must not reach the command line.
         values={key: value for key, value in (values or {}).items() if key in known}
         if isinstance(values, dict) else {},
+        # Settings written before presets existed carry no mode, and describing
+        # them as a preset would misreport what they hold.
+        mode=mode if mode in {item.key for item in PRESETS} | {CUSTOM_MODE} else CUSTOM_MODE,
     )
 
 
@@ -326,6 +526,7 @@ def save_settings(path: pathlib.Path, settings: Settings) -> None:
     path.write_text(json.dumps({
         "model": settings.model,
         "accelerator": settings.accelerator,
+        "mode": settings.mode,
         "values": settings.values,
     }, indent=2) + "\n", encoding="utf-8")
 

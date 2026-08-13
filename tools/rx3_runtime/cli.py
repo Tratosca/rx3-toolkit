@@ -31,11 +31,19 @@ def main() -> int:
     definitions = discover_patches(root, args.firmware)
     if args.command == "list":
         for patch in definitions:
+            if not patch.selectable:
+                continue
             marker = "default" if patch.default else "optional"
-            print(f"{patch.patch_id:24} {marker:8} {patch.name} — {patch.description}")
+            dependencies = f" (requires: {', '.join(patch.requires)})" if patch.requires else ""
+            print(
+                f"{patch.patch_id:24} {marker:8} {patch.name} — "
+                f"{patch.description}{dependencies}"
+            )
         return 0
 
-    selected = args.patches or [patch.patch_id for patch in definitions if patch.default]
+    selected = args.patches or [
+        patch.patch_id for patch in definitions if patch.selectable and patch.default
+    ]
     result = build_runtime(
         args.firmware,
         selected,

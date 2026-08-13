@@ -13,7 +13,7 @@ import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from tools.rx3_stems import provisioning, separation, sidecar
+from tools.rx3_stems import estimate, provisioning, separation, sidecar
 from tools.rx3_stems import job as job_module
 from tools.rx3_stems.job import JobState, StemJob, failure_detail
 from tools.rx3_stems.rekordbox import (
@@ -1023,6 +1023,470 @@ class EngineTests(unittest.TestCase):
                 values = runtime.subprocess_environment()
             self.assertEqual(values["PATH"], os.environ.get("PATH", ""))
             self.assertFalse((pathlib.Path(directory) / "bin").exists())
+
+
+class TrackPositionTests(unittest.TestCase):
+    """`completed` counts finished work; `position` says which track is running.
+
+    Showing the first beside the name of the track being processed is what made
+    the progress line read one behind reality.
+    """
+
+    def playlist(self, root: pathlib.Path, count: int):
+        tracks = []
+        for index in range(count):
+            audio = root / f"Artist - Track {index}.aiff"
+            audio.write_bytes(b"fixture")
+            tracks.append((str(index + 1), f"Track {index}", "Artist", audio))
+        return parse_collection(write_export(root, tracks))
+
+    def test_position_leads_completed_while_a_track_is_running(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            collection = self.playlist(root, 3)
+            output = root / "export"
+            stems = output / "RX3_STEMS"
+            stems.mkdir(parents=True)
+            for index in range(3):
+                (stems / f"Artist - Track {index}.rx3stem").write_bytes(b"x" * 128)
+
+            seen: list[tuple[str, int, int]] = []
+            StemJob(
+                provisioning.detect(), collection, collection.playlists[0], output,
+                observer=lambda state: seen.append(
+                    (state.current, state.position, state.completed)
+                ),
+            ).run()
+
+            # Every update that names a track names it at its own position, and
+            # never reports it as already counted.
+            named = [entry for entry in seen if entry[0]]
+            self.assertTrue(named)
+            for current, position, completed in named:
+                self.assertEqual(current, f"Artist — Track {position - 1}")
+                self.assertLess(completed, position + 1)
+            self.assertEqual(min(position for _, position, _ in named), 1)
+
+    def test_position_and_completed_both_reach_the_total(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            collection = self.playlist(root, 2)
+            output = root / "export"
+            stems = output / "RX3_STEMS"
+            stems.mkdir(parents=True)
+            for index in range(2):
+                (stems / f"Artist - Track {index}.rx3stem").write_bytes(b"x" * 128)
+
+            state = StemJob(
+                provisioning.detect(), collection, collection.playlists[0], output
+            ).run()
+            self.assertEqual(state.state, "done")
+            self.assertEqual(state.position, 2)
+            self.assertEqual(state.completed, 2)
+            self.assertEqual(state.total, 2)
+
+
+class EstimateTests(unittest.TestCase):
+    def test_the_first_measurement_replaces_the_seeded_guess(self):
+        estimator = estimate.Estimator("MDXC", "cpu")
+        self.assertFalse(estimator.measured)
+        seeded = estimator.rate
+        estimator.observe(audio_seconds=200, elapsed=100)
+        self.assertTrue(estimator.measured)
+        self.assertAlmostEqual(estimator.rate, 0.5)
+        self.assertNotAlmostEqual(estimator.rate, seeded)
+
+    def test_later_measurements_are_blended_rather_than_obeyed(self):
+        estimator = estimate.Estimator("MDX", "cpu")
+        estimator.observe(audio_seconds=100, elapsed=100)   # rate 1.0
+        estimator.observe(audio_seconds=100, elapsed=200)   # rate 2.0
+        self.assertGreater(estimator.rate, 1.0)
+        self.assertLess(estimator.rate, 2.0)
+
+    def test_a_resumed_track_cannot_collapse_the_rate(self):
+        """An existing sidecar costs no time and says nothing about speed."""
+        estimator = estimate.Estimator("MDX", "cpu")
+        estimator.observe(audio_seconds=100, elapsed=100)
+        estimator.observe(audio_seconds=300, elapsed=0.001)
+        self.assertAlmostEqual(estimator.rate, 1.0)
+
+    def test_repeated_measurements_converge_on_the_truth(self):
+        estimator = estimate.Estimator("Demucs", "cpu")
+        for _ in range(20):
+            estimator.observe(audio_seconds=100, elapsed=250)
+        self.assertAlmostEqual(estimator.rate, 2.5, places=3)
+
+    def test_an_export_without_durations_yields_no_estimate(self):
+        estimator = estimate.Estimator("MDX", "cpu")
+        self.assertIsNone(estimator.remaining(0))
+
+    def test_measured_rates_survive_to_the_next_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / estimate.THROUGHPUT_NAME
+            estimator = estimate.estimator_for(path, "MDXC", "mps")
+            self.assertFalse(estimator.measured)
+            estimator.observe(audio_seconds=100, elapsed=42)
+            estimate.remember(path, estimator)
+
+            restored = estimate.estimator_for(path, "MDXC", "mps")
+            self.assertTrue(restored.measured)
+            self.assertAlmostEqual(restored.rate, 0.42)
+            # Another pairing is a different machine configuration entirely.
+            self.assertFalse(estimate.estimator_for(path, "MDXC", "cpu").measured)
+
+    def test_an_unmeasured_estimator_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / estimate.THROUGHPUT_NAME
+            estimate.remember(path, estimate.Estimator("MDX", "cpu"))
+            self.assertFalse(path.exists())
+
+    def test_damaged_calibration_is_ignored_rather_than_fatal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / estimate.THROUGHPUT_NAME
+            path.write_text("{not json", encoding="utf-8")
+            self.assertEqual(estimate.load_rates(path), {})
+            self.assertFalse(estimate.estimator_for(path, "MDX", "cpu").measured)
+
+    def test_durations_are_phrased_at_the_precision_they_support(self):
+        self.assertEqual(estimate.format_duration(None), "unknown")
+        self.assertEqual(estimate.format_duration(12), "under a minute")
+        self.assertEqual(estimate.format_duration(59), "under a minute")
+        self.assertEqual(estimate.format_duration(90), "about 2 min")
+        self.assertEqual(estimate.format_duration(2040), "about 34 min")
+        self.assertEqual(estimate.format_duration(3600), "about 1 h")
+        self.assertEqual(estimate.format_duration(4800), "about 1 h 20 min")
+
+    def test_a_forecast_names_the_playlist_and_flags_a_rough_estimate(self):
+        tracks = [unittest.mock.Mock(duration=300) for _ in range(4)]
+        rough = estimate.forecast(tracks, estimate.Estimator("MDX", "cpu"))
+        self.assertEqual(rough.tracks, 4)
+        self.assertEqual(rough.audio_seconds, 1200)
+        self.assertFalse(rough.measured)
+        self.assertIn("4 tracks", rough.summary)
+        self.assertIn("20 min of audio", rough.summary)
+        self.assertIn("(rough)", rough.summary)
+
+        estimator = estimate.Estimator("MDX", "cpu")
+        estimator.observe(audio_seconds=100, elapsed=100)
+        measured = estimate.forecast(tracks, estimator)
+        self.assertTrue(measured.measured)
+        self.assertEqual(measured.seconds, 1200)
+        self.assertIn("about 20 min", measured.summary)
+        self.assertNotIn("(rough)", measured.summary)
+
+
+class QualityPresetTests(unittest.TestCase):
+    def catalogue(self, *entries: tuple[str, str, float]) -> separation.Catalogue:
+        return separation.Catalogue(models=tuple(
+            separation.Model(
+                architecture=architecture, name=filename, filename=filename,
+                stems=("Vocals", "Instrumental"), vocal_sdr=sdr,
+                download_files=(filename,),
+            )
+            for filename, architecture, sdr in entries
+        ))
+
+    def variants(self):
+        """Every (preset, variant) pairing a machine can actually resolve to."""
+        for preset in separation.PRESETS:
+            yield preset, preset.resolve()
+            if preset.torch_variant is not None:
+                yield preset, preset.resolve(prefers_torch=True)
+
+    def test_a_preset_takes_its_first_candidate_the_catalogue_offers(self):
+        for preset, variant in self.variants():
+            catalogue = self.catalogue(
+                (variant.candidates[1], variant.architecture, 9.0),
+                (variant.candidates[0], variant.architecture, 8.0),
+            )
+            resolved = separation.apply_preset(
+                separation.Settings(), preset, catalogue,
+                prefers_torch=variant is preset.torch_variant,
+            )
+            # The order of the candidate list wins over the catalogue's score:
+            # these are the models this pipeline has been measured against.
+            self.assertEqual(resolved.model, variant.candidates[0])
+            self.assertEqual(resolved.mode, preset.key)
+
+    def test_a_withdrawn_candidate_falls_back_to_the_best_of_its_architecture(self):
+        preset = separation.preset(separation.FAST_MODE)
+        variant = preset.resolve()
+        catalogue = self.catalogue(
+            ("renamed_upstream.onnx", variant.architecture, 12.4),
+            ("weaker.onnx", variant.architecture, 9.0),
+            ("another_architecture.ckpt", "MDXC", 13.0),
+        )
+        resolved = separation.apply_preset(separation.Settings(), preset, catalogue)
+        # The best of the preset's own architecture, not the best overall: the
+        # tuning and the timings only hold for that architecture.
+        self.assertEqual(resolved.model, "renamed_upstream.onnx")
+
+    def test_an_empty_catalogue_still_resolves_to_something_runnable(self):
+        """The state before the runtime is installed, so before any model list."""
+        for preset, variant in self.variants():
+            resolved = separation.apply_preset(
+                separation.Settings(), preset, separation.Catalogue(),
+                prefers_torch=variant is preset.torch_variant,
+            )
+            self.assertEqual(resolved.model, variant.candidates[0])
+            self.assertEqual(resolved.mode, preset.key)
+
+    def test_a_preset_only_passes_arguments_of_its_own_architecture(self):
+        for preset, variant in self.variants():
+            catalogue = self.catalogue(
+                (variant.candidates[0], variant.architecture, 10.0)
+            )
+            resolved = separation.apply_preset(
+                separation.Settings(), preset, catalogue,
+                prefers_torch=variant is preset.torch_variant,
+            )
+            arguments = " ".join(resolved.arguments(variant.architecture))
+            for other, options in separation.ARCHITECTURE_OPTIONS.items():
+                if other == variant.architecture:
+                    continue
+                for option in options:
+                    self.assertNotIn(option.flag, arguments)
+
+    def test_fast_asks_for_a_lighter_model_than_quality(self):
+        """The presets trade a model, not just a parameter: the roformer that
+        wins on quality has no setting that makes it cheap enough for a DJ
+        preparing a set, so `fast` moves to a smaller architecture."""
+        for prefers_torch in (False, True):
+            fast = separation.preset(separation.FAST_MODE).resolve(
+                prefers_torch=prefers_torch
+            )
+            quality = separation.preset(separation.QUALITY_MODE).resolve(
+                prefers_torch=prefers_torch
+            )
+            self.assertNotEqual(fast.architecture, quality.architecture)
+            self.assertEqual(set(fast.candidates) & set(quality.candidates), set())
+
+    def test_quality_asks_for_more_passes_than_the_model_would(self):
+        """`mdxc_overlap` is a hop divisor, not an amount of overlap: lowering
+        it steps the prediction window less far, so the result is stitched from
+        more passes over the audio. Reading it the other way round, as the
+        option's help text once did, inverts the preset."""
+        option = next(
+            item for item in separation.ARCHITECTURE_OPTIONS["MDXC"]
+            if item.name == "mdxc_overlap"
+        )
+        # A preset that reduced to the model's own default would be a rename,
+        # not a trade-off.
+        self.assertLess(separation.QUALITY_OVERLAP, option.default)
+        self.assertNotIn("Higher is better", option.help)
+
+    def test_a_torch_only_build_routes_the_fast_model_through_torch(self):
+        """audio-separator opens an ONNX Runtime session only while the segment
+        size equals the model's own `dim_t`, and converts the graph to Torch
+        otherwise. Where ONNX Runtime cannot reach the GPU, that conversion is
+        the difference between separating on the GPU and on the CPU."""
+        fast = separation.preset(separation.FAST_MODE)
+        direct, through_torch = fast.resolve(), fast.resolve(prefers_torch=True)
+        # Same model either way, so no accelerator change costs a download.
+        self.assertEqual(direct.candidates, through_torch.candidates)
+        self.assertEqual(direct.architecture, through_torch.architecture)
+        self.assertNotIn("mdx_segment_size", direct.values)
+        self.assertEqual(through_torch.values["mdx_segment_size"],
+                         separation.MDX_TORCH_SEGMENT)
+
+    def test_the_torch_route_asks_for_a_segment_the_onnx_one_would_not(self):
+        """A segment size equal to `dim_t` is what keeps the ONNX session, and
+        `dim_t` is 256 for every candidate the fast preset names - which is
+        also the option's own default, so the ONNX path is the one taken by
+        doing nothing. The Torch route has to differ from it to exist."""
+        option = next(
+            item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
+            if item.name == "mdx_segment_size"
+        )
+        self.assertNotEqual(separation.MDX_TORCH_SEGMENT, option.default)
+        self.assertLessEqual(separation.MDX_TORCH_SEGMENT, option.maximum)
+
+    def test_a_build_that_accelerates_neither_runtime_keeps_onnx(self):
+        """With nothing to move the work to, the conversion only costs time."""
+        quality = separation.preset(separation.QUALITY_MODE)
+        # A roformer is Torch already, so nothing about the accelerator can
+        # change what the quality preset means.
+        self.assertIs(quality.resolve(prefers_torch=True), quality.resolve())
+        prefers = {
+            key: acceleration.prefers_torch
+            for key, acceleration in provisioning.ACCELERATIONS.items()
+        }
+        # ROCm has no ONNX GPU provider at all; on Apple Silicon CoreML lists
+        # one but splits the graph and leaves the work interleaved with the
+        # CPU. DirectML accelerates ONNX alone, CUDA both, and the CPU build
+        # neither - none of those want the conversion.
+        self.assertEqual({key for key, value in prefers.items() if value},
+                         {"rocm", "mps"})
+
+    def test_editing_a_parameter_demotes_the_preset_to_custom(self):
+        settings = separation.apply_preset(
+            separation.Settings(), separation.preset(separation.QUALITY_MODE),
+            separation.Catalogue(),
+        )
+        self.assertEqual(settings.mode, separation.QUALITY_MODE)
+        option = separation.normalization_option()
+        edited = settings.with_value(option, 0.5)
+        self.assertEqual(edited.mode, separation.CUSTOM_MODE)
+
+    def test_choosing_a_model_by_hand_demotes_the_preset_to_custom(self):
+        settings = separation.Settings()
+        self.assertEqual(settings.mode, separation.QUALITY_MODE)
+        self.assertEqual(settings.with_model("something_else.ckpt").mode,
+                         separation.CUSTOM_MODE)
+
+    def test_a_parameter_set_to_the_value_it_already_had_changes_nothing(self):
+        """Reapplying the dialog unchanged must not relabel the preset."""
+        settings = separation.apply_preset(
+            separation.Settings(), separation.preset(separation.QUALITY_MODE),
+            separation.Catalogue(),
+        )
+        option = separation.normalization_option()
+        self.assertEqual(settings.with_value(option, settings.value(option)), settings)
+
+    def test_choosing_an_accelerator_leaves_the_preset_alone(self):
+        """Acceleration is a property of the machine, not of the trade-off."""
+        settings = separation.Settings()
+        self.assertEqual(settings.with_accelerator("cpu").mode, settings.mode)
+
+    def test_the_mode_survives_a_round_trip_through_disk(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / separation.SETTINGS_NAME
+            for mode in (separation.FAST_MODE, separation.QUALITY_MODE,
+                         separation.CUSTOM_MODE):
+                settings = separation.Settings(mode=mode)
+                separation.save_settings(path, settings)
+                self.assertEqual(separation.load_settings(path).mode, mode)
+
+    def test_settings_written_before_presets_existed_read_as_custom(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / separation.SETTINGS_NAME
+            path.write_text(
+                '{"model": "some_model.ckpt", "accelerator": "cpu", "values": {}}',
+                encoding="utf-8",
+            )
+            # Describing an unknown configuration as a preset would misreport
+            # what it holds.
+            self.assertEqual(separation.load_settings(path).mode, separation.CUSTOM_MODE)
+
+
+class ThemeTests(unittest.TestCase):
+    """The palette has to come from what Tk paints, not from a fixed guess."""
+
+    def module(self):
+        application = pathlib.Path(__file__).parents[1] / "apps/rx3-toolbox"
+        if str(application) not in sys.path:
+            sys.path.insert(0, str(application))
+        import theme
+
+        return theme
+
+    _root = None
+    _unavailable = "not probed"
+
+    @classmethod
+    def setUpClass(cls):
+        # One Tk interpreter for the whole class. Creating and destroying a
+        # root per test crashes some macOS Tk builds outright, taking the rest
+        # of the suite with it, so each test gets a Toplevel on a shared root.
+        #
+        # The probe runs out of process for the same reason: when Aqua cannot
+        # be initialised, Tk aborts rather than raising, and a headless run has
+        # to be skipped rather than killed.
+        probe = subprocess.run(
+            [sys.executable, "-c", "import tkinter as tk; tk.Tk().destroy()"],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+        if probe.returncode:
+            detail = (probe.stderr or probe.stdout).strip().splitlines()
+            cls._unavailable = detail[-1] if detail else f"exit status {probe.returncode}"
+            return
+        tkinter = __import__("tkinter")
+        try:
+            cls._root = tkinter.Tk()
+            cls._root.withdraw()
+        except tkinter.TclError as error:  # No display, as on a headless runner.
+            cls._unavailable = str(error)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._root is not None:
+            cls._root.destroy()
+            cls._root = None
+
+    def root(self):
+        """A window of this test's own, on the shared interpreter."""
+        if self._root is None:
+            raise unittest.SkipTest(f"Tk is unavailable: {self._unavailable}")
+        return __import__("tkinter").Toplevel(self._root)
+
+    def test_the_window_themes_and_reflows_without_looping(self):
+        """One window, exercising every live behaviour of the theme module.
+
+        Kept as a single test because each one costs a mapped Tk window: the
+        palette comes from what Tk paints, marked labels follow the width they
+        are given, and neither the reflow nor the scrollbar may feed its own
+        event back into itself.
+        """
+        theme = self.module()
+        window = self.root()
+        try:
+            from tkinter import ttk
+
+            style = ttk.Style(window)
+            style.configure("TFrame", background="#ffffff")
+            self.assertFalse(theme.is_dark(window))
+            style.configure("TFrame", background="#1e1e1e")
+            self.assertTrue(theme.is_dark(window))
+
+            palette = theme.apply(window)
+            self.assertEqual(style.lookup("Muted.TLabel", "foreground"), palette.muted)
+            self.assertEqual(style.lookup("Warning.TLabel", "foreground"), palette.warning)
+
+            window.geometry("600x400")
+            label = theme.wrapping(ttk.Label(window, text="word " * 200), inset=40)
+            label.pack(fill="x")
+            scroller = theme.ScrollFrame(window)
+            scroller.pack(fill="both", expand=True)
+            ttk.Label(scroller.body, text="short").pack()
+            theme.follow_width(window)
+            window.update_idletasks()
+            window.update()
+
+            reflowed = label.cget("wraplength")
+            self.assertGreater(reflowed, theme.MINIMUM_WRAP)
+            self.assertFalse(scroller._bar_shown)
+            roomy = scroller._canvas.winfo_width()
+
+            # Every widget carries its toplevel in its bind tags, so a Toplevel
+            # bound for <Configure> is handed each descendant's too. Reflowing
+            # to an inner widget's width resizes it, which reports it again.
+            # Filling the scroller must likewise not narrow its own viewport,
+            # or the rewrapped text changes height and hides the bar again.
+            for index in range(40):
+                ttk.Label(scroller.body, text=f"row {index}").pack()
+            window.update_idletasks()
+            window.update()
+
+            self.assertEqual(label.cget("wraplength"), reflowed)
+            self.assertTrue(scroller._bar_shown)
+            self.assertEqual(scroller._canvas.winfo_width(), roomy)
+        finally:
+            window.destroy()
+
+    def test_the_two_appearances_never_share_a_colour(self):
+        theme = self.module()
+        for key in ("muted", "warning", "text_background", "text_foreground"):
+            self.assertNotEqual(theme.LIGHT[key], theme.DARK[key])
+
+    def test_no_pane_hard_codes_a_colour_or_a_wrap_width(self):
+        """A fixed grey is unreadable in the appearance it was not chosen for,
+        and a wraplength in pixels makes the window a fixed-width document."""
+        application = pathlib.Path(__file__).parents[1] / "apps/rx3-toolbox"
+        for pane in ("mod_generator.py", "stem_studio.py"):
+            source = (application / pane).read_text(encoding="utf-8")
+            self.assertNotIn("foreground=", source)
+            self.assertNotIn("#555555", source)
+            self.assertNotIn("wraplength=", source)
 
 
 if __name__ == "__main__":

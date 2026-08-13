@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 /*
- * Asynchronous two-deck vocal stem hook for XDJ-RX3 firmware 1.19.
+ * Modular two-deck performance core for XDJ-RX3 firmware 1.19.
  *
- * The hook associates a basename-matched sidecar in PcmReader::load and
- * applies the selected component state in PcmReader::getStreamAt. Pad 7 and
- * pad 8 are independent instrumental and vocal toggles in Slip Loop mode.
- * Without a valid sidecar, audio and pad events follow the stock path.
+ * The core is the sole broker for guarded inline hooks, deck identity, native
+ * rendering and touch routing. Optional Stems and Key Shift features own
+ * disjoint state and hook groups and can fail independently.
  *
  * Both pads blink while a sidecar is being read and hold their colour once it
  * is resident, so the operator can see when the toggles become effective.
@@ -20,24 +19,86 @@
  *
  * Instrumental output is full mix minus vocal. Both signals must originate
  * from the same decode path to preserve phase, delay, and gain alignment.
+ * The resulting stream is then passed through rbp's native BeatEffectPitch,
+ * independently for each deck. The performance overlay clones an existing
+ * NS_GlyphText object, so text, rectangles, fonts, and clipping stay inside
+ * rbp's own UI renderer.
  */
 
 #define GET_STREAM_AT ((unsigned long)0x0003d1e0)
 #define PCM_LOAD      ((unsigned long)0x00038ff0)
 #define ON_KEY_PAD    ((unsigned long)0x003060e8)
+#define ON_KEY_HOT_CUE ((unsigned long)0x003030ec)
+#define ON_KEY_BEAT_LOOP ((unsigned long)0x003031cc)
+#define ON_KEY_SLIP_LOOP ((unsigned long)0x00303238)
+#define ON_KEY_BEAT_JUMP ((unsigned long)0x00303294)
 #define CHECK_SLIP_LED ((unsigned long)0x002fcc04)
 #define SET_LED_COLOR  ((unsigned long)0x0033e4f8)
 #define SET_LED_STATE  ((unsigned long)0x0033e3f4)
+#define PAL_DRAW_TEXT  ((unsigned long)0x001d23e4)
+#define PAL_DRAW_IMAGE ((unsigned long)0x001d3284)
+#define SOLVE_TOUCH    ((unsigned long)0x002dc104)
+#define BEATFX_XPAD_CTOR ((unsigned long)0x0035b0f8)
+#define TOUCH_BUTTON_ON  ((unsigned long)0x00360594)
+#define TOUCH_BUTTON_HOLD ((unsigned long)0x00360610)
+#define TOUCH_TOGGLE_ON  ((unsigned long)0x003606dc)
+#define TOUCH_TOGGLE_OFF ((unsigned long)0x00360728)
+#define TOUCH_XPAD_ON    ((unsigned long)0x00360a00)
+#define TOUCH_XPAD_OFF   ((unsigned long)0x00360a44)
+#define TOUCH_XPAD_HOLD  ((unsigned long)0x00360e5c)
+#define TOUCH_BUTTON_OFF ((unsigned long)0x00363280)
+#define AUDIO_START    ((unsigned long)0x000447b8)
+/* dsp::TimeStretch::getStreamAt is the deck's playback stream. It wraps
+   PcmReader::getStreamAt and is the speed and master-tempo stage, so its output
+   is what the deck actually plays. PcmReader::getStreamAt itself is shared with
+   Player::update's BPM and waveform analysis scan, which walks the whole track
+   out of order; a sequential DSP cannot sit there. TimeStretch+4 is the reader,
+   which identifies the deck. */
+#define RENDER_CUR_POS ((unsigned long)0x001d46f0)
+#define GET_HMI_MANAGER ((unsigned long)0x001d09b4)
+#define REFRESH_GLYPH   ((unsigned long)0x001d07b0)
+#define SET_BEATFX_STORAGE ((unsigned long)0x001331fc)
 
 #define LOG_FILE  "/tmp/rx3-stems.log"
+#define READY_FILE "/tmp/rx3-performance.ready"
 
 #define TRANSITION_FRAMES 256u
 
-/* uif::Led::State, and the half-period of the loading indication. */
+/* uif::Led::State, and the half-period of the loading indication.
+   SubMiconTx::setFullColorLed lights a blinking LED while
+   floor((juce::Time::currentTimeMillis() - started_at) / period) is even, so
+   the period the panel is given is the half-period: 500 ms is one second on,
+   one second off. The on-screen toggles reuse the same origin and formula. */
 #define LED_OFF   0
 #define LED_ON    1
 #define LED_BLINK 2
-#define BLINK_PERIOD_MS 50u
+#define BLINK_PERIOD_MS 500u
+#define PERFORMANCE_VISIBLE_US 500000u
+#define RX3_DIAGNOSTIC_ONLY 0
+#define RX3_PITCH_DIAGNOSTIC 1
+#define BEATFX_LEFT_LAYER 0x1701u
+#define XPAD_RIGHT_LAYER  0x1801u
+#define HEADER_LAYER      0x0101u
+#define PERFORMANCE_TAB_LAYER 0x0e01u
+
+/* Private IDs above NS_GetImageCount() == 0x15cd. The image-info hook resolves
+   only these IDs to private RGB565 records, so no Pioneer resource or cached
+   DirectFB surface is overwritten. IDs 0x0d7c..0x0d84 were previously used
+   here by mistake; static extraction proved that they are the live SOURCE
+   Aqua/Blue/Default colour selector. */
+#define TAB_IMAGE_KEY   0x1600u
+#define TAB_IMAGE_STEMS 0x1601u
+#define TAB_IMAGE_STATUS_NONE 0x1602u
+#define TAB_IMAGE_KEY_NONE 0x1603u
+#define TAB_IMAGE_BYTES 18000u
+#define TAB_IMAGE_COUNT 4u
+#define STOCK_IMAGE_COUNT 0x15cdu
+#define EXTENDED_IMAGE_COUNT 0x1604u
+#define IMAGE_TABLE_POINTER ((unsigned long)0x05a14f60)
+#define TAB_KEY_PATH "/root/pdj/rx3-key-selected.rgb565"
+#define TAB_STEMS_PATH "/root/pdj/rx3-stems-selected.rgb565"
+#define TAB_STATUS_NONE_PATH "/root/pdj/rx3-status-none-selected.rgb565"
+#define TAB_KEY_NONE_PATH "/root/pdj/rx3-none-selected.rgb565"
 
 /* Reject a stem above this fraction of estimated available RAM. */
 #define MEM_NUMERATOR   3
@@ -70,9 +131,12 @@ extern int      memcmp(const void *, const void *, size_t);
 extern char    *getenv(const char *);
 extern int      pthread_create(pthread_t *, const void *, void *(*)(void *), void *);
 extern int      pthread_detach(pthread_t);
+extern int      usleep(unsigned int);
+extern int      gettimeofday(void *, void *);
 
 #define O_RDONLY 0
 #define O_WRONLY 1
+#define O_NONBLOCK 04000
 #define O_CREAT  0100
 #define O_TRUNC  01000
 #define O_APPEND 02000
@@ -91,6 +155,10 @@ extern int      pthread_detach(pthread_t);
 typedef struct { float left, right; } Float2;
 typedef struct { int16_t left, right; } Short2;
 
+#include "rx3_feature_api.h"
+#include "../../keyshift/1.19/rx3_keyshift_decl.h"
+#include "../../stems/1.19/rx3_stems_decl.h"
+
 typedef unsigned long (*get_stream_fn)(void *, unsigned long, Float2 *, unsigned long);
 typedef int (*load_fn)(void *, const void *);
 typedef int (*on_key_pad_fn)(void *, const void *);
@@ -100,25 +168,18 @@ typedef void (*set_led_color_fn)(void *, int, int, const void *);
    With State 2 the panel runs the blink itself, so the rate of the LED refresh
    this hook rides on does not affect the cadence. */
 typedef void (*set_led_state_fn)(void *, int, unsigned int, unsigned int, long, int);
-
-enum stem_mode {
-    MODE_NONE = 0,
-    MODE_INSTRUMENTAL = 1,
-    MODE_VOCAL = 2,
-    MODE_BOTH = MODE_INSTRUMENTAL | MODE_VOCAL
-};
-
-enum sidecar_format { FORMAT_F32 = 1, FORMAT_S16 = 2 };
-
-struct __attribute__((packed)) sidecar_header {
-    char     magic[8];
-    uint32_t sample_rate;
-    uint32_t channels;
-    uint32_t format;
-    uint32_t header_size;
-    uint64_t frames;
-    uint8_t  reserved[32];
-};
+typedef void (*draw_text_fn)(void *, void *);
+typedef void (*draw_image_fn)(void *, void *);
+typedef void (*solve_touch_fn)(void *, const void *, const void *);
+typedef void *(*beatfx_xpad_ctor_fn)(void *, void *);
+typedef void (*touch_area_fn)(void *);
+typedef void (*touch_area_hold_fn)(void *, unsigned int, unsigned int);
+typedef void (*audio_start_fn)(void *, void *);
+typedef int (*audio_buffer_size_fn)(void *);
+typedef double (*audio_sample_rate_fn)(void *);
+typedef void (*render_cur_pos_fn)(int *, int *);
+typedef void (*set_beatfx_selected_fn)(int);
+typedef int (*get_beatfx_selected_fn)(void);
 
 /* Expected prologues, checked before writing executable code. */
 static const uint8_t get_stream_guard[8] = {
@@ -130,44 +191,153 @@ static const uint8_t load_guard[8] = {
 static const uint8_t pad_guard[8] = {
     0xb8, 0x30, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
 };
+static const uint8_t hot_cue_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+static const uint8_t pad_mode_guard[8] = {
+    0x0b, 0x30, 0xd1, 0xe5, 0x00, 0x20, 0xa0, 0xe1
+};
 /* This prologue contains a PC-relative ldr and requires literal relocation. */
 static const uint8_t slip_led_guard[8] = {
     0xb4, 0x3d, 0x9f, 0xe5, 0xf0, 0x4f, 0x2d, 0xe9
 };
+static const uint8_t draw_text_guard[8] = {
+    0xf0, 0x4f, 0x2d, 0xe9, 0x4d, 0xdf, 0x4d, 0xe2
+};
+static const uint8_t draw_image_guard[8] = {
+    0xf0, 0x4f, 0x2d, 0xe9, 0xcc, 0xd0, 0x4d, 0xe2
+};
+static const uint8_t touch_guard[8] = {
+    0xf0, 0x45, 0x2d, 0xe9, 0x02, 0x60, 0xa0, 0xe1
+};
+static const uint8_t beatfx_xpad_ctor_guard[8] = {
+    0xf0, 0x4f, 0x2d, 0xe9, 0x7c, 0xd0, 0x4d, 0xe2
+};
+static const uint8_t touch_button_on_guard[8] = {
+    0x20, 0xc0, 0xd0, 0xe5, 0x30, 0x40, 0x2d, 0xe9
+};
+static const uint8_t touch_button_hold_guard[8] = {
+    0xb1, 0x00, 0x52, 0xe3, 0x70, 0x40, 0x2d, 0xe9
+};
+static const uint8_t touch_toggle_on_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x00, 0xe0, 0xa0, 0xe1
+};
+static const uint8_t touch_toggle_off_guard[8] = {
+    0x00, 0xc0, 0xa0, 0xe1, 0x04, 0x00, 0x90, 0xe5
+};
+static const uint8_t touch_button_off_guard[8] = {
+    0x20, 0xc0, 0xd0, 0xe5, 0x10, 0x40, 0x2d, 0xe9
+};
+static const uint8_t touch_xpad_on_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x10, 0xd0, 0x4d, 0xe2
+};
+static const uint8_t touch_xpad_off_guard[8] = {
+    0x30, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+static const uint8_t touch_xpad_hold_guard[8] = {
+    0x08, 0x30, 0x90, 0xe5, 0x30, 0x40, 0x2d, 0xe9
+};
+static const uint8_t audio_start_guard[8] = {
+    0x00, 0x30, 0x91, 0xe5, 0xf0, 0x47, 0x2d, 0xe9
+};
+static const uint8_t set_beatfx_guard[8] = {
+    0x98, 0x33, 0x0b, 0xe3, 0x16, 0x32, 0x40, 0xe3
+};
 static get_stream_fn original_get_stream;
 static load_fn       original_load;
 static on_key_pad_fn original_on_key_pad;
+static on_key_pad_fn original_on_key_hot_cue;
+static on_key_pad_fn original_on_key_beat_loop;
+static on_key_pad_fn original_on_key_slip_loop;
+static on_key_pad_fn original_on_key_beat_jump;
 static check_slip_led_fn original_check_slip_led;
 
-struct stem_payload {
-    const void *data;
-    uint32_t format;
-    uint64_t frames;
-    void *block;
-    size_t block_size;
+static volatile void *deck_readers[2];
+static volatile int state_thread_running;
+static volatile uint64_t overlay_seen_us;
+static volatile uint64_t overlay_drawn_us;
+static volatile unsigned int captured_touch;
+static volatile unsigned int overlay_panel;
+static volatile unsigned long draw_calls;
+static volatile unsigned long main_window_draws;
+static volatile unsigned long image_draw_calls;
+static volatile unsigned long custom_tab_draws;
+static volatile unsigned long custom_pad_draws;
+static volatile unsigned long touch_calls;
+static volatile unsigned int stock_tab_backing_ready;
+static uint8_t stock_tab_backing[0x54];
+static volatile unsigned int tab_assets_ready;
+static volatile unsigned int tab_assets_installing;
+static volatile unsigned int initial_performance_refresh_done;
+static volatile unsigned long audio_start_calls;
+static volatile uint8_t performance_window;
+static volatile unsigned int performance_window_ready;
+static volatile unsigned int text_template_ready;
+static uint8_t text_template[0x54];
+
+struct touch_geometry {
+    int x;
+    int y;
+    unsigned int width;
+    unsigned int height;
 };
 
-struct deck_context {
-    volatile void *reader;
-    volatile enum stem_mode mode;
-    volatile uint32_t generation;
-    volatile int armed;
-    enum stem_mode rendered_mode;
-    enum stem_mode transition_from;
-    enum stem_mode transition_to;
-    unsigned int transition_cursor;
-    struct stem_payload vocal;
-};
+static void *beatfx_touch_areas[6];
+static struct touch_geometry stock_touch_geometry[6];
+static volatile void *captured_native_touch;
+static void *performance_left_glyph;
+static void *performance_right_glyph;
+static void *key_tab_glyph;
+static void *stems_tab_glyph;
+static void *stock_status_glyph;
+static volatile unsigned int beatfx_reselect_generation;
+static volatile unsigned int beatfx_reselect_pending;
+#if defined(RX3_EMULATOR_BUILD)
+/* Host-only state. The deployable hook is compiled without this branch. */
+static volatile unsigned int emulator_forced_panel;
+static volatile unsigned int emulator_panel_applied;
+static unsigned int emulator_touch_sequence;
+#endif
 
-static struct deck_context decks[2];
-static volatile unsigned int captured_pad_mask[2];
-static const char *stems_dir;
+static const struct rx3_panel_feature *panel_for_id(unsigned int panel_id);
+static int deck_index_for_reader(const void *reader);
+#if defined(RX3_EMULATOR_BUILD)
+static void emulator_poll_touch(void);
+static void emulator_activate_initial_panel(void);
+#endif
 
-struct load_request {
-    struct deck_context *context;
-    void *reader;
-    uint32_t generation;
-    char path[1024];
+static int stems_feature_configured(void);
+static int stems_feature_install(void);
+static void stems_feature_remove(void);
+static void stems_feature_track_will_load(unsigned int deck, void *reader,
+                                          const void *track_info);
+static void stems_feature_track_did_load(unsigned int deck, void *reader,
+                                         const void *track_info);
+static void stems_feature_destroy_deck(unsigned int deck);
+static int keyshift_feature_configured(void);
+static int keyshift_feature_install(void);
+static void keyshift_feature_remove(void);
+static void keyshift_feature_track_did_load(unsigned int deck, void *reader,
+                                            const void *track_info);
+static const struct rx3_panel_feature keyshift_panel;
+static const struct rx3_panel_feature stems_panel;
+
+#define RUNTIME_FEATURE_COUNT 2u
+
+static struct rx3_runtime_feature runtime_features[RUNTIME_FEATURE_COUNT] = {
+    {
+        "keyshift", 0, &keyshift_panel,
+        keyshift_feature_configured, keyshift_feature_install,
+        keyshift_feature_remove, 0, keyshift_feature_track_did_load,
+        rx3_keyshift_start_audio, rx3_keyshift_report,
+        rx3_keyshift_destroy_deck
+    },
+    {
+        "stems", 0, &stems_panel,
+        stems_feature_configured, stems_feature_install,
+        stems_feature_remove, stems_feature_track_will_load,
+        stems_feature_track_did_load, 0, 0, stems_feature_destroy_deck
+    }
 };
 
 struct installed_hook {
@@ -179,7 +349,43 @@ struct installed_hook {
 static struct installed_hook get_stream_hook;
 static struct installed_hook load_hook;
 static struct installed_hook pad_hook;
+static struct installed_hook hot_cue_hook;
+static struct installed_hook beat_loop_hook;
+static struct installed_hook slip_loop_hook;
+static struct installed_hook beat_jump_hook;
 static struct installed_hook slip_led_hook;
+static struct installed_hook draw_text_hook;
+static struct installed_hook draw_image_hook;
+static struct installed_hook touch_hook;
+static struct installed_hook beatfx_xpad_ctor_hook;
+static struct installed_hook touch_button_on_hook;
+static struct installed_hook touch_button_hold_hook;
+static struct installed_hook touch_button_off_hook;
+static struct installed_hook touch_toggle_on_hook;
+static struct installed_hook touch_toggle_off_hook;
+static struct installed_hook touch_xpad_on_hook;
+static struct installed_hook touch_xpad_off_hook;
+static struct installed_hook touch_xpad_hold_hook;
+static struct installed_hook audio_start_hook;
+static struct installed_hook timestretch_operate_hook;
+static struct installed_hook timestretch_fgpr_hook;
+static struct installed_hook set_beatfx_hook;
+static draw_text_fn original_draw_text;
+static draw_image_fn original_draw_image;
+static solve_touch_fn original_solve_touch;
+static beatfx_xpad_ctor_fn original_beatfx_xpad_ctor;
+static touch_area_fn original_touch_button_on;
+static touch_area_hold_fn original_touch_button_hold;
+static touch_area_fn original_touch_button_off;
+static touch_area_fn original_touch_toggle_on;
+static touch_area_fn original_touch_toggle_off;
+static touch_area_fn original_touch_xpad_on;
+static touch_area_fn original_touch_xpad_off;
+static touch_area_hold_fn original_touch_xpad_hold;
+static audio_start_fn original_audio_start;
+static timestretch_operate_fn original_timestretch_operate;
+static timestretch_operate_fn original_timestretch_fgpr;
+static set_beatfx_selected_fn original_set_beatfx_selected;
 /* Logging. */
 
 static size_t str_length(const char *s)
@@ -222,6 +428,203 @@ static void log_number(const char *label, unsigned long value)
         buffer[n++] = digits[--d];
     buffer[n] = '\0';
     log_line(buffer);
+}
+
+
+
+
+
+
+
+
+struct rx3_timeval { long seconds, microseconds; };
+
+static uint64_t monotonic_enough_us(void)
+{
+    struct rx3_timeval value;
+    if (gettimeofday(&value, 0))
+        return 0;
+    return (uint64_t)(unsigned long)value.seconds * 1000000u +
+           (uint64_t)(unsigned long)value.microseconds;
+}
+
+/* juce::Time::currentTimeMillis, which the panel compares the LED blink
+   against, is gettimeofday reduced to milliseconds. Reproducing it here keeps
+   the on-screen toggles in the LED's own time domain. */
+static unsigned int now_ms(void)
+{
+    return (unsigned int)(monotonic_enough_us() / 1000u);
+}
+
+static int deck_is_loading(const struct stems_deck_context *context)
+{
+    return context->reader && context->armed && !context->vocal.data;
+}
+
+static int any_deck_is_loading(void)
+{
+    return deck_is_loading(&stems_decks[0]) ||
+           deck_is_loading(&stems_decks[1]);
+}
+
+/* One origin for both indications: the pads run their blink in the panel, the
+   toggles are redrawn from the same parity, so the two cannot drift apart. */
+static unsigned int blink_origin_ms(void)
+{
+    if (!blink_origin_valid) {
+        blink_origin = now_ms();
+        blink_origin_valid = 1u;
+    }
+    return blink_origin;
+}
+
+static int blink_phase_is_on(void)
+{
+    return (((now_ms() - blink_origin_ms()) / BLINK_PERIOD_MS) & 1u) == 0u;
+}
+
+static void refresh_performance_ui(void);
+static int read_exactly(int fd, void *destination, size_t length);
+
+static uint8_t tab_image_pixels[TAB_IMAGE_COUNT][TAB_IMAGE_BYTES];
+
+static void install_tab_assets(void)
+{
+    if (tab_assets_ready)
+        return;
+    if (!__sync_bool_compare_and_swap(&tab_assets_installing, 0u, 1u))
+        return;
+    static const char *paths[TAB_IMAGE_COUNT] = {
+        TAB_KEY_PATH,
+        TAB_STEMS_PATH,
+        TAB_STATUS_NONE_PATH,
+        TAB_KEY_NONE_PATH
+    };
+
+    for (unsigned int i = 0; i < TAB_IMAGE_COUNT; i++) {
+        int fd = open(paths[i], O_RDONLY);
+        if (fd < 0 || read_exactly(fd, tab_image_pixels[i],
+                                  TAB_IMAGE_BYTES)) {
+            if (fd >= 0)
+                close(fd);
+            log_line("warning: custom tab bitmap installation failed");
+            tab_assets_installing = 0u;
+            return;
+        }
+        close(fd);
+    }
+
+    uint8_t *stock_table = *(uint8_t **)IMAGE_TABLE_POINTER;
+    if (!stock_table) {
+        tab_assets_installing = 0u;
+        return;
+    }
+    size_t table_bytes = EXTENDED_IMAGE_COUNT * 44u;
+    uint8_t *table = mmap(0, table_bytes, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (table == MAP_FAILED) {
+        log_line("warning: private image table allocation failed");
+        tab_assets_installing = 0u;
+        return;
+    }
+    memcpy(table, stock_table, STOCK_IMAGE_COUNT * 44u);
+
+    /* Stock records keep their pixel payloads in rbp's original allocation.
+       Convert each relative offset so resolving it against the secondary
+       table reaches the same original address. */
+    uint32_t relocation = (uint32_t)(unsigned long)stock_table -
+                          (uint32_t)(unsigned long)table;
+    for (unsigned int image = 0; image < STOCK_IMAGE_COUNT; image++) {
+        uint8_t *record = table + image * 44u;
+        uint32_t data_offset;
+        memcpy(&data_offset, record + 0x20u, sizeof(data_offset));
+        data_offset += relocation;
+        memcpy(record + 0x20u, &data_offset, sizeof(data_offset));
+        if (record[0x19u]) {
+            uint32_t palette_offset;
+            memcpy(&palette_offset, record + 0x24u,
+                   sizeof(palette_offset));
+            palette_offset += relocation;
+            memcpy(record + 0x24u, &palette_offset,
+                   sizeof(palette_offset));
+        }
+    }
+
+    for (unsigned int i = 0; i < TAB_IMAGE_COUNT; i++) {
+        uint8_t *record = table + (TAB_IMAGE_KEY + i) * 44u;
+        memcpy(record, table + 0x1598u * 44u, 44u);
+        uint16_t width = 180u;
+        uint16_t height = 50u;
+        uint32_t pixels = (uint32_t)(unsigned long)tab_image_pixels[i] -
+                          (uint32_t)(unsigned long)table;
+        uint32_t no_palette = 0u;
+        memcpy(record + 4u, &width, sizeof(width));
+        memcpy(record + 6u, &height, sizeof(height));
+        record[0x18u] = 1u; /* RGB565 */
+        record[0x19u] = 0u;
+        memcpy(record + 0x20u, &pixels, sizeof(pixels));
+        memcpy(record + 0x24u, &no_palette, sizeof(no_palette));
+    }
+
+    __sync_synchronize();
+    *(uint8_t **)IMAGE_TABLE_POINTER = table;
+    __sync_synchronize();
+    tab_assets_ready = 1u;
+    log_line("extended private KEY/STEMS image table installed");
+}
+
+static void *watch_patch_state(void *unused)
+{
+    (void)unused;
+    unsigned int ticks = 0;
+    int last_phase = -1;
+    while (state_thread_running) {
+        usleep(50000u);
+        if (!tab_assets_ready)
+            install_tab_assets();
+#if defined(RX3_EMULATOR_BUILD)
+        emulator_activate_initial_panel();
+#endif
+        /* Nothing else invalidates the pad windows while a sidecar is read, so
+           the blink has to ask for the redraw that carries its own parity. */
+        const struct rx3_panel_feature *panel = panel_for_id(overlay_panel);
+        if (panel && panel->needs_refresh && panel->needs_refresh() &&
+            performance_window_ready) {
+            int phase = blink_phase_is_on();
+            if (phase != last_phase) {
+                last_phase = phase;
+                refresh_performance_ui();
+            }
+        } else {
+            last_phase = -1;
+            if (!any_deck_is_loading())
+                blink_origin_valid = 0u;
+        }
+        ticks++;
+        if (RX3_PITCH_DIAGNOSTIC && ticks % 100u == 0u)
+            for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++)
+                if (runtime_features[i].active && runtime_features[i].report)
+                    runtime_features[i].report();
+        if (ticks == 100u) {
+            log_number("probe text draw calls = ", draw_calls);
+            log_number("probe main-window draws = ", main_window_draws);
+            log_number("probe image draw calls = ", image_draw_calls);
+            log_number("probe custom tab draws = ", custom_tab_draws);
+            log_number("probe custom PAD draws = ", custom_pad_draws);
+            log_number("probe touch calls = ", touch_calls);
+            log_number("probe audio-start calls = ", audio_start_calls);
+        }
+    }
+    return 0;
+}
+
+static void publish_ready(void)
+{
+    int fd = open(READY_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
+        return;
+    (void)write(fd, "ready\n", 6);
+    close(fd);
 }
 
 /* Sidecar loading. */
@@ -443,10 +846,10 @@ static int sidecar_is_readable(const char *path)
 
 static void *sidecar_loader(void *opaque)
 {
-    struct load_request *request = opaque;
+    struct stems_load_request *request = opaque;
     struct stem_payload next;
     int loaded = !load_sidecar(request->path, &next);
-    struct deck_context *context = request->context;
+    struct stems_deck_context *context = request->context;
 
     if (loaded && context->generation == request->generation &&
         context->reader == request->reader) {
@@ -459,7 +862,7 @@ static void *sidecar_loader(void *opaque)
         __sync_synchronize();
         context->reader = request->reader;
         log_number("asynchronous sidecar ready on deck = ",
-                   (unsigned long)(context - decks) + 1u);
+                   (unsigned long)(context - stems_decks) + 1u);
     } else {
         if (loaded)
             release_payload(&next);
@@ -596,25 +999,866 @@ static void *install_pc_ldr_hook(struct installed_hook *hook,
     return trampoline;
 }
 
-/* Audio mixing. */
+/* Native overlay. NS_PALRender_DrawText receives a fully attached 0x54-byte
+   NS_GlyphText. Clone the stock deck-2 KEY label, retain its window/parent,
+   and alter only the public text-box fields established by
+   NS_GlyphText_CreateFromProperty. */
 
-static struct deck_context *context_for_reader(const void *reader)
+static const uint16_t text_patched[] = {'P','A','T','C','H','E','D',0};
+static const uint16_t text_empty[]    = {0};
+
+#include "../../keyshift/1.19/rx3_keyshift_panel.h"
+#include "../../stems/1.19/rx3_stems_panel.h"
+
+static const struct rx3_panel_feature *panel_for_id(unsigned int panel_id)
 {
-    for (unsigned int i = 0; i < 2u; i++)
-        if (decks[i].reader == reader)
-            return &decks[i];
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++)
+        if (runtime_features[i].active && runtime_features[i].panel &&
+            runtime_features[i].panel->panel_id == panel_id)
+            return runtime_features[i].panel;
     return 0;
 }
 
-static struct deck_context *context_for_player(const void *player)
+static const struct rx3_panel_feature *panel_for_slot(unsigned int slot)
+{
+    if (slot >= RUNTIME_FEATURE_COUNT || !runtime_features[slot].active)
+        return 0;
+    return runtime_features[slot].panel;
+}
+
+static void set_u16(void *object, unsigned int offset, uint16_t value)
+{
+    memcpy((uint8_t *)object + offset, &value, sizeof(value));
+}
+
+static void set_u32(void *object, unsigned int offset, uint32_t value)
+{
+    memcpy((uint8_t *)object + offset, &value, sizeof(value));
+}
+
+static uint8_t text_length16(const uint16_t *text)
+{
+    uint8_t length = 0;
+    while (text[length] && length < 0xfeu)
+        length++;
+    return length;
+}
+
+static void draw_native_box(void *render, const void *model,
+                            uint8_t target_window,
+                            int x1, int y1, int x2, int y2,
+                            const uint16_t *text, uint8_t length,
+                            uint32_t foreground, uint32_t background)
+{
+    uint8_t box[0x54];
+    int parent_x = 0;
+    int parent_y = 0;
+    ((render_cur_pos_fn)RENDER_CUR_POS)(&parent_x, &parent_y);
+    memcpy(box, model, sizeof(box));
+    uint16_t window_layer;
+    memcpy(&window_layer, box + 0x10u, sizeof(window_layer));
+    window_layer = (uint16_t)((window_layer & 0xff00u) | target_window);
+    set_u16(box, 0x10, window_layer);
+    set_u16(box, 0x18, (uint16_t)(x1 - parent_x));
+    set_u16(box, 0x1a, (uint16_t)(y1 - parent_y));
+    set_u16(box, 0x1c, (uint16_t)(x2 - parent_x));
+    set_u16(box, 0x1e, (uint16_t)(y2 - parent_y));
+    set_u32(box, 0x28, foreground);
+    set_u32(box, 0x34, (uint32_t)(unsigned long)text);
+    box[0x38] = length;
+    box[0x3c] = 4; /* horizontally and vertically centred */
+    set_u32(box, 0x40, 1);
+    set_u32(box, 0x44, background);
+    set_u32(box, 0x50, 1);
+    original_draw_text(render, box);
+}
+
+static void draw_performance_overlay(void *render, const void *model)
+{
+    const uint32_t white = 0x00f4f4f4u;
+    const uint32_t green = 0x0020c878u;
+    draw_native_box(render, model, 1, 1140, 3, 1275, 47,
+                    text_patched, 7, white, green);
+}
+
+static void draw_native_box_local(void *render, const void *model,
+                                  const void *window_model,
+                                  uint8_t target_window,
+                                  int x1, int y1, int x2, int y2,
+                                  const uint16_t *label,
+                                  uint32_t foreground, uint32_t background)
+{
+    uint8_t box[0x54];
+    uint16_t window_layer;
+    memcpy(box, model, sizeof(box));
+    memcpy(&window_layer, (const uint8_t *)window_model + 0x10u,
+           sizeof(window_layer));
+    window_layer = (uint16_t)((window_layer & 0xff00u) | target_window);
+    set_u16(box, 0x10, window_layer);
+    set_u16(box, 0x18, (uint16_t)x1);
+    set_u16(box, 0x1a, (uint16_t)y1);
+    set_u16(box, 0x1c, (uint16_t)x2);
+    set_u16(box, 0x1e, (uint16_t)y2);
+    set_u32(box, 0x28, foreground);
+    set_u32(box, 0x34, (uint32_t)(unsigned long)label);
+    box[0x38] = text_length16(label);
+    box[0x3c] = 4;
+    set_u32(box, 0x40, 1);
+    set_u32(box, 0x44, background);
+    set_u32(box, 0x50, 1);
+    original_draw_text(render, box);
+}
+
+static void pioneer_theme(uint16_t window_layer,
+                          uint32_t *border, uint32_t *inactive,
+                          uint32_t *active, uint32_t *light_text)
+{
+    (void)window_layer;
+    *border = 0x00000000u;
+    *inactive = 0x00000000u;
+    *active = 0x00000000u;
+    *light_text = 0x00000000u;
+}
+
+static void refresh_initial_performance_tabs_if_ready(void)
+{
+    /* REFRESH_GLYPH must run from rbp's UI rendering path. Calling it from the
+       state watcher can stall the renderer during startup. Every caller sets
+       or captures a native glyph immediately before reaching this guard. */
+    if (!initial_performance_refresh_done && tab_assets_ready &&
+        text_template_ready && stock_tab_backing_ready &&
+        key_tab_glyph && stems_tab_glyph && stock_status_glyph) {
+        initial_performance_refresh_done = 1u;
+        refresh_performance_ui();
+        log_line("initial native performance tabs refreshed");
+    }
+}
+
+
+/* The tab strip. The stock STATUS / BEAT FX row is captured as it goes past --
+   see the image id below -- and redrawn at the KEY / STEMS position, so the
+   frame, the corner radius and the palette are rbp's own rather than a
+   reconstruction. Drawing the boxes by hand was tried and rejected: the theme
+   colours are not exposed, and every literal guess looked foreign. */
+static void draw_custom_tabs(void *render, const void *image)
+{
+    overlay_seen_us = monotonic_enough_us();
+    if (!stock_tab_backing_ready) {
+        original_draw_image(render, (void *)image);
+        return;
+    }
+    uint16_t window_layer;
+    memcpy(&window_layer, (const uint8_t *)image + 0x10u, sizeof(window_layer));
+
+    uint8_t backing[0x54];
+    memcpy(backing, stock_tab_backing, sizeof(backing));
+    if (tab_assets_ready) {
+        const struct rx3_panel_feature *panel = panel_for_id(overlay_panel);
+        uint32_t image_id = panel ? panel->tab_image : TAB_IMAGE_KEY_NONE;
+        set_u32(backing, 0x44, image_id);
+    }
+    set_u16(backing, 0x10, window_layer);
+    set_u16(backing, 0x18, 10u);
+    set_u16(backing, 0x1a, 0u);
+    set_u16(backing, 0x1c, 190u);
+    set_u16(backing, 0x1e, 50u);
+    original_draw_image(render, backing);
+    custom_tab_draws++;
+#if defined(RX3_EMULATOR_BUILD)
+    if (custom_tab_draws == 1u)
+        log_line("emulator custom tab rendered");
+#endif
+}
+
+static void draw_stock_button_local(void *render, const void *model,
+                                    uint8_t window, int x1, int y1,
+                                    int x2, int y2,
+                                    const uint16_t *label, int selected)
+{
+    uint16_t window_layer;
+    memcpy(&window_layer, (const uint8_t *)model + 0x10u,
+           sizeof(window_layer));
+    window_layer = (uint16_t)((window_layer & 0xff00u) | window);
+    uint32_t border, inactive, active, light_text;
+    pioneer_theme(window_layer, &border, &inactive, &active, &light_text);
+    const uint32_t dark_text = 0x00000000u;
+    draw_native_box_local(render, text_template, model, window,
+                          x1, y1, x2, y2, text_empty,
+                          light_text, border);
+    draw_native_box_local(render, text_template, model, window,
+                          x1 + 1, y1 + 1, x2 - 1, y2 - 1, label,
+                          selected ? dark_text : light_text,
+                          selected ? active : inactive);
+}
+
+static void draw_custom_pad_half(void *render, const void *model,
+                                 uint8_t window, unsigned int deck)
+{
+    custom_pad_draws++;
+#if defined(RX3_EMULATOR_BUILD)
+    if (custom_pad_draws == 1u)
+        log_line("emulator custom PAD rendered");
+#endif
+    const struct rx3_panel_feature *panel = panel_for_id(overlay_panel);
+    if (!panel)
+        return;
+    for (unsigned int control = 0; control < panel->control_count; control++) {
+        draw_stock_button_local(
+            render, model, window,
+            panel->lefts[control], 21, panel->rights[control], 59,
+            panel->label(deck, control), panel->selected(deck, control));
+    }
+}
+
+
+
+static void hooked_draw_image(void *render, void *image)
+{
+    image_draw_calls++;
+    if (RX3_DIAGNOSTIC_ONLY) {
+        original_draw_image(render, image);
+        return;
+    }
+    /* Populate the private image records before their first DirectFB lookup.
+       Pioneer image-table records and their cached surfaces stay untouched. */
+    if (!tab_assets_ready)
+        install_tab_assets();
+    /* The image models can all be captured before the watcher finishes
+       installing the replacement payloads. Re-check on every ordinary image
+       draw so the first draw after installation performs the one-shot refresh
+       on rbp's UI thread. Limiting this guard to the capture branches made the
+       bootstrap dependent on draw ordering and could leave ZOOM/GRID visible
+       until another native invalidation. */
+    refresh_initial_performance_tabs_if_ready();
+    uint16_t window_layer;
+    memcpy(&window_layer, (const uint8_t *)image + 0x10u,
+           sizeof(window_layer));
+    uint8_t window = (uint8_t)(window_layer & 0xffu);
+    uint32_t image_id;
+    memcpy(&image_id, (const uint8_t *)image + 0x44u, sizeof(image_id));
+
+    /* Capture the native 180x50 model, including its renderer/window
+       attachment. While a custom panel is selected, replace the stock row by
+       the no-selection artwork: STATUS and BEAT FX are then both black even
+       though rbp internally remains in BEAT FX so its pad subtree stays live. */
+    if (window_layer == PERFORMANCE_TAB_LAYER &&
+        (image_id == 0x1598u || image_id == 0x1599u)) {
+        stock_status_glyph = image;
+        memcpy(stock_tab_backing, image, sizeof(stock_tab_backing));
+        stock_tab_backing_ready = 1u;
+        refresh_initial_performance_tabs_if_ready();
+        if (overlay_panel && tab_assets_ready) {
+            uint8_t neutral[0x54];
+            memcpy(neutral, image, sizeof(neutral));
+            set_u32(neutral, 0x44, TAB_IMAGE_STATUS_NONE);
+            original_draw_image(render, neutral);
+            return;
+        }
+    }
+
+    if (window_layer == BEATFX_LEFT_LAYER && image_id == 0x14e9u)
+        performance_left_glyph = image;
+    if (window_layer == XPAD_RIGHT_LAYER && image_id == 0x14eau)
+        performance_right_glyph = image;
+    if (image_id == 0x15c9u)
+        key_tab_glyph = image;
+    if (image_id == 0x15cau)
+        stems_tab_glyph = image;
+    refresh_initial_performance_tabs_if_ready();
+
+    /* Hardware trace: BeatFxSelectItem/Trash use window-layer 0x1701 and the
+       right X-PAD subtree uses 0x1801. Deck summaries below use 0x0301, so
+       the full layer is the safe discriminator that image IDs alone lacked. */
+    if (overlay_panel && image_id == 0x159au) {
+        performance_window = window;
+        if (!performance_window_ready) {
+            performance_window_ready = 1u;
+            log_number("native performance window = ", window);
+        }
+    }
+    if (overlay_panel && text_template_ready &&
+        window_layer == BEATFX_LEFT_LAYER) {
+        if (image_id == 0x14e9u)
+            original_draw_image(render, image);
+        draw_custom_pad_half(render, image, window, 0u);
+        return;
+    }
+    if (overlay_panel && text_template_ready &&
+        window_layer == XPAD_RIGHT_LAYER) {
+        if (image_id == 0x14eau)
+            original_draw_image(render, image);
+        draw_custom_pad_half(render, image, window, 1u);
+        return;
+    }
+    if (overlay_panel && (window == 6u || window == 7u)) {
+        if (text_template_ready)
+            draw_custom_pad_half(render, image, window,
+                                 window == 7u ? 0u : 1u);
+        else
+            original_draw_image(render, image);
+        return;
+    }
+
+    if (image_id != 0x15c9u && image_id != 0x15cau) {
+        original_draw_image(render, image);
+        return;
+    }
+    if (!text_template_ready) {
+        original_draw_image(render, image);
+        return;
+    }
+
+    draw_custom_tabs(render, image);
+}
+
+static void hooked_draw_text(void *render, void *text)
+{
+    draw_calls++;
+    uint16_t window_layer;
+    memcpy(&window_layer, (const uint8_t *)text + 0x10u, sizeof(window_layer));
+    uint8_t window = (uint8_t)(window_layer & 0xffu);
+    if (!RX3_DIAGNOSTIC_ONLY && overlay_panel && text_template_ready &&
+        window_layer == XPAD_RIGHT_LAYER) {
+        draw_custom_pad_half(render, text, window, 1u);
+        return;
+    }
+    if (!RX3_DIAGNOSTIC_ONLY && overlay_panel &&
+        (window == 6u || window == 7u)) {
+        if (!text_template_ready) {
+            original_draw_text(render, text);
+            return;
+        }
+        draw_custom_pad_half(render, text, window,
+                             window == 7u ? 0u : 1u);
+        return;
+    }
+    original_draw_text(render, text);
+    if (RX3_DIAGNOSTIC_ONLY)
+        return;
+    if (window_layer != HEADER_LAYER)
+        return;
+    overlay_seen_us = 0;
+    if (!text_template_ready) {
+        memcpy(text_template, text, sizeof(text_template));
+        text_template_ready = 1u;
+    }
+    refresh_initial_performance_tabs_if_ready();
+    main_window_draws++;
+    overlay_drawn_us = monotonic_enough_us();
+    draw_performance_overlay(render, text);
+}
+
+static int performance_overlay_is_visible(void)
+{
+    return overlay_seen_us != 0;
+}
+
+static int point_in_rect(int x, int y, int x1, int y1, int x2, int y2)
+{
+    return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+}
+
+static int native_touch_index(const void *area)
+{
+    for (unsigned int i = 0; i < 6u; i++)
+        if (beatfx_touch_areas[i] == area)
+            return (int)i;
+    return -1;
+}
+
+static void set_touch_geometry(void *area, int x, int y,
+                               unsigned int width, unsigned int height)
+{
+    if (!area)
+        return;
+    *(int *)((uint8_t *)area + 8u) = x;
+    *(int *)((uint8_t *)area + 0xcu) = y;
+    *(unsigned int *)((uint8_t *)area + 0x10u) = width;
+    *(unsigned int *)((uint8_t *)area + 0x14u) = height;
+}
+
+static void configure_native_performance_touches(unsigned int panel)
+{
+    if (!beatfx_touch_areas[0])
+        return;
+    const struct rx3_panel_feature *feature = panel_for_id(panel);
+    if (feature) {
+        for (unsigned int deck = 0; deck < 2u; deck++)
+            for (unsigned int control = 0;
+                 control < feature->control_count; control++) {
+                unsigned int index = deck * feature->control_count + control;
+                unsigned int width = (unsigned int)(
+                    feature->rights[control] - feature->lefts[control] + 1);
+                set_touch_geometry(beatfx_touch_areas[index],
+                                   (int)(deck * 640u) + feature->lefts[control],
+                                   521, width, 39u);
+            }
+        for (unsigned int i = feature->control_count * 2u; i < 6u; i++)
+            set_touch_geometry(beatfx_touch_areas[i], -4096, -4096, 1u, 1u);
+    } else {
+        for (unsigned int i = 0; i < 6u; i++)
+            set_touch_geometry(beatfx_touch_areas[i],
+                               stock_touch_geometry[i].x,
+                               stock_touch_geometry[i].y,
+                               stock_touch_geometry[i].width,
+                               stock_touch_geometry[i].height);
+    }
+}
+
+static void refresh_performance_ui(void)
+{
+    void *manager = ((void *(*)(void))GET_HMI_MANAGER)();
+    void *glyphs[5] = {
+        performance_left_glyph, performance_right_glyph,
+        key_tab_glyph, stems_tab_glyph, stock_status_glyph
+    };
+    for (unsigned int i = 0; i < 5u; i++)
+        if (glyphs[i])
+            ((void (*)(void *, int, void *))REFRESH_GLYPH)(
+                manager, -1, glyphs[i]);
+}
+
+static void restore_status_after_pad_mode(void)
+{
+    if (!overlay_panel)
+        return;
+    overlay_panel = 0;
+    captured_native_touch = 0;
+    configure_native_performance_touches(0);
+    if (original_set_beatfx_selected)
+        original_set_beatfx_selected(0);
+    refresh_performance_ui();
+    log_line("pad mode selected: custom panel returned to STATUS");
+}
+
+static int pad_mode_key_pressed(const void *key_input)
+{
+    return (*(const uint8_t *)((const uint8_t *)key_input + 0x0bu) & 0x0fu) == 0u;
+}
+
+static int hooked_on_key_hot_cue(void *player_innards, const void *key_input)
+{
+    int result = original_on_key_hot_cue(player_innards, key_input);
+    if (pad_mode_key_pressed(key_input))
+        restore_status_after_pad_mode();
+    return result;
+}
+
+static int hooked_on_key_beat_loop(void *player_innards, const void *key_input)
+{
+    int result = original_on_key_beat_loop(player_innards, key_input);
+    if (pad_mode_key_pressed(key_input))
+        restore_status_after_pad_mode();
+    return result;
+}
+
+static int hooked_on_key_slip_loop(void *player_innards, const void *key_input)
+{
+    int result = original_on_key_slip_loop(player_innards, key_input);
+    if (pad_mode_key_pressed(key_input))
+        restore_status_after_pad_mode();
+    return result;
+}
+
+static int hooked_on_key_beat_jump(void *player_innards, const void *key_input)
+{
+    int result = original_on_key_beat_jump(player_innards, key_input);
+    if (pad_mode_key_pressed(key_input))
+        restore_status_after_pad_mode();
+    return result;
+}
+
+static void *hooked_beatfx_xpad_ctor(void *object, void *notification)
+{
+    void *result = original_beatfx_xpad_ctor(object, notification);
+    for (unsigned int i = 0; i < 6u; i++) {
+        void *area = *(void **)((uint8_t *)object + 4u + i * 4u);
+        beatfx_touch_areas[i] = area;
+        if (!area)
+            continue;
+        stock_touch_geometry[i].x = *(int *)((uint8_t *)area + 8u);
+        stock_touch_geometry[i].y = *(int *)((uint8_t *)area + 0xcu);
+        stock_touch_geometry[i].width =
+            *(unsigned int *)((uint8_t *)area + 0x10u);
+        stock_touch_geometry[i].height =
+            *(unsigned int *)((uint8_t *)area + 0x14u);
+    }
+    configure_native_performance_touches(overlay_panel);
+    log_line("native BeatFxAndXPad touch areas captured");
+    return result;
+}
+
+static void activate_native_performance_touch(void *area)
+{
+    int index = native_touch_index(area);
+    const struct rx3_panel_feature *panel = panel_for_id(overlay_panel);
+    if (index < 0 || !panel)
+        return;
+    if ((unsigned int)index >= panel->control_count * 2u)
+        return;
+    captured_native_touch = area;
+    unsigned int deck = (unsigned int)index / panel->control_count;
+    unsigned int control = (unsigned int)index % panel->control_count;
+    panel->activate(deck, control);
+    log_number("native feature touch = ", (unsigned long)index);
+
+    /* KEY/STEMS controls stay in their panel so successive adjustments remain
+       visible. Only a hardware pad-mode selector restores STATUS. */
+    refresh_performance_ui();
+}
+
+static void hooked_touch_button_on(void *area)
+{
+    if (native_touch_index(area) >= 0 && overlay_panel) {
+        activate_native_performance_touch(area);
+        return;
+    }
+    original_touch_button_on(area);
+}
+
+static void hooked_touch_button_hold(void *area, unsigned int x, unsigned int y)
+{
+    if (area == captured_native_touch ||
+        (native_touch_index(area) >= 0 && overlay_panel))
+        return;
+    original_touch_button_hold(area, x, y);
+}
+
+static void hooked_touch_button_off(void *area)
+{
+    if (area == captured_native_touch ||
+        (native_touch_index(area) >= 0 && overlay_panel)) {
+        captured_native_touch = 0;
+        return;
+    }
+    original_touch_button_off(area);
+}
+
+static void hooked_touch_toggle_on(void *area)
+{
+    if (native_touch_index(area) >= 0 && overlay_panel) {
+        activate_native_performance_touch(area);
+        return;
+    }
+    original_touch_toggle_on(area);
+}
+
+static void hooked_touch_toggle_off(void *area)
+{
+    if (area == captured_native_touch ||
+        (native_touch_index(area) >= 0 && overlay_panel)) {
+        captured_native_touch = 0;
+        return;
+    }
+    original_touch_toggle_off(area);
+}
+
+static void hooked_touch_xpad_on(void *area)
+{
+    if (native_touch_index(area) >= 0 && overlay_panel) {
+        activate_native_performance_touch(area);
+        return;
+    }
+    original_touch_xpad_on(area);
+}
+
+static void hooked_touch_xpad_off(void *area)
+{
+    if (area == captured_native_touch ||
+        (native_touch_index(area) >= 0 && overlay_panel)) {
+        captured_native_touch = 0;
+        return;
+    }
+    original_touch_xpad_off(area);
+}
+
+static void hooked_touch_xpad_hold(void *area, unsigned int x, unsigned int y)
+{
+    if (area == captured_native_touch ||
+        (native_touch_index(area) >= 0 && overlay_panel))
+        return;
+    original_touch_xpad_hold(area, x, y);
+}
+
+static void select_custom_panel(unsigned int panel)
+{
+    beatfx_reselect_pending = 0u;
+    (void)__sync_add_and_fetch(&beatfx_reselect_generation, 1u);
+    overlay_panel = panel;
+    /* BeatFxAndXPad is dispatched only while the firmware's binary state is
+       BEAT FX. Keep that state active for the lifetime of the custom panel;
+       STATUS and BEAT FX physical keys leave it through the hooked setter. */
+    if (original_set_beatfx_selected)
+        original_set_beatfx_selected(1);
+    configure_native_performance_touches(panel);
+    refresh_performance_ui();
+}
+
+static void *finish_beatfx_reselect(void *argument)
+{
+    unsigned int generation = (unsigned int)(unsigned long)argument;
+    /* Ui_CycleTask publishes the requested state every 15 ms. Keep STATUS
+       requested for four cycles so the subsequent BEAT FX request is a real
+       native display transition even under scheduler jitter. */
+    usleep(60000u);
+    if (beatfx_reselect_pending &&
+        beatfx_reselect_generation == generation && !overlay_panel &&
+        original_set_beatfx_selected) {
+        log_line("native Beat FX rebuild applied");
+        original_set_beatfx_selected(1);
+        /* The native state-7 rebuild paints Aqua/Default/Yellow over the tab
+           strip. Let that rebuild finish, then restore the persistent custom
+           row on top using the already captured native glyphs. */
+        usleep(30000u);
+        if (beatfx_reselect_pending &&
+            beatfx_reselect_generation == generation && !overlay_panel)
+            refresh_performance_ui();
+    }
+    if (beatfx_reselect_generation == generation)
+        beatfx_reselect_pending = 0u;
+    return 0;
+}
+
+static void hooked_set_beatfx_selected(int selected)
+{
+#if defined(RX3_EMULATOR_BUILD)
+    if (emulator_forced_panel && emulator_panel_applied) {
+        overlay_panel = emulator_forced_panel;
+        original_set_beatfx_selected(1);
+        return;
+    }
+#endif
+    unsigned int leaving_custom_panel = overlay_panel != 0u;
+    overlay_panel = 0;
+    captured_native_touch = 0;
+    configure_native_performance_touches(0);
+    /* Ui_CycleTask can echo the provisional STATUS value through this setter.
+       While the two-cycle transition is pending, neither that internal 0 nor
+       duplicate 1 stores may alter the generation. A new KEY/STEMS selection
+       cancels explicitly in select_custom_panel(). */
+    if (beatfx_reselect_pending) {
+        log_number("native Beat FX rebuild ignored setter = ",
+                   (unsigned long)selected);
+        return;
+    }
+    unsigned int generation = __sync_add_and_fetch(
+        &beatfx_reselect_generation, 1u);
+    if (leaving_custom_panel && selected) {
+        pthread_t thread;
+        beatfx_reselect_pending = 1u;
+        log_line("native Beat FX rebuild scheduled");
+        original_set_beatfx_selected(0);
+        if (!pthread_create(&thread, 0, finish_beatfx_reselect,
+                            (void *)(unsigned long)generation))
+            pthread_detach(thread);
+        else {
+            beatfx_reselect_pending = 0u;
+            original_set_beatfx_selected(1);
+        }
+    } else {
+        beatfx_reselect_pending = 0u;
+        original_set_beatfx_selected(selected);
+    }
+    refresh_performance_ui();
+}
+
+#if defined(RX3_EMULATOR_BUILD)
+static int emulator_parse_coordinate(const char **cursor, int *value)
+{
+    const char *position = *cursor;
+    int parsed = 0;
+    int digits = 0;
+    while (*position == ' ' || *position == '\t')
+        position++;
+    while (*position >= '0' && *position <= '9') {
+        parsed = parsed * 10 + (*position - '0');
+        position++;
+        digits++;
+    }
+    *cursor = position;
+    *value = parsed;
+    return digits != 0;
+}
+
+static void emulator_apply_touch(int x, int y)
+{
+    const struct rx3_panel_feature *panel;
+    if (x < 0 || x >= 1280 || y < 0 || y >= 720)
+        return;
+
+    if (y >= 363 && y <= 413) {
+        const struct rx3_panel_feature *requested = 0;
+        if (x >= 1090 && x <= 1179)
+            requested = panel_for_slot(0u);
+        else if (x >= 1181 && x <= 1270)
+            requested = panel_for_slot(1u);
+        if (requested) {
+            emulator_forced_panel = requested->panel_id;
+            emulator_panel_applied = 1u;
+            select_custom_panel(requested->panel_id);
+            log_number("emulator touch selected panel = ", requested->panel_id);
+        }
+        return;
+    }
+
+    if (y >= 433 && y <= 483 && x >= 1090 && x <= 1270) {
+        emulator_forced_panel = 0u;
+        emulator_panel_applied = 0u;
+        overlay_panel = 0u;
+        captured_native_touch = 0;
+        configure_native_performance_touches(0u);
+        original_set_beatfx_selected(x >= 1181 ? 1 : 0);
+        refresh_performance_ui();
+        log_line(x >= 1181 ? "emulator touch selected BEAT FX"
+                           : "emulator touch selected STATUS");
+        return;
+    }
+
+    panel = panel_for_id(overlay_panel);
+    if (panel && y >= 521 && y <= 560) {
+        unsigned int deck = x >= 640 ? 1u : 0u;
+        int local_x = x - (int)(deck * 640u);
+        for (unsigned int control = 0; control < panel->control_count; control++) {
+            if (local_x >= panel->lefts[control] &&
+                local_x <= panel->rights[control]) {
+                panel->activate(deck, control);
+                refresh_performance_ui();
+                log_number("emulator touch deck = ", deck + 1u);
+                log_number("emulator touch control = ", control);
+                return;
+            }
+        }
+    }
+}
+
+static void emulator_poll_touch(void)
+{
+    char command[64];
+    ssize_t count;
+    const char *cursor;
+    int sequence, x, y;
+    int descriptor = open("/tmp/rx3emu-touch.fifo", O_RDONLY);
+    if (descriptor < 0)
+        return;
+    count = read(descriptor, command, sizeof(command) - 1u);
+    close(descriptor);
+    if (count <= 0)
+        return;
+    command[count] = '\0';
+    cursor = command;
+    if (emulator_parse_coordinate(&cursor, &sequence) &&
+        emulator_parse_coordinate(&cursor, &x) &&
+        emulator_parse_coordinate(&cursor, &y) &&
+        sequence > 0 && (unsigned int)sequence != emulator_touch_sequence) {
+        emulator_touch_sequence = (unsigned int)sequence;
+        emulator_apply_touch(x, y);
+    }
+}
+
+static void emulator_activate_initial_panel(void)
+{
+    if (!emulator_forced_panel || emulator_panel_applied ||
+        !tab_assets_ready || !text_template_ready ||
+        !stock_tab_backing_ready || !beatfx_touch_areas[0])
+        return;
+    emulator_panel_applied = 1u;
+    overlay_panel = emulator_forced_panel;
+    original_set_beatfx_selected(1);
+    configure_native_performance_touches(emulator_forced_panel);
+    refresh_performance_ui();
+    log_number("emulator activated feature panel = ",
+               emulator_forced_panel);
+}
+
+static void *emulator_touch_loop(void *unused)
+{
+    (void)unused;
+    log_line("emulator virtual touch channel ready");
+    while (state_thread_running)
+        emulator_poll_touch();
+    return 0;
+}
+#endif
+
+static void hooked_solve_touch(void *handler, const void *status,
+                               const void *mode)
+{
+    touch_calls++;
+    if (RX3_DIAGNOSTIC_ONLY) {
+        original_solve_touch(handler, status, mode);
+        return;
+    }
+    const uint8_t *event = status;
+    int pressed = event[0] != 0;
+    int x = *(const int *)(event + 4u);
+    int y = *(const int *)(event + 8u);
+    if (x > 1280 || y > 720) {
+        x = x * 1280 / 4096;
+        y = y * 720 / 4096;
+    }
+
+    if (captured_touch) {
+        *(uint8_t *)((uint8_t *)handler + 4u) = (uint8_t)pressed;
+        *(int *)((uint8_t *)handler + 8u) = x;
+        *(int *)((uint8_t *)handler + 0xcu) = y;
+        if (!pressed)
+            captured_touch = 0;
+        return;
+    }
+
+    if (pressed && !*(const uint8_t *)((const uint8_t *)handler + 4u) &&
+        performance_overlay_is_visible()) {
+        const struct rx3_panel_feature *left = panel_for_slot(0u);
+        const struct rx3_panel_feature *right = panel_for_slot(1u);
+        if (left && point_in_rect(x, y, 1090, 363, 1179, 413)) {
+            select_custom_panel(left->panel_id);
+            log_line("touch action = left feature panel");
+            captured_touch = 3u;
+        } else if (right && point_in_rect(x, y, 1181, 363, 1270, 413)) {
+            select_custom_panel(right->panel_id);
+            log_line("touch action = right feature panel");
+            captured_touch = 3u;
+        }
+        if (captured_touch) {
+            *(uint8_t *)((uint8_t *)handler + 4u) = 1;
+            *(int *)((uint8_t *)handler + 8u) = x;
+            *(int *)((uint8_t *)handler + 0xcu) = y;
+            return;
+        }
+    }
+    original_solve_touch(handler, status, mode);
+}
+
+/* Audio mixing. */
+
+static struct stems_deck_context *context_for_reader(const void *reader)
+{
+    int deck = deck_index_for_reader(reader);
+    if (deck < 0 || stems_decks[deck].reader != reader)
+        return 0;
+    return &stems_decks[deck];
+}
+
+/* Stable core service used by audio features. A feature receives only a deck
+   index; its mutable per-deck state remains private to that feature. */
+static int deck_index_for_reader(const void *reader)
+{
+    for (unsigned int deck = 0; deck < 2u; deck++)
+        if (deck_readers[deck] == reader)
+            return (int)deck;
+    return -1;
+}
+
+static struct stems_deck_context *context_for_player(const void *player)
 {
     unsigned int player_no = *(const uint8_t *)((const uint8_t *)player + 0x26u);
     if (player_no < 1u || player_no > 2u)
         return 0;
-    return &decks[player_no - 1u];
+    return &stems_decks[player_no - 1u];
 }
 
-static Float2 vocal_at(const struct deck_context *context, unsigned long index)
+static Float2 vocal_at(const struct stems_deck_context *context,
+                       unsigned long index)
 {
     Float2 sample;
     if (context->vocal.format == FORMAT_S16) {
@@ -652,9 +1896,31 @@ static int block_is_silent(const Float2 *output, unsigned long frames)
     return 1;
 }
 
-static void apply_mix(struct deck_context *context, unsigned long position,
-                      Float2 *output, unsigned long frames,
-                      enum stem_mode selected)
+/* rbp publishes the audio device format here. Features that size buffers from
+   it cannot be built before this point. */
+static void hooked_audio_start(void *engine, void *device)
+{
+    unsigned int rate = 44100u;
+    audio_start_calls++;
+    if (device) {
+        void **vtable = *(void ***)device;
+        double sample_rate = ((audio_sample_rate_fn)vtable[0x44u / 4u])(device);
+        if (sample_rate > 0.0 && sample_rate <= 192000.0)
+            rate = (unsigned int)sample_rate;
+    }
+    original_audio_start(engine, device);
+    if (RX3_DIAGNOSTIC_ONLY) {
+        log_line("diagnostic: audioDeviceAboutToStart observed");
+        return;
+    }
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++)
+        if (runtime_features[i].active && runtime_features[i].audio_started)
+            runtime_features[i].audio_started(rate);
+}
+
+static void apply_mix(struct stems_deck_context *context,
+                      unsigned long position, Float2 *output,
+                      unsigned long frames, enum stem_mode selected)
 {
     if (selected != context->transition_to) {
         context->transition_from   = context->rendered_mode;
@@ -696,206 +1962,79 @@ static void apply_mix(struct deck_context *context, unsigned long position,
     }
 }
 
-/* Hook replacements. */
+#include "../../keyshift/1.19/rx3_keyshift.h"
 
-static unsigned long hooked_get_stream(void *reader, unsigned long position,
-                                       Float2 *output, unsigned long frames)
-{
-    unsigned long result = original_get_stream(reader, position, output, frames);
-
-    struct deck_context *context = context_for_reader(reader);
-    if (!context || !context->vocal.data)
-        return result;
-    if ((uint64_t)position + frames > context->vocal.frames)
-        return result;
-
-    enum stem_mode selected = context->mode;
-    if (selected == MODE_BOTH && context->transition_cursor >= TRANSITION_FRAMES &&
-        context->rendered_mode == MODE_BOTH)
-        return result;
-    if (block_is_silent(output, frames))
-        return result;
-
-    apply_mix(context, position, output, frames, selected);
-    return result;
-}
+/* Shared hook replacement. Feature-specific hooks are composed below. */
+#include "../../keyshift/1.19/rx3_keyshift_feature.h"
+#include "../../stems/1.19/rx3_stems_feature.h"
 
 static int hooked_load(void *reader, const void *track_info)
 {
     unsigned int channel = *(const uint32_t *)((const uint8_t *)reader + 0x20u);
-    struct deck_context *context = channel < 2u ? &decks[channel] : 0;
-    char path[1024];
-    int has_sidecar = context &&
-                      !sidecar_path_for_track(track_info, path, sizeof(path)) &&
-                      sidecar_is_readable(path);
-
-    /* Detach before original_load. The old audio thread may continue but no
-       longer sees the stem. Its payload remains allocated until stock load
-       stops that thread synchronously, preventing use-after-munmap. */
-    if (context)
-        context->reader = 0;
-    int result = original_load(reader, track_info);
-    if (!context) {
-        log_number("sidecar ignored: unknown PcmReader channel = ", channel);
+    if (channel >= 2u) {
+        int result = original_load(reader, track_info);
+        log_number("feature dispatch ignored: unknown PcmReader channel = ",
+                   channel);
         return result;
     }
 
-    context->generation++;
-    context->armed = has_sidecar;
-    release_payload(&context->vocal);
-    context->mode = MODE_BOTH;
-    context->rendered_mode = MODE_BOTH;
-    context->transition_from = MODE_BOTH;
-    context->transition_to = MODE_BOTH;
-    context->transition_cursor = TRANSITION_FRAMES;
+    deck_readers[channel] = 0;
     __sync_synchronize();
-    context->reader = reader;
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++)
+        if (runtime_features[i].active &&
+            runtime_features[i].track_will_load)
+            runtime_features[i].track_will_load(channel, reader, track_info);
 
-    if (has_sidecar) {
-        struct load_request *request = mmap(0, 4096u, PROT_READ | PROT_WRITE,
-                                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (request != MAP_FAILED) {
-            request->context = context;
-            request->reader = reader;
-            request->generation = context->generation;
-            size_t path_length = str_length(path) + 1u;
-            memcpy(request->path, path, path_length);
-            pthread_t thread;
-            if (!pthread_create(&thread, 0, sidecar_loader, request)) {
-                pthread_detach(thread);
-                log_number("asynchronous sidecar load started, deck = ", channel + 1u);
-            } else {
-                munmap(request, 4096u);
-                log_line("sidecar disabled: loader thread creation failed");
-            }
-        } else {
-            log_line("sidecar disabled: request allocation failed");
-        }
-    }
+    int result = original_load(reader, track_info);
+    __sync_synchronize();
+    deck_readers[channel] = reader;
+    __sync_synchronize();
+
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++)
+        if (runtime_features[i].active && runtime_features[i].track_did_load)
+            runtime_features[i].track_did_load(channel, reader, track_info);
     return result;
 }
 
-static int hooked_on_key_pad(void *player_innards, const void *key_input)
+static unsigned int configure_features(void)
 {
-    const uint8_t *event = (const uint8_t *)key_input;
-    uint16_t key_code = (uint16_t)event[8] | ((uint16_t)event[9] << 8);
-    unsigned int operation = event[11] & 0x0fu;
-
-    /* Pads 7 and 8 use key codes 0x411d and 0x411e. */
-    if (key_code < 0x411du || key_code > 0x411eu)
-        return original_on_key_pad(player_innards, key_input);
-
-    unsigned int bit = 1u << (key_code - 0x411du);
-    unsigned int object_channel = *(const uint8_t *)((const uint8_t *)player_innards + 0x26u);
-    unsigned int event_channel = event[10];
-    unsigned int ui_channel = event_channel >= 1u && event_channel <= 2u
-                            ? event_channel : object_channel;
-    if (event_channel >= 1u && event_channel <= 2u &&
-        object_channel != event_channel) {
-        log_number("pad object/event channel mismatch, object = ", object_channel);
-        log_number("pad uses event channel = ", event_channel);
+    unsigned int active = 0;
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++) {
+        runtime_features[i].active = runtime_features[i].configured &&
+                                     runtime_features[i].configured();
+        if (runtime_features[i].active)
+            active++;
     }
-    struct deck_context *context = ui_channel >= 1u && ui_channel <= 2u
-                                 ? &decks[ui_channel - 1u] : 0;
-    unsigned int deck = context ? (unsigned int)(context - decks) : 0u;
-
-    /* onKey_SlipBeatLoop writes 2 at PlayerInnards+0x74. onKey_Pad uses this
-       value as its path selector. event[10] can contain UI channel 0 rather
-       than the deck enum expected by UiGetPadModeSlipLoopFlg. */
-    int slip_loop = *(const uint32_t *)((const uint8_t *)player_innards + 0x74u) == 2u;
-
-    /* Operation 0 is press. Consume a captured gesture through release even
-       when pad mode changes between the two events. */
-    if (operation == 0u && slip_loop && context && context->reader &&
-        context->armed) {
-        captured_pad_mask[deck] |= bit;
-        enum stem_mode selected = context->mode;
-        if (key_code == 0x411du)
-            selected = (enum stem_mode)(selected ^ MODE_INSTRUMENTAL);
-        else
-            selected = (enum stem_mode)(selected ^ MODE_VOCAL);
-        context->mode = selected;
-        if (selected == MODE_VOCAL)
-            log_line("SLIP LOOP PAD 8 : vocal");
-        else if (selected == MODE_INSTRUMENTAL)
-            log_line("SLIP LOOP PAD 7 : instrumental");
-        else if (selected == MODE_NONE)
-            log_line("SLIP LOOP : mute");
-        else
-            log_line("SLIP LOOP : both");
-        return 1;
-    }
-
-    if (context && (captured_pad_mask[deck] & bit)) {
-        /* Operations 2 and 3 are the release variants used by the stock Hot
-           Cue path, including release after a long press. */
-        if (operation == 2u || operation == 3u)
-            captured_pad_mask[deck] &= ~bit;
-        return 1;
-    }
-
-    return original_on_key_pad(player_innards, key_input);
+    return active;
 }
 
-struct rgb { uint8_t red, green, blue; };
-
-/* checkSlipBeatLoopLedState has already populated LedStat. The list contains
-   both decks. Each 44-byte uif::Led stores its ID at +0 and channel at +4.
-   Filtering both fields prevents one deck from changing the other deck's
-   visual state. Other pad modes remain on the stock path. */
-static void hooked_check_slip_led(void *player, void *led_stat)
+static unsigned int install_features(void)
 {
-    static const struct rgb instrumental_rgb = {255u, 0u, 0u};
-    static const struct rgb vocal_rgb        = {0u, 255u, 0u};
-
-    original_check_slip_led(player, led_stat);
-
-    struct deck_context *context = context_for_player(player);
-    if (!context || !context->reader || !context->armed)
-        return;
-
-    uint16_t count = *(const uint16_t *)((const uint8_t *)led_stat + 4u);
-    uint8_t *entries = *(uint8_t **)((uint8_t *)led_stat + 8u);
-    if (!entries || count > 256u)
-        return;
-
-    /* Armed but not yet resident: the sidecar is still being read. Both pads
-       blink until the payload is published, then they hold the selection. */
-    int loading = !context->vocal.data;
-    /* LedStat+0 is the millisecond stamp the manager wrote for this refresh. */
-    uint32_t now = *(const uint32_t *)led_stat;
-
-    enum stem_mode selected = context->mode;
-    int instrumental_on = (selected & MODE_INSTRUMENTAL) != 0;
-    int vocal_on = (selected & MODE_VOCAL) != 0;
-    uint32_t deck_channel = (uint32_t)(context - decks) + 1u;
-
-    for (uint16_t i = 0; i < count; i++) {
-        uint8_t *led = entries + (size_t)i * 44u;
-        uint32_t id = *(const uint32_t *)led;
-        uint32_t channel = *(const uint32_t *)(led + 4u);
-        if (channel != deck_channel)
+    unsigned int active = 0;
+    for (unsigned int i = 0; i < RUNTIME_FEATURE_COUNT; i++) {
+        struct rx3_runtime_feature *feature = &runtime_features[i];
+        if (!feature->active)
             continue;
-        const struct rgb *colour;
-        int lit;
-        if (id == 24u) {
-            colour = &instrumental_rgb;
-            lit = instrumental_on;
-        } else if (id == 25u) {
-            colour = &vocal_rgb;
-            lit = vocal_on;
-        } else {
+        if (!feature->install || feature->install()) {
+            active++;
             continue;
         }
-        if (loading) {
-            /* setState leaves a blink that already runs at this period alone,
-               so the two pads stay in step from one refresh to the next. */
-            ((set_led_state_fn)SET_LED_STATE)(led, LED_BLINK, BLINK_PERIOD_MS,
-                                              now, 0, 0);
-            ((set_led_color_fn)SET_LED_COLOR)(led, LED_BLINK, 0, colour);
-        } else {
-            ((set_led_color_fn)SET_LED_COLOR)(led, LED_ON, lit ? 0 : 1, colour);
-        }
+        log_line("optional feature disabled: hook guard rejected");
+        log_line(feature->name);
+        if (feature->remove)
+            feature->remove();
+        feature->active = 0;
+    }
+    return active;
+}
+
+static void remove_features(void)
+{
+    for (unsigned int i = RUNTIME_FEATURE_COUNT; i > 0u; i--) {
+        struct rx3_runtime_feature *feature = &runtime_features[i - 1u];
+        if (feature->remove)
+            feature->remove();
+        feature->active = 0;
     }
 }
 
@@ -903,68 +2042,226 @@ static void hooked_check_slip_led(void *player, void *led_stat)
 
 __attribute__((constructor)) static void initialize(void)
 {
+    /* Each feature is a module of its own and announces itself through the
+       environment its module.sh exports. The core installs either way, so that
+       key shift works without sidecars and stems works without key shift. */
     stems_dir = getenv("RX3_STEMS_DIR");
-    if (!stems_dir || !stems_dir[0])
+    if (stems_dir && !stems_dir[0])
+        stems_dir = 0;
+    const char *keyshift = getenv("RX3_KEYSHIFT");
+    keyshift_enabled = keyshift && keyshift[0] == '1';
+    if (!configure_features()) {
+        /* Nothing selected: leave rbp exactly as it is. */
         return;
+    }
 
     for (unsigned int i = 0; i < 2u; i++) {
-        decks[i].mode = MODE_BOTH;
-        decks[i].rendered_mode = MODE_BOTH;
-        decks[i].transition_from = MODE_BOTH;
-        decks[i].transition_to = MODE_BOTH;
-        decks[i].transition_cursor = TRANSITION_FRAMES;
+        stems_decks[i].mode = MODE_BOTH;
+        stems_decks[i].rendered_mode = MODE_BOTH;
+        stems_decks[i].transition_from = MODE_BOTH;
+        stems_decks[i].transition_to = MODE_BOTH;
+        stems_decks[i].transition_cursor = TRANSITION_FRAMES;
     }
 
-    original_get_stream = (get_stream_fn)install_hook(
-        &get_stream_hook, GET_STREAM_AT, get_stream_guard, (void *)hooked_get_stream);
-    if (!original_get_stream) {
-        log_line("rejected: unexpected PcmReader::getStreamAt prologue");
-        return;
-    }
-
+    /* PcmReader::load is the core deck-identity service used independently by
+       both features. The remaining audio/pad hooks belong to stems alone. */
     original_load = (load_fn)install_hook(
         &load_hook, PCM_LOAD, load_guard, (void *)hooked_load);
     if (!original_load) {
-        uninstall_hook(&get_stream_hook);
-        original_get_stream = 0;
-        log_line("rejected: unexpected PcmReader::load prologue; first hook removed");
+        log_line("rejected: unexpected PcmReader::load prologue");
         return;
     }
 
-    original_on_key_pad = (on_key_pad_fn)install_hook(
-        &pad_hook, ON_KEY_PAD, pad_guard, (void *)hooked_on_key_pad);
-    if (!original_on_key_pad) {
-        uninstall_hook(&load_hook);
-        uninstall_hook(&get_stream_hook);
-        original_load = 0;
-        original_get_stream = 0;
-        log_line("rejected: unexpected PlayerInnards::onKey_Pad prologue; hooks removed");
-        return;
+    original_set_beatfx_selected = (set_beatfx_selected_fn)install_hook(
+        &set_beatfx_hook, SET_BEATFX_STORAGE, set_beatfx_guard,
+        (void *)hooked_set_beatfx_selected);
+    if (!original_set_beatfx_selected) {
+        log_line("rejected: unexpected Beat FX state setter prologue");
+        goto reject_performance_hooks;
     }
 
-    original_check_slip_led = (check_slip_led_fn)install_pc_ldr_hook(
-        &slip_led_hook, CHECK_SLIP_LED, slip_led_guard,
-        (void *)hooked_check_slip_led);
-    if (!original_check_slip_led) {
-        uninstall_hook(&pad_hook);
-        uninstall_hook(&load_hook);
-        uninstall_hook(&get_stream_hook);
-        original_on_key_pad = 0;
-        original_load = 0;
-        original_get_stream = 0;
-        log_line("rejected: unexpected Slip Loop LED prologue; hooks removed");
-        return;
+    original_on_key_hot_cue = (on_key_pad_fn)install_hook(
+        &hot_cue_hook, ON_KEY_HOT_CUE, hot_cue_guard,
+        (void *)hooked_on_key_hot_cue);
+    original_on_key_beat_loop = (on_key_pad_fn)install_hook(
+        &beat_loop_hook, ON_KEY_BEAT_LOOP, pad_mode_guard,
+        (void *)hooked_on_key_beat_loop);
+    original_on_key_slip_loop = (on_key_pad_fn)install_hook(
+        &slip_loop_hook, ON_KEY_SLIP_LOOP, pad_mode_guard,
+        (void *)hooked_on_key_slip_loop);
+    original_on_key_beat_jump = (on_key_pad_fn)install_hook(
+        &beat_jump_hook, ON_KEY_BEAT_JUMP, pad_mode_guard,
+        (void *)hooked_on_key_beat_jump);
+    if (!original_on_key_hot_cue || !original_on_key_beat_loop ||
+        !original_on_key_slip_loop || !original_on_key_beat_jump) {
+        log_line("rejected: unexpected hardware pad-mode key prologue");
+        goto reject_performance_hooks;
     }
 
-    log_line("RX3 stems hook active; asynchronous loading and deck-filtered LEDs");
+    original_beatfx_xpad_ctor = (beatfx_xpad_ctor_fn)install_hook(
+        &beatfx_xpad_ctor_hook, BEATFX_XPAD_CTOR, beatfx_xpad_ctor_guard,
+        (void *)hooked_beatfx_xpad_ctor);
+    if (!original_beatfx_xpad_ctor) {
+        log_line("rejected: unexpected BeatFxAndXPad constructor prologue");
+        goto reject_performance_hooks;
+    }
+
+    original_touch_button_on = (touch_area_fn)install_hook(
+        &touch_button_on_hook, TOUCH_BUTTON_ON, touch_button_on_guard,
+        (void *)hooked_touch_button_on);
+    original_touch_button_hold = (touch_area_hold_fn)install_hook(
+        &touch_button_hold_hook, TOUCH_BUTTON_HOLD, touch_button_hold_guard,
+        (void *)hooked_touch_button_hold);
+    original_touch_button_off = (touch_area_fn)install_hook(
+        &touch_button_off_hook, TOUCH_BUTTON_OFF, touch_button_off_guard,
+        (void *)hooked_touch_button_off);
+    original_touch_toggle_on = (touch_area_fn)install_hook(
+        &touch_toggle_on_hook, TOUCH_TOGGLE_ON, touch_toggle_on_guard,
+        (void *)hooked_touch_toggle_on);
+    original_touch_toggle_off = (touch_area_fn)install_hook(
+        &touch_toggle_off_hook, TOUCH_TOGGLE_OFF, touch_toggle_off_guard,
+        (void *)hooked_touch_toggle_off);
+    original_touch_xpad_on = (touch_area_fn)install_hook(
+        &touch_xpad_on_hook, TOUCH_XPAD_ON, touch_xpad_on_guard,
+        (void *)hooked_touch_xpad_on);
+    original_touch_xpad_off = (touch_area_fn)install_hook(
+        &touch_xpad_off_hook, TOUCH_XPAD_OFF, touch_xpad_off_guard,
+        (void *)hooked_touch_xpad_off);
+    original_touch_xpad_hold = (touch_area_hold_fn)install_hook(
+        &touch_xpad_hold_hook, TOUCH_XPAD_HOLD, touch_xpad_hold_guard,
+        (void *)hooked_touch_xpad_hold);
+    if (!original_touch_button_on || !original_touch_button_hold ||
+        !original_touch_button_off || !original_touch_toggle_on ||
+        !original_touch_toggle_off || !original_touch_xpad_on ||
+        !original_touch_xpad_off || !original_touch_xpad_hold) {
+        log_line("rejected: unexpected native performance touch prologue");
+        goto reject_performance_hooks;
+    }
+
+    original_draw_text = (draw_text_fn)install_hook(
+        &draw_text_hook, PAL_DRAW_TEXT, draw_text_guard, (void *)hooked_draw_text);
+    if (!original_draw_text) {
+        log_line("rejected: unexpected NS_PALRender_DrawText prologue");
+        goto reject_performance_hooks;
+    }
+
+    original_draw_image = (draw_image_fn)install_hook(
+        &draw_image_hook, PAL_DRAW_IMAGE, draw_image_guard, (void *)hooked_draw_image);
+    if (!original_draw_image) {
+        log_line("rejected: unexpected NS_PALRender_DrawImage prologue");
+        goto reject_performance_hooks;
+    }
+
+    original_solve_touch = (solve_touch_fn)install_hook(
+        &touch_hook, SOLVE_TOUCH, touch_guard, (void *)hooked_solve_touch);
+    if (!original_solve_touch) {
+        log_line("rejected: unexpected solveCoordToKey prologue");
+        goto reject_performance_hooks;
+    }
+
+    if (!install_features())
+        goto reject_performance_hooks;
+
+#if defined(RX3_EMULATOR_BUILD)
+    /* The host has no front-panel microcontroller to request the first native
+       transition. Force one configured panel so the real rendering branches
+       are observable and clickable. */
+    const char *emulator_panel = getenv("RX3_EMULATOR_PANEL");
+    if (emulator_panel &&
+        (emulator_panel[0] == '1' || emulator_panel[0] == '2')) {
+        unsigned int requested = (unsigned int)(emulator_panel[0] - '0');
+        if (panel_for_id(requested)) {
+            emulator_forced_panel = requested;
+            log_number("emulator requested feature panel = ", requested);
+        }
+    }
+#endif
+
+    state_thread_running = 1;
+    pthread_t state_thread;
+    if (!pthread_create(&state_thread, 0, watch_patch_state, 0))
+        pthread_detach(state_thread);
+    else
+        log_line("warning: patch-state watcher could not start");
+#if defined(RX3_EMULATOR_BUILD)
+    pthread_t touch_thread;
+    if (!pthread_create(&touch_thread, 0, emulator_touch_loop, 0))
+        pthread_detach(touch_thread);
+    else
+        log_line("warning: emulator touch thread could not start");
+#endif
+    publish_ready();
+    log_line("RX3 performance hook active: native ZOOM/GRID replacement and wait caution");
+    return;
+
+reject_performance_hooks:
+    configure_native_performance_touches(0);
+    remove_features();
+    uninstall_hook(&touch_xpad_hold_hook);
+    uninstall_hook(&touch_xpad_off_hook);
+    uninstall_hook(&touch_xpad_on_hook);
+    uninstall_hook(&touch_toggle_off_hook);
+    uninstall_hook(&touch_toggle_on_hook);
+    uninstall_hook(&touch_button_off_hook);
+    uninstall_hook(&touch_button_hold_hook);
+    uninstall_hook(&touch_button_on_hook);
+    uninstall_hook(&beatfx_xpad_ctor_hook);
+    uninstall_hook(&beat_jump_hook);
+    uninstall_hook(&slip_loop_hook);
+    uninstall_hook(&beat_loop_hook);
+    uninstall_hook(&hot_cue_hook);
+    uninstall_hook(&set_beatfx_hook);
+    uninstall_hook(&touch_hook);
+    uninstall_hook(&draw_image_hook);
+    uninstall_hook(&draw_text_hook);
+    uninstall_hook(&load_hook);
+    original_touch_xpad_hold = 0;
+    original_touch_xpad_off = 0;
+    original_touch_xpad_on = 0;
+    original_touch_toggle_off = 0;
+    original_touch_toggle_on = 0;
+    original_touch_button_off = 0;
+    original_touch_button_hold = 0;
+    original_touch_button_on = 0;
+    original_beatfx_xpad_ctor = 0;
+    original_on_key_beat_jump = 0;
+    original_on_key_slip_loop = 0;
+    original_on_key_beat_loop = 0;
+    original_on_key_hot_cue = 0;
+    original_set_beatfx_selected = 0;
+    original_solve_touch = 0;
+    original_draw_image = 0;
+    original_draw_text = 0;
+    original_load = 0;
 }
 
 __attribute__((destructor)) static void finalize(void)
 {
-    uninstall_hook(&slip_led_hook);
-    uninstall_hook(&pad_hook);
+    state_thread_running = 0;
+    configure_native_performance_touches(0);
+    remove_features();
+    uninstall_hook(&touch_xpad_hold_hook);
+    uninstall_hook(&touch_xpad_off_hook);
+    uninstall_hook(&touch_xpad_on_hook);
+    uninstall_hook(&touch_toggle_off_hook);
+    uninstall_hook(&touch_toggle_on_hook);
+    uninstall_hook(&touch_button_off_hook);
+    uninstall_hook(&touch_button_hold_hook);
+    uninstall_hook(&touch_button_on_hook);
+    uninstall_hook(&beatfx_xpad_ctor_hook);
+    uninstall_hook(&beat_jump_hook);
+    uninstall_hook(&slip_loop_hook);
+    uninstall_hook(&beat_loop_hook);
+    uninstall_hook(&hot_cue_hook);
+    uninstall_hook(&set_beatfx_hook);
+    uninstall_hook(&touch_hook);
+    uninstall_hook(&draw_image_hook);
+    uninstall_hook(&draw_text_hook);
     uninstall_hook(&load_hook);
-    uninstall_hook(&get_stream_hook);
-    for (unsigned int i = 0; i < 2u; i++)
-        release_payload(&decks[i].vocal);
+    for (unsigned int i = 0; i < 2u; i++) {
+        for (unsigned int feature = 0;
+             feature < RUNTIME_FEATURE_COUNT; feature++)
+            if (runtime_features[feature].destroy_deck)
+                runtime_features[feature].destroy_deck(i);
+    }
 }

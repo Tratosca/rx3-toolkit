@@ -1,6 +1,59 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
+## Unreleased
+
+The two applications became one, and the stems half answers the questions it
+used to leave the operator guessing at.
+
+### Changed
+
+- `RX3 Mod Generator` and `RX3 Stem Studio` ship as a single application,
+  `XDJ-RX3 Toolkit`, with a **USB Runtime** tab and a **Vocal Stems** tab. One
+  download per platform replaces two; the `XDJ-RX3-Mod-Generator-*` and
+  `XDJ-RX3-Stem-Studio-*` archives are retired in favour of `XDJ-RX3-Toolkit-*`.
+  `make gui` and `make stems-gui` become `make app`. The per-user data directory
+  keeps its old name, so an installed separation runtime is found rather than
+  downloaded again.
+- Secondary text follows the desktop appearance instead of a fixed `#555555`
+  chosen against a light window. On a dark desktop the help text in Advanced
+  options was grey on grey at roughly 1.6:1; it is now above 8:1 in both
+  appearances, and follows a mid-session appearance change.
+- The progress line says which track is being worked on — *track 3 of 20* —
+  rather than how many are behind it, which read one short of reality.
+- The **Fast** preset trades a model rather than a parameter. It used to run the
+  same roformer as **High quality** with fewer passes, which is the same heavy
+  transformer either way; it now runs an MDX-Net model — roughly a third of the
+  inference for about 2.4 dB less vocal SDR, which is audible as a little more
+  instrument left in the acapella. Switching to it downloads a few tens of
+  megabytes on first use. **High quality** is unchanged.
+- On Apple Silicon and AMD ROCm, **Fast** runs its model through PyTorch rather
+  than ONNX Runtime. On a Mac, CoreML is offered and enabled but cannot take an
+  MDX-Net graph whole — it claims 151 of 178 nodes across 28 partitions, so the
+  work stays interleaved with the CPU, which is what the activity monitor was
+  showing. Taking the same model through Metal instead separated a minute of
+  audio in 12.1 s against 42.6 s. On ROCm, ONNX Runtime has no GPU provider at
+  all and the conversion is the difference between the GPU and the CPU. It is
+  the same model file either way, so no accelerator change costs a download.
+- The `mdxc_overlap` help text said "Higher is better and slower". It is the
+  opposite: the option is a hop divisor, so a higher value steps the prediction
+  window further and stitches the result from fewer passes. Anyone who raised it
+  for quality was lowering it.
+
+### Added
+
+- **Fast** and **High quality** presets, and **Custom** for anything tuned by
+  hand. Both run the best-scoring vocal model and differ in `mdxc_overlap`, so
+  switching between them needs no second download. Editing a model or parameter
+  in Advanced options switches the setting to Custom rather than leaving a
+  preset name on a configuration it no longer describes.
+- A duration estimate, stated before the run from the playlist's own track
+  lengths and corrected from the machine's measured speed as it goes. Measured
+  speeds are kept in `throughput.json` per architecture and accelerator, so
+  later runs start calibrated.
+- A standing notice that separation occupies the machine, and a confirmation
+  before any run estimated at more than ten minutes.
+
 ## 0.4.0
 
 Two reasons a sidecar was ignored or left the vocal in the instrumental. Both

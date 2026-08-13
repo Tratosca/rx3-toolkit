@@ -1,0 +1,21 @@
+#!/bin/sh
+
+if [ "$1" = "-n" ]; then
+    key=$2
+else
+    key=$1
+fi
+
+case "$key" in
+    rootfs) echo nfs ;;
+    aplstart) echo on ;;
+    boot_type) echo normal ;;
+    dhcp_server) echo 0 ;;
+    joglcd) echo rt ;;
+    no_reset_usbbhub) echo 1 ;;
+    release) echo 01.19 ;;
+    serial_num) echo RX3EMU0001 ;;
+    ubifs_formatted) echo false ;;
+    rev_boot|rev_kernel|rev_rootfs|rev_apl) echo 0 ;;
+    *) exit 1 ;;
+esac
