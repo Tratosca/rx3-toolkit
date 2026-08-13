@@ -14,9 +14,12 @@ import re
 import struct
 import sys
 import unittest
+from importlib import import_module
 from pathlib import Path
 
 REPOSITORY = Path(__file__).parents[1]
+PATCHER_PACKAGE = REPOSITORY / "tools/rx3_patcher"
+sys.path.insert(0, str(REPOSITORY))
 sys.path.insert(0, str(REPOSITORY / "tools"))
 
 from rx3_runtime.build import discover_patches  # noqa: E402
@@ -43,23 +46,25 @@ def modules_by_id():
 
 
 class OfflinePatcherTests(unittest.TestCase):
-    """`patch.py` and `module.sh` must rewrite the same words."""
+    """The offline patchers and `module.sh` must rewrite the same words."""
 
     def test_offline_tables_match_the_device_registrations(self):
+        definitions = modules_by_id()
         checked = 0
-        for patch_id, definition in sorted(modules_by_id().items()):
-            patcher = definition.directory / "patch.py"
-            if not patcher.is_file():
+        for patcher in sorted(PATCHER_PACKAGE.glob("*.py")):
+            if patcher.name.startswith("_") or patcher.name == "patchlib.py":
                 continue
+            imported = import_module(f"tools.rx3_patcher.{patcher.stem}")
+            patch_id = imported.MODULE_ID
 
-            namespace = {"__file__": str(patcher), "__name__": "offline_patcher"}
-            source = patcher.read_text(encoding="utf-8")
-            # The module guards its entry point behind __main__, so executing it
-            # yields the table without patching anything.
-            exec(compile(source, str(patcher), "exec"), namespace)  # noqa: S102
+            self.assertIn(
+                patch_id, definitions,
+                f"{patcher.name}: MODULE_ID {patch_id!r} matches no manifest",
+            )
+            definition = definitions[patch_id]
             offline = {
                 offset: (bytes.fromhex(stock), bytes.fromhex(patched))
-                for offset, stock, patched, _label in namespace["PATCHES"]
+                for offset, stock, patched, _label in imported.PATCHES
             }
 
             module_script = definition.directory / "module.sh"

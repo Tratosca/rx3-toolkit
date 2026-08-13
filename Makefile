@@ -11,6 +11,10 @@ BUILD_DIR ?= build
 FIRMWARE ?= 1.19
 MODULES ?=
 CORE_DIR := runtime/modules/core/$(FIRMWARE)
+# One directory per module, so a new module is picked up without editing this
+# file: its headers become hook prerequisites and its guards join `make test`.
+MODULE_HEADERS := $(wildcard runtime/modules/*/$(FIRMWARE)/*.h)
+MODULE_GUARDS := $(wildcard runtime/modules/*/$(FIRMWARE)/test_regressions.py)
 HOOK := $(BUILD_DIR)/librx3_core.so
 EMULATOR_HOOK := $(BUILD_DIR)/librx3_core_emulator.so
 AUTOEXEC := $(BUILD_DIR)/autoexec.bin
@@ -44,30 +48,12 @@ help:
 
 hook: $(HOOK)
 
-$(HOOK): $(CORE_DIR)/rx3_core_hook.c \
-         $(CORE_DIR)/rx3_feature_api.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_decl.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_feature.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_panel.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_pitch_shift.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_decl.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_feature.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_panel.h
+$(HOOK): $(CORE_DIR)/rx3_core_hook.c $(MODULE_HEADERS)
 	@mkdir -p "$(BUILD_DIR)"
 	$(CC) $(CFLAGS) $(LDFLAGS) -o "$@" "$(CORE_DIR)/rx3_core_hook.c"
 	@file "$@" | grep -q 'ELF 32-bit LSB shared object, ARM, EABI5'
 
-$(EMULATOR_HOOK): $(CORE_DIR)/rx3_core_hook.c \
-         $(CORE_DIR)/rx3_feature_api.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_decl.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_feature.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_keyshift_panel.h \
-         runtime/modules/keyshift/$(FIRMWARE)/rx3_pitch_shift.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_decl.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_feature.h \
-         runtime/modules/stems/$(FIRMWARE)/rx3_stems_panel.h
+$(EMULATOR_HOOK): $(CORE_DIR)/rx3_core_hook.c $(MODULE_HEADERS)
 	@mkdir -p "$(BUILD_DIR)"
 	$(CC) $(CFLAGS) -DRX3_EMULATOR_BUILD=1 $(LDFLAGS) \
 	  -o "$@" "$(CORE_DIR)/rx3_core_hook.c"
@@ -86,9 +72,7 @@ app:
 	$(PYTHON) apps/rx3-toolbox/main.py
 
 test:
-	$(PYTHON) "$(CORE_DIR)/test_regressions.py"
-	$(PYTHON) "runtime/modules/keyshift/$(FIRMWARE)/test_regressions.py"
-	$(PYTHON) "runtime/modules/stems/$(FIRMWARE)/test_regressions.py"
+	@set -e; for guard in $(MODULE_GUARDS); do $(PYTHON) "$$guard"; done
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'
 
 emulator-image:
