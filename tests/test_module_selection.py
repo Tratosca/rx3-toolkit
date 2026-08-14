@@ -41,6 +41,10 @@ class SelectionPropagationTests(unittest.TestCase):
     def set(self, identifier, value):
         self.variables[identifier].set(value)
 
+    def clear(self):
+        for name in list(self.variables):
+            self.set(name, False)
+
     def ticked(self):
         return {name for name, variable in self.variables.items() if variable.get()}
 
@@ -49,25 +53,22 @@ class SelectionPropagationTests(unittest.TestCase):
             set(self.variables), {patch.patch_id for patch in discover_patches()}
         )
 
-    def test_ticking_a_feature_pulls_in_its_dependency(self):
-        for name in list(self.variables):
-            self.set(name, False)
-
+    def test_ticking_a_feature_pulls_in_its_dependency_and_nothing_else(self):
+        self.clear()
         self.set("beatjump-32bars", True)
         self.assertIn("decoder-sleep", self.ticked())
 
+        self.clear()
         self.set("stems", True)
         self.assertIn("core", self.ticked())
 
-    def test_decoder_sleep_stands_alone(self):
-        for name in list(self.variables):
-            self.set(name, False)
+        # A module that requires nothing stays on its own.
+        self.clear()
         self.set("decoder-sleep", True)
         self.assertEqual(self.ticked(), {"decoder-sleep"})
 
     def test_unticking_a_dependency_unticks_what_needed_it(self):
-        for name in list(self.variables):
-            self.set(name, False)
+        self.clear()
         self.set("beatjump-32bars", True)
         self.set("beatjump-no-quantize", True)
         self.assertTrue({"beatjump-32bars", "decoder-sleep"} <= self.ticked())
@@ -79,8 +80,7 @@ class SelectionPropagationTests(unittest.TestCase):
         self.assertNotIn("decoder-sleep", remaining)
 
     def test_core_follows_its_dependents_and_is_never_ticked_alone(self):
-        for name in list(self.variables):
-            self.set(name, False)
+        self.clear()
         self.assertFalse(self.variables["core"].get())
 
         self.set("keyshift", True)
@@ -107,46 +107,36 @@ class SelectionPropagationTests(unittest.TestCase):
             any(text.endswith("(required)") for text in disabled),
             f"an internal module must be shown but not tickable; saw {states}",
         )
-
-    def test_the_build_selection_never_names_an_internal_module(self):
         # resolve_patches rejects an internal module as a direct selection, so
         # what the pane hands the resolver must exclude it even when ticked.
         self.set("stems", True)
-        selectable = {
-            patch.patch_id for patch in discover_patches() if patch.selectable
-        }
         self.assertTrue(self.variables["core"].get())
-        self.assertNotIn("core", selectable)
+        self.assertFalse(internal & {
+            patch.patch_id for patch in discover_patches() if patch.selectable
+        })
 
 
 class ClosureTests(unittest.TestCase):
     """The graph helpers the pane relies on, without a display."""
 
-    def setUp(self):
-        self.definitions = discover_patches()
-
-    def test_required_closure_reaches_transitive_dependencies(self):
+    def test_the_closures_run_both_ways_and_ignore_unknown_identifiers(self):
+        definitions = discover_patches()
         self.assertEqual(
-            required_closure(self.definitions, ["beatjump-32bars"]),
+            required_closure(definitions, ["beatjump-32bars"]),
             {"beatjump-32bars", "decoder-sleep"},
         )
         self.assertEqual(
-            required_closure(self.definitions, ["decoder-sleep"]), {"decoder-sleep"}
+            required_closure(definitions, ["decoder-sleep"]), {"decoder-sleep"}
         )
-
-    def test_dependent_closure_reaches_transitive_dependents(self):
         self.assertEqual(
-            dependent_closure(self.definitions, ["decoder-sleep"]),
+            dependent_closure(definitions, ["decoder-sleep"]),
             {"decoder-sleep", "beatjump-32bars", "beatjump-no-quantize"},
         )
         self.assertEqual(
-            dependent_closure(self.definitions, ["core"]),
-            {"core", "keyshift", "stems"},
+            dependent_closure(definitions, ["core"]), {"core", "keyshift", "stems"}
         )
-
-    def test_closures_ignore_unknown_identifiers(self):
-        self.assertEqual(required_closure(self.definitions, ["nope"]), set())
-        self.assertEqual(dependent_closure(self.definitions, ["nope"]), set())
+        self.assertEqual(required_closure(definitions, ["nope"]), set())
+        self.assertEqual(dependent_closure(definitions, ["nope"]), set())
 
 
 if __name__ == "__main__":

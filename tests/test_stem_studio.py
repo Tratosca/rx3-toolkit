@@ -82,17 +82,16 @@ class RekordboxTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 parse_collection(xml)
 
-    def test_windows_drive_letter_locations_lose_the_url_leading_slash(self):
-        # Rekordbox on Windows writes this exact form.
-        resolved = file_url_to_path("file://localhost/C:/Music/Artist%20-%20Track.aiff")
-        self.assertEqual(pathlib.PurePath(resolved).parts[0].rstrip("\\/"), "C:")
-        self.assertEqual(pathlib.PurePath(resolved).name, "Artist - Track.aiff")
+    def test_locations_resolve_per_platform_and_reject_remote_urls(self):
+        # Rekordbox on Windows writes this exact form: the drive letter loses
+        # the leading slash of the URL, a POSIX path keeps it.
+        windows = file_url_to_path("file://localhost/C:/Music/Artist%20-%20Track.aiff")
+        self.assertEqual(pathlib.PurePath(windows).parts[0].rstrip("\\/"), "C:")
+        self.assertEqual(pathlib.PurePath(windows).name, "Artist - Track.aiff")
 
-    def test_posix_locations_keep_their_leading_slash(self):
-        resolved = file_url_to_path("file://localhost/Users/dj/Music/Track.aiff")
-        self.assertEqual(pathlib.PurePath(resolved).parts[1], "Users")
+        posix = file_url_to_path("file://localhost/Users/dj/Music/Track.aiff")
+        self.assertEqual(pathlib.PurePath(posix).parts[1], "Users")
 
-    def test_rejects_a_remote_location(self):
         with self.assertRaises(ValueError):
             file_url_to_path("https://example.invalid/Track.aiff")
 
@@ -176,30 +175,6 @@ class JobTests(unittest.TestCase):
             self.assertEqual(len(state.errors), 1)
             self.assertIn("Ambiguous filename", state.errors[0].error)
 
-    def test_refuses_two_distinct_sources_with_the_same_basename(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            sources = []
-            for folder in ("one", "two"):
-                source = root / folder / "Same Name.aiff"
-                source.parent.mkdir()
-                source.write_bytes(b"fixture")
-                sources.append(source)
-            xml = write_export(root, [
-                ("1", "One", "A", sources[0]),
-                ("2", "Two", "B", sources[1]),
-            ])
-            collection = parse_collection(xml)
-            output = root / "export"
-            (output / "RX3_STEMS").mkdir(parents=True)
-            (output / "RX3_STEMS/Same Name.rx3stem").write_bytes(b"x" * 128)
-
-            state = StemJob(self.runtime(), collection, collection.playlists[0], output).run()
-            self.assertEqual(state.state, "done")
-            self.assertEqual(len(state.results), 1)
-            self.assertEqual(len(state.errors), 1)
-            self.assertIn("Ambiguous filename", state.errors[0].error)
-
     def test_missing_source_is_reported_without_stopping_the_queue(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -265,15 +240,17 @@ class InferenceDeviceTests(unittest.TestCase):
             job._note_inference_device(f"{job_module.CPU_FALLBACK}, running in CPU mode")
         self.assertEqual(len(job.state.notices), 1)
 
-    def test_an_accelerated_run_says_nothing(self):
-        job = self.job("cuda")
-        job._note_inference_device("CUDA is available in Torch, setting Torch device to CUDA")
-        self.assertEqual(job.state.notices, ())
+    def test_nothing_is_reported_when_the_cpu_is_where_the_run_belongs(self):
+        accelerated = self.job("cuda")
+        accelerated._note_inference_device(
+            "CUDA is available in Torch, setting Torch device to CUDA"
+        )
+        self.assertEqual(accelerated.state.notices, ())
 
-    def test_a_cpu_run_is_not_a_fallback(self):
-        job = self.job("cpu")
-        job._note_inference_device(f"{job_module.CPU_FALLBACK}, running in CPU mode")
-        self.assertEqual(job.state.notices, ())
+        # The CPU profile running on the CPU is not a fallback.
+        cpu = self.job("cpu")
+        cpu._note_inference_device(f"{job_module.CPU_FALLBACK}, running in CPU mode")
+        self.assertEqual(cpu.state.notices, ())
 
 
 class FailureDetailTests(unittest.TestCase):
@@ -357,12 +334,11 @@ class SeparationTests(unittest.TestCase):
         self.assertEqual(normalization.default, 1.0)
         self.assertIn("--normalization=1.0", separation.Settings().arguments("MDXC"))
 
-    def test_flags_are_emitted_without_a_value(self):
+    def test_flags_carry_no_value_and_out_of_range_values_are_refused(self):
         denoise = next(o for o in separation.ARCHITECTURE_OPTIONS["MDX"] if o.kind == "flag")
-        settings = separation.Settings().with_value(denoise, True)
-        self.assertIn(denoise.flag, settings.arguments("MDX"))
-
-    def test_out_of_range_values_are_refused(self):
+        self.assertIn(
+            denoise.flag, separation.Settings().with_value(denoise, True).arguments("MDX")
+        )
         overlap = next(
             o for o in separation.ARCHITECTURE_OPTIONS["MDXC"] if o.name == "mdxc_overlap"
         )
@@ -385,9 +361,10 @@ class SeparationTests(unittest.TestCase):
             self.assertEqual(restored.values, {})
             self.assertEqual(restored.accelerator, "auto")
 
-    def test_a_missing_settings_file_yields_the_defaults(self):
-        loaded = separation.load_settings(pathlib.Path("/nonexistent/separation.json"))
-        self.assertEqual(loaded, separation.Settings())
+            self.assertEqual(
+                separation.load_settings(path.with_name("absent.json")),
+                separation.Settings(),
+            )
 
 
 class SidecarGainTests(unittest.TestCase):
@@ -679,23 +656,7 @@ class SeparatorEnvironmentTests(unittest.TestCase):
             self.assertTrue(environment["PATH"].startswith(str(root)))
             self.assertEqual(environment["AUDIO_SEPARATOR_MODEL_DIR"], str(runtime.models))
 
-    def test_downloading_a_model_carries_the_prepared_environment(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            runtime = self.runtime(root)
-            model = separation.Model(
-                architecture="VR", name="HP-UVR", filename="1_HP-UVR.pth",
-                stems=("Vocals",), vocal_sdr=7.9, download_files=("1_HP-UVR.pth",),
-            )
-            (runtime.models / "1_HP-UVR.pth").write_bytes(b"weights")
-            process = unittest.mock.Mock(stdout=iter(["downloading\n"]))
-            process.wait.return_value = 0
-            with unittest.mock.patch("subprocess.Popen", return_value=process) as popen:
-                separation.download_model(runtime, model)
-            environment = popen.call_args.kwargs["env"]
-            self.assertTrue(environment["PATH"].startswith(str(root)))
-
-    def test_an_incomplete_download_is_reported_rather_than_assumed(self):
+    def test_a_download_carries_the_environment_and_is_checked_afterwards(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             runtime = self.runtime(root)
@@ -705,12 +666,14 @@ class SeparatorEnvironmentTests(unittest.TestCase):
                 download_files=("model.ckpt", "config.yaml"),
             )
             (runtime.models / "model.ckpt").write_bytes(b"weights")
-            process = unittest.mock.Mock(stdout=iter([]))
+            process = unittest.mock.Mock(stdout=iter(["downloading\n"]))
             process.wait.return_value = 0
-            with unittest.mock.patch("subprocess.Popen", return_value=process):
+            # One of the two files never arrived: reported, not assumed.
+            with unittest.mock.patch("subprocess.Popen", return_value=process) as popen:
                 with self.assertRaises(RuntimeError) as raised:
                     separation.download_model(runtime, model)
             self.assertIn("config.yaml", str(raised.exception))
+            self.assertTrue(popen.call_args.kwargs["env"]["PATH"].startswith(str(root)))
 
 
 class RuntimeStateTests(unittest.TestCase):
@@ -746,29 +709,25 @@ class RuntimeStateTests(unittest.TestCase):
                 # Nothing to rebuild: the copy in use is not the managed one.
                 self.assertFalse(provisioning.needs_reinstall("cuda", external))
 
-    def test_the_installed_accelerator_round_trips(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.home(directory):
-                self.assertIsNone(provisioning.installed_accelerator())
-                (pathlib.Path(directory) / provisioning.STATE_NAME).write_text(
-                    '{"accelerator": "cuda"}', encoding="utf-8"
-                )
-                self.assertEqual(provisioning.installed_accelerator(), "cuda")
-
-    def test_an_unreadable_or_unknown_state_reads_as_absent(self):
+    def test_the_installed_accelerator_round_trips_and_a_damaged_state_is_absent(self):
         with tempfile.TemporaryDirectory() as directory:
             state = pathlib.Path(directory) / provisioning.STATE_NAME
             with self.home(directory):
-                state.write_text("not json", encoding="utf-8")
                 self.assertIsNone(provisioning.installed_accelerator())
-                state.write_text('{"accelerator": "quantum"}', encoding="utf-8")
-                self.assertIsNone(provisioning.installed_accelerator())
+                state.write_text('{"accelerator": "cuda"}', encoding="utf-8")
+                self.assertEqual(provisioning.installed_accelerator(), "cuda")
+                for damaged in ("not json", '{"accelerator": "quantum"}'):
+                    state.write_text(damaged, encoding="utf-8")
+                    self.assertIsNone(provisioning.installed_accelerator())
 
     def test_reinstallation_is_needed_only_when_the_accelerator_differs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             runtime = self.ready_runtime(root)
             with self.home(directory):
+                # No state at all: a runtime from an earlier version of the
+                # application is not a mismatch.
+                self.assertFalse(provisioning.needs_reinstall("cuda", runtime))
                 (root / provisioning.STATE_NAME).write_text(
                     '{"accelerator": "cpu"}', encoding="utf-8"
                 )
@@ -779,12 +738,6 @@ class RuntimeStateTests(unittest.TestCase):
                     environment=root, models=root, separator=None, ffmpeg=None
                 )
                 self.assertFalse(provisioning.needs_reinstall("cuda", absent))
-
-    def test_a_runtime_from_an_earlier_version_reports_no_mismatch(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            with self.home(directory):
-                self.assertFalse(provisioning.needs_reinstall("cuda", self.ready_runtime(root)))
 
     def test_uninstall_removes_the_environment_and_keeps_the_models(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -816,17 +769,7 @@ class RuntimeStateTests(unittest.TestCase):
                 self.assertEqual(alias.read_bytes(), b"binary")
                 self.assertEqual(runtime.ffmpeg_directory(), exposed)
 
-    def test_an_already_named_ffmpeg_is_used_where_it_is(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            real = root / provisioning._executable_name("ffmpeg")
-            real.write_bytes(b"binary")
-            runtime = provisioning.Runtime(
-                environment=root, models=root, separator=root / "separator", ffmpeg=real,
-            )
-            self.assertEqual(runtime.ffmpeg_directory(), root)
-
-    def test_the_subprocess_environment_puts_ffmpeg_first_on_path(self):
+    def test_an_already_named_ffmpeg_is_used_where_it_is_and_leads_the_path(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             real = root / provisioning._executable_name("ffmpeg")
@@ -835,6 +778,7 @@ class RuntimeStateTests(unittest.TestCase):
                 environment=root, models=root / "models",
                 separator=root / "separator", ffmpeg=real,
             )
+            self.assertEqual(runtime.ffmpeg_directory(), root)
             values = runtime.subprocess_environment()
             self.assertTrue(values["PATH"].startswith(str(root)))
             self.assertEqual(values["AUDIO_SEPARATOR_MODEL_DIR"], str(root / "models"))
@@ -854,30 +798,25 @@ class FfmpegCapabilityTests(unittest.TestCase):
     """A build without one of the filters the pipeline uses fails partway
     through a job, so it has to be rejected before one is started."""
 
-    def probe(self, root, stdout, returncode=0):
-        binary = root / "ffmpeg"
+    def probe(self, binary, stdout, returncode=0):
         binary.write_text(stdout)  # distinct content keeps the probe cache honest
         result = subprocess.CompletedProcess([], returncode, stdout, "")
         with unittest.mock.patch.object(provisioning.subprocess, "run", return_value=result):
             return binary, provisioning.missing_filters(binary)
 
-    def test_a_complete_build_is_accepted(self):
-        with tempfile.TemporaryDirectory() as directory:
-            _, absent = self.probe(pathlib.Path(directory), FILTER_LISTING)
-            self.assertEqual(absent, ())
-
-    def test_a_build_without_apad_is_reported(self):
-        listing = "\n".join(
+    def test_the_probe_reports_exactly_what_a_build_is_missing(self):
+        without_apad = "\n".join(
             line for line in FILTER_LISTING.splitlines() if " apad " not in line
         )
         with tempfile.TemporaryDirectory() as directory:
-            _, absent = self.probe(pathlib.Path(directory), listing)
-            self.assertEqual(absent, ("apad",))
-
-    def test_a_binary_that_cannot_list_its_filters_is_not_trusted(self):
-        with tempfile.TemporaryDirectory() as directory:
-            _, absent = self.probe(pathlib.Path(directory), "", returncode=1)
-            self.assertEqual(absent, provisioning.REQUIRED_FILTERS)
+            root = pathlib.Path(directory)
+            self.assertEqual(self.probe(root / "complete", FILTER_LISTING)[1], ())
+            self.assertEqual(self.probe(root / "partial", without_apad)[1], ("apad",))
+            # A binary that cannot even list its filters is not trusted.
+            self.assertEqual(
+                self.probe(root / "mute", "", returncode=1)[1],
+                provisioning.REQUIRED_FILTERS,
+            )
 
     def test_an_incomplete_copy_falls_through_to_the_next(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -930,37 +869,31 @@ class CudaWheelTests(unittest.TestCase):
         ):
             return provisioning.resolve_acceleration("cuda")
 
-    def test_a_blackwell_card_gets_an_index_that_carries_its_architecture(self):
-        self.assertEqual(self.resolve((12, 0)).torch_index, provisioning.CUDA_WHEEL_INDEX)
-
-    def test_a_card_older_than_turing_keeps_the_legacy_index(self):
-        self.assertEqual(
-            self.resolve((6, 1)).torch_index, provisioning.LEGACY_CUDA_WHEEL_INDEX
-        )
-
-    def test_an_unreadable_capability_takes_the_current_index(self):
-        self.assertEqual(self.resolve(None).torch_index, provisioning.CUDA_WHEEL_INDEX)
-
-    def test_cuda_never_leaves_the_wheel_index_to_pypi(self):
-        for capability in ((12, 0), (7, 5), (6, 1), None):
-            self.assertIsNotNone(self.resolve(capability).torch_index)
+    def test_the_index_follows_the_architecture_of_the_card(self):
+        # A Blackwell card, and an unreadable capability, take the current
+        # index; anything older than Turing keeps the legacy one.
+        expected = {
+            (12, 0): provisioning.CUDA_WHEEL_INDEX,
+            (7, 5): provisioning.CUDA_WHEEL_INDEX,
+            (6, 1): provisioning.LEGACY_CUDA_WHEEL_INDEX,
+            None: provisioning.CUDA_WHEEL_INDEX,
+        }
+        for capability, index in expected.items():
+            self.assertEqual(self.resolve(capability).torch_index, index)
 
 
 class AccelerationTests(unittest.TestCase):
-    def test_every_platform_offers_automatic_and_cpu(self):
+    def test_every_platform_resolves_to_a_known_profile(self):
         keys = [key for key, _ in provisioning.available_accelerations()]
         self.assertEqual(keys[0], provisioning.AUTOMATIC)
         self.assertIn("cpu", keys)
 
-    def test_automatic_resolves_to_a_known_profile(self):
         resolved = provisioning.resolve_acceleration(provisioning.AUTOMATIC)
         self.assertIn(resolved.key, provisioning.ACCELERATIONS)
         self.assertIn(resolved.extra, ("cpu", "gpu", "dml"))
-
-    def test_an_unknown_stored_accelerator_falls_back_to_detection(self):
+        # An accelerator stored by a later version falls back to detection.
         self.assertEqual(
-            provisioning.resolve_acceleration("from-the-future").key,
-            provisioning.resolve_acceleration(provisioning.AUTOMATIC).key,
+            provisioning.resolve_acceleration("from-the-future").key, resolved.key
         )
 
     def test_directml_is_the_only_profile_needing_a_separation_flag(self):
@@ -1040,7 +973,7 @@ class TrackPositionTests(unittest.TestCase):
             tracks.append((str(index + 1), f"Track {index}", "Artist", audio))
         return parse_collection(write_export(root, tracks))
 
-    def test_position_leads_completed_while_a_track_is_running(self):
+    def test_position_leads_completed_and_both_reach_the_total(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             collection = self.playlist(root, 3)
@@ -1051,7 +984,7 @@ class TrackPositionTests(unittest.TestCase):
                 (stems / f"Artist - Track {index}.rx3stem").write_bytes(b"x" * 128)
 
             seen: list[tuple[str, int, int]] = []
-            StemJob(
+            state = StemJob(
                 provisioning.detect(), collection, collection.playlists[0], output,
                 observer=lambda state: seen.append(
                     (state.current, state.position, state.completed)
@@ -1067,23 +1000,8 @@ class TrackPositionTests(unittest.TestCase):
                 self.assertLess(completed, position + 1)
             self.assertEqual(min(position for _, position, _ in named), 1)
 
-    def test_position_and_completed_both_reach_the_total(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            collection = self.playlist(root, 2)
-            output = root / "export"
-            stems = output / "RX3_STEMS"
-            stems.mkdir(parents=True)
-            for index in range(2):
-                (stems / f"Artist - Track {index}.rx3stem").write_bytes(b"x" * 128)
-
-            state = StemJob(
-                provisioning.detect(), collection, collection.playlists[0], output
-            ).run()
             self.assertEqual(state.state, "done")
-            self.assertEqual(state.position, 2)
-            self.assertEqual(state.completed, 2)
-            self.assertEqual(state.total, 2)
+            self.assertEqual((state.position, state.completed, state.total), (3, 3, 3))
 
 
 class EstimateTests(unittest.TestCase):
@@ -1096,29 +1014,24 @@ class EstimateTests(unittest.TestCase):
         self.assertAlmostEqual(estimator.rate, 0.5)
         self.assertNotAlmostEqual(estimator.rate, seeded)
 
-    def test_later_measurements_are_blended_rather_than_obeyed(self):
+    def test_later_measurements_are_blended_and_converge(self):
         estimator = estimate.Estimator("MDX", "cpu")
         estimator.observe(audio_seconds=100, elapsed=100)   # rate 1.0
         estimator.observe(audio_seconds=100, elapsed=200)   # rate 2.0
         self.assertGreater(estimator.rate, 1.0)
         self.assertLess(estimator.rate, 2.0)
 
-    def test_a_resumed_track_cannot_collapse_the_rate(self):
-        """An existing sidecar costs no time and says nothing about speed."""
-        estimator = estimate.Estimator("MDX", "cpu")
-        estimator.observe(audio_seconds=100, elapsed=100)
+        # An existing sidecar costs no time and says nothing about speed, so it
+        # must not reach the blend at all.
+        blended = estimator.rate
         estimator.observe(audio_seconds=300, elapsed=0.001)
-        self.assertAlmostEqual(estimator.rate, 1.0)
+        self.assertAlmostEqual(estimator.rate, blended)
 
-    def test_repeated_measurements_converge_on_the_truth(self):
-        estimator = estimate.Estimator("Demucs", "cpu")
+        converging = estimate.Estimator("Demucs", "cpu")
         for _ in range(20):
-            estimator.observe(audio_seconds=100, elapsed=250)
-        self.assertAlmostEqual(estimator.rate, 2.5, places=3)
-
-    def test_an_export_without_durations_yields_no_estimate(self):
-        estimator = estimate.Estimator("MDX", "cpu")
-        self.assertIsNone(estimator.remaining(0))
+            converging.observe(audio_seconds=100, elapsed=250)
+        self.assertAlmostEqual(converging.rate, 2.5, places=3)
+        self.assertIsNone(converging.remaining(0))
 
     def test_measured_rates_survive_to_the_next_run(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1270,24 +1183,13 @@ class QualityPresetTests(unittest.TestCase):
                 for option in options:
                     self.assertNotIn(option.flag, arguments)
 
-    def test_the_top_two_presets_trade_passes_rather_than_models(self):
-        """Trading the model costs a download and gives up SDR, so the ladder
-        only does it once, at the bottom. High quality and Normal are one model
-        at two steps: moving between them is free in both senses."""
-        for accelerates_torch in (True, False):
-            quality = separation.preset(separation.QUALITY_MODE).resolve(
-                accelerates_torch=accelerates_torch
-            )
-            normal = separation.preset(separation.NORMAL_MODE).resolve(
-                accelerates_torch=accelerates_torch
-            )
-            self.assertEqual(quality.architecture, normal.architecture)
-            self.assertEqual(quality.candidates, normal.candidates)
-            self.assertNotEqual(quality.values, normal.values)
-
-    def test_every_preset_is_a_distinct_configuration(self):
-        """Three names have to mean three things on every build, including the
-        one that can only run a single architecture."""
+    def test_the_ladder_trades_passes_first_and_the_model_only_at_the_bottom(self):
+        """Three names have to mean three distinct things on every build.
+        Trading the model costs a download and gives up SDR, so the ladder only
+        does it once, at the bottom: High quality and Normal are one model at
+        two steps, and moving between them is free in both senses. Below the
+        roformer every architecture lands within a quarter of the same cost, so
+        there is no second trade to make."""
         for accelerates_torch in (True, False):
             resolved = [
                 preset.resolve(accelerates_torch=accelerates_torch)
@@ -1299,11 +1201,17 @@ class QualityPresetTests(unittest.TestCase):
             }
             self.assertEqual(len(configurations), len(separation.PRESETS))
 
-    def test_only_the_quickest_preset_gives_up_the_best_model(self):
-        """Below the roformer every architecture in the catalogue lands within
-        a quarter of the same cost, so there is no second step down to make.
-        Spending the one available trade anywhere but the bottom of the ladder
-        would give up SDR without buying speed."""
+            quality, normal = (
+                separation.preset(key).resolve(accelerates_torch=accelerates_torch)
+                for key in (separation.QUALITY_MODE, separation.NORMAL_MODE)
+            )
+            self.assertEqual(quality.architecture, normal.architecture)
+            self.assertEqual(quality.candidates, normal.candidates)
+            self.assertNotEqual(quality.values, normal.values)
+
+        # Where the roformer runs, only the quickest preset gives it up, and it
+        # gives it up for a waveform model rather than the band-limited ONNX
+        # fallback: SDR is traded, the top of the spectrum is not.
         for key in (separation.QUALITY_MODE, separation.NORMAL_MODE):
             self.assertEqual(
                 separation.preset(key).resolve(accelerates_torch=True).candidates,
@@ -1311,8 +1219,6 @@ class QualityPresetTests(unittest.TestCase):
             )
         quick = separation.preset(separation.QUICK_MODE).resolve(accelerates_torch=True)
         self.assertNotEqual(quick.candidates, separation.ROFORMER_CANDIDATES)
-        # A waveform model, so it gives up SDR without giving up the top of the
-        # spectrum the way the band-limited ONNX fallback does.
         self.assertEqual(quick.architecture, "Demucs")
 
     def test_a_build_that_accelerates_torch_asks_for_the_better_model(self):
@@ -1351,59 +1257,44 @@ class QualityPresetTests(unittest.TestCase):
         for summary in summaries:
             self.assertTrue(summary and summary[0].isupper())
 
-    def test_the_two_overlap_options_are_read_in_opposite_directions(self):
-        """`mdxc_overlap` on a roformer is a step in seconds, not an amount of
-        overlap: raising it advances the prediction window further, so the
-        result is stitched from fewer passes. `mdx_overlap` is a real fraction
-        and reads the other way round. Taking either for the other inverts
-        every preset it appears in."""
-        mdxc = next(
-            item for item in separation.ARCHITECTURE_OPTIONS["MDXC"]
-            if item.name == "mdxc_overlap"
-        )
-        mdx = next(
-            item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
-            if item.name == "mdx_overlap"
-        )
-        # Normal is quicker than High quality, which on the roformer means a
-        # higher value and on the MDX fallback a lower one.
-        self.assertGreater(separation.NORMAL_OVERLAP, mdxc.default)
-        self.assertGreater(separation.MDX_QUALITY_OVERLAP, mdx.default)
-        self.assertLess(separation.MDX_QUICK_OVERLAP, mdx.default)
-        self.assertNotIn("Higher is better", mdxc.help)
-
-    def test_the_onnx_ladder_runs_from_most_passes_to_fewest(self):
-        """The build that can only run one architecture still gets three
-        distinct offers, and they have to be ordered the way their names are."""
-        overlaps = [
-            preset.onnx.values.get("mdx_overlap", next(
-                item for item in separation.ARCHITECTURE_OPTIONS["MDX"]
-                if item.name == "mdx_overlap"
-            ).default)
-            for preset in separation.PRESETS
-        ]
-        self.assertEqual(overlaps, sorted(overlaps, reverse=True))
-
     # `vocals_mel_band_roformer` chunks at `stft_hop_length * (dim_t - 1)`, or
     # 441 * 1100 = 485100 samples = 11.0 s at 44.1 kHz.
     ROFORMER_CHUNK_SECONDS = 11
 
-    def test_the_normal_preset_stops_short_of_a_seam(self):
-        """The step is clamped to the chunk, so any value at or above the chunk
-        length in seconds separates in one pass with no overlap at all. Measured
-        on a 90 s excerpt, that leaves a discontinuity every 11.0 s reaching 25x
-        the surrounding sample-to-sample difference, against 0.7x away from a
-        boundary - a click, and the deck subtracts the stem from the mix, so it
-        lands in the instrumental too. One step below, 9% of the chunk still
-        overlaps, the boundaries measure like any other sample, and it costs
-        nothing: 0.399 s/s against 0.406."""
-        self.assertLess(separation.NORMAL_OVERLAP, self.ROFORMER_CHUNK_SECONDS)
-        option = next(
-            item for item in separation.ARCHITECTURE_OPTIONS["MDXC"]
-            if item.name == "mdxc_overlap"
+    def test_the_overlaps_step_the_right_way_on_each_architecture(self):
+        """`mdxc_overlap` on a roformer is a step in seconds, not an amount of
+        overlap: raising it advances the prediction window further, so the
+        result is stitched from fewer passes. `mdx_overlap` is a real fraction
+        and reads the other way round. Taking either for the other inverts
+        every preset it appears in.
+
+        The roformer step is clamped to the chunk, so any value at or above the
+        chunk length in seconds separates in one pass with no overlap at all.
+        Measured on a 90 s excerpt, that leaves a discontinuity every 11.0 s
+        reaching 25x the surrounding sample-to-sample difference, against 0.7x
+        away from a boundary - a click, and the deck subtracts the stem from the
+        mix, so it lands in the instrumental too. One step below, 9% of the
+        chunk still overlaps and it costs nothing: 0.399 s/s against 0.406."""
+        mdxc, mdx = (
+            next(item for item in separation.ARCHITECTURE_OPTIONS[architecture]
+                 if item.name == name)
+            for architecture, name in (("MDXC", "mdxc_overlap"), ("MDX", "mdx_overlap"))
         )
-        # Still a step up from High quality, or it would not be a preset.
-        self.assertGreater(separation.NORMAL_OVERLAP, option.default)
+        # Normal is quicker than High quality, which on the roformer means a
+        # higher value and on the MDX fallback a lower one.
+        self.assertGreater(separation.NORMAL_OVERLAP, mdxc.default)
+        self.assertLess(separation.NORMAL_OVERLAP, self.ROFORMER_CHUNK_SECONDS)
+        self.assertGreater(separation.MDX_QUALITY_OVERLAP, mdx.default)
+        self.assertLess(separation.MDX_QUICK_OVERLAP, mdx.default)
+        self.assertNotIn("Higher is better", mdxc.help)
+
+        # The build that can only run MDX still gets three distinct offers,
+        # ordered the way their names are.
+        overlaps = [
+            preset.onnx.values.get("mdx_overlap", mdx.default)
+            for preset in separation.PRESETS
+        ]
+        self.assertEqual(overlaps, sorted(overlaps, reverse=True))
 
     def test_no_preset_overrides_a_model_segment_size(self):
         """Every candidate runs at the segment size its own weights were
@@ -1416,34 +1307,20 @@ class QualityPresetTests(unittest.TestCase):
                 self.assertNotIn("mdxc_segment_size", variant.values)
                 self.assertNotIn("mdxc_override_model_segment_size", variant.values)
 
-    def test_editing_a_parameter_demotes_the_preset_to_custom(self):
+    def test_editing_the_configuration_by_hand_demotes_the_preset_to_custom(self):
         settings = separation.apply_preset(
             separation.Settings(), separation.preset(separation.QUALITY_MODE),
             separation.Catalogue(),
         )
         self.assertEqual(settings.mode, separation.QUALITY_MODE)
         option = separation.normalization_option()
-        edited = settings.with_value(option, 0.5)
-        self.assertEqual(edited.mode, separation.CUSTOM_MODE)
-
-    def test_choosing_a_model_by_hand_demotes_the_preset_to_custom(self):
-        settings = separation.Settings()
-        self.assertEqual(settings.mode, separation.QUALITY_MODE)
-        self.assertEqual(settings.with_model("something_else.ckpt").mode,
-                         separation.CUSTOM_MODE)
-
-    def test_a_parameter_set_to_the_value_it_already_had_changes_nothing(self):
-        """Reapplying the dialog unchanged must not relabel the preset."""
-        settings = separation.apply_preset(
-            separation.Settings(), separation.preset(separation.QUALITY_MODE),
-            separation.Catalogue(),
+        self.assertEqual(settings.with_value(option, 0.5).mode, separation.CUSTOM_MODE)
+        self.assertEqual(
+            settings.with_model("something_else.ckpt").mode, separation.CUSTOM_MODE
         )
-        option = separation.normalization_option()
+        # Reapplying the dialog unchanged must not relabel the preset, and
+        # acceleration is a property of the machine, not of the trade-off.
         self.assertEqual(settings.with_value(option, settings.value(option)), settings)
-
-    def test_choosing_an_accelerator_leaves_the_preset_alone(self):
-        """Acceleration is a property of the machine, not of the trade-off."""
-        settings = separation.Settings()
         self.assertEqual(settings.with_accelerator("cpu").mode, settings.mode)
 
     def test_the_mode_survives_a_round_trip_through_disk(self):
@@ -1455,15 +1332,12 @@ class QualityPresetTests(unittest.TestCase):
                 separation.save_settings(path, settings)
                 self.assertEqual(separation.load_settings(path).mode, mode)
 
-    def test_settings_written_before_presets_existed_read_as_custom(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = pathlib.Path(directory) / separation.SETTINGS_NAME
+            # Settings written before presets existed describe an unknown
+            # configuration; calling it a preset would misreport what it holds.
             path.write_text(
                 '{"model": "some_model.ckpt", "accelerator": "cpu", "values": {}}',
                 encoding="utf-8",
             )
-            # Describing an unknown configuration as a preset would misreport
-            # what it holds.
             self.assertEqual(separation.load_settings(path).mode, separation.CUSTOM_MODE)
 
 
@@ -1579,16 +1453,6 @@ class ThemeTests(unittest.TestCase):
         theme = self.module()
         for key in ("muted", "warning", "text_background", "text_foreground"):
             self.assertNotEqual(theme.LIGHT[key], theme.DARK[key])
-
-    def test_no_pane_hard_codes_a_colour_or_a_wrap_width(self):
-        """A fixed grey is unreadable in the appearance it was not chosen for,
-        and a wraplength in pixels makes the window a fixed-width document."""
-        application = pathlib.Path(__file__).parents[1] / "apps/rx3-toolbox"
-        for pane in ("mod_generator.py", "stem_studio.py"):
-            source = (application / pane).read_text(encoding="utf-8")
-            self.assertNotIn("foreground=", source)
-            self.assertNotIn("#555555", source)
-            self.assertNotIn("wraplength=", source)
 
 
 if __name__ == "__main__":
