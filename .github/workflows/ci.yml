@@ -188,6 +188,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
@@ -199,6 +202,22 @@ jobs:
         run: |
           find release -maxdepth 1 -type f -print
 
+      # The changelog is where the release is described in the first place, so
+      # the published notes are that section rather than a second account of it.
+      - name: Take the release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v want="## $version" '
+            $0 == want { found = 1; next }
+            /^## / { found = 0 }
+            found
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no '## $version' section" >&2
+            exit 1
+          fi
+          cat notes.md
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -208,5 +227,5 @@ jobs:
           "${GITHUB_REF_NAME}"
           release/*
           --verify-tag
-          --generate-notes
+          --notes-file notes.md
           --title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"
