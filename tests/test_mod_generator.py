@@ -93,7 +93,7 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertNotIn(f'"{patch.patch_id}"', gui)
 
     def test_release_matrix_covers_supported_desktop_hosts(self):
-        workflow = (REPOSITORY / ".github/workflows/release.yml").read_text()
+        workflow = (REPOSITORY / ".github/workflows/ci.yml").read_text()
         for expected in (
             "ubuntu-24.04",
             "windows-2025",
@@ -103,21 +103,30 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertIn(f"runner: {expected}", workflow)
 
     def test_desktop_product_names_follow_project_name(self):
-        workflow = (REPOSITORY / ".github/workflows/release.yml").read_text()
+        workflow = (REPOSITORY / ".github/workflows/ci.yml").read_text()
         gui = (REPOSITORY / "apps/rx3-toolbox/main.py").read_text()
         spec = (REPOSITORY / "apps/rx3-toolbox/rx3_toolbox.spec").read_text()
+
         self.assertIn('PRODUCT = "XDJ-RX3 Toolkit"', gui)
         self.assertIn("self.title(PRODUCT)", gui)
         self.assertIn('name="XDJ-RX3 Toolkit"', spec)
-        self.assertIn("name: Release XDJ-RX3 Toolkit", workflow)
+
+        self.assertIn("Publish GitHub Release", workflow)
+        self.assertIn("gh release create", workflow)
         self.assertIn("archive: XDJ-RX3-Toolkit-", workflow)
-        self.assertIn('--title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"', workflow)
-        # The two applications this one replaces must not survive anywhere that
-        # names a download, or the release page would offer both again.
+        self.assertIn(
+            '--title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"',
+            workflow,
+        )
+
         for obsolete in (
-            "RX3 Runtime Builder", "RX3-Runtime-Builder", "Toolkit Builder",
-            "RX3 Mod Generator", "RX3-Mod-Generator",
-            "RX3 Stem Studio", "RX3-Stem-Studio",
+            "RX3 Runtime Builder",
+            "RX3-Runtime-Builder",
+            "Toolkit Builder",
+            "RX3 Mod Generator",
+            "RX3-Mod-Generator",
+            "RX3 Stem Studio",
+            "RX3-Stem-Studio",
         ):
             self.assertNotIn(obsolete, workflow + gui + spec)
 
@@ -163,7 +172,7 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertEqual(result.patches, ("core", "keyshift"))
             plain = load_firmware_codec().read_autoexec(result.output, key)
             normalized = plain.replace(b"\r\n", b"\n")
-            
+
             self.assertIn(b"compatibility\ncore\nkeyshift\n", normalized)
             self.assertNotIn(b"\nstems\n", normalized)
 
