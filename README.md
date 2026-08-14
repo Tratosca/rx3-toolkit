@@ -1,286 +1,394 @@
-# XDJ-RX3 Toolkit
+<h1 align="center">
+  XDJ-RX3 Toolkit
+</h1>
 
-Adds ±32 beat jumps, faster decoder polling, and vocal/instrumental pad control
-to a Pioneer DJ XDJ-RX3, from a file on your USB drive. Nothing is flashed. A
-power cycle restores the stock system.
+<p align="center">
+  <b>Vocal &amp; instrumental stems, longer beat jumps, and more on your XDJ-RX3.</b><br>
+  No flashing. No firmware surgery. Pull the USB stick out and your player is stock again.
+</p>
 
-One application ships with it, XDJ-RX3 Toolkit, with a tab for each half of the
-job. **USB Runtime** writes the file the RX3 reads. **Vocal Stems** prepares the
-stems, which are the separated vocal and instrumental parts of a track.
+<p align="center">
+  <a href="../../releases"><img alt="Release" src="https://img.shields.io/github/v/release/Tratosca/rx3-toolkit?style=flat-square&color=ff5c00"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square"></a>
+  <img alt="Firmware" src="https://img.shields.io/badge/XDJ--RX3%20firmware-1.19-black?style=flat-square">
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#what-you-get">What you get</a> •
+  <a href="#quick-start">Quick start</a> •
+  <a href="#playing-with-it">Playing with it</a> •
+  <a href="#back-to-stock">Back to stock</a> •
+  <a href="#faq">FAQ</a> •
+  <a href="#documentation">Docs</a>
+</p>
+
+<!-- Add a demo GIF or a photo of the pads here: ![demo](docs/assets/demo.gif) -->
+
+---
+
+## What you get
+
+### 🎤 Vocal and instrumental on the pads
+
+Prepare your tracks on your computer, load them on the RX3 the usual way, and
+**Slip Loop** mode turns into stem control:
+
+| Pad | Colour | What it does |
+| :--: | :--: | --- |
+| **7** | 🔴 Red | Instrumental on / off |
+| **8** | 🟢 Green | Vocal on / off |
+
+### ⏭️ 32-beat Beat Jump
+
+Beat Jump gets a new **32-beat** mode. Repeated presses also fire
+straight away instead of waiting for the grid to catch up.
+
+### 🔌 Lives on the USB stick, not in the player
+
+Everything runs from the stick and disappears when the power goes off. Any RX3 you plug your stick on will be modded. Nothing
+is written to the player's internal memory, so there is no firmware to back up
+and nothing to uninstall.
+
+**Power off → pull the stick → power on → stock RX3.**
+
+---
 
 ## What you need
 
 | | |
-|---|---|
-| Device | XDJ-RX3, any hardware revision |
-| Firmware | `1.19` |
-| Computer | Windows x64, macOS (Intel or Apple Silicon), or Linux x64 |
-| USB drive | FAT32 or exFAT, exported from Rekordbox |
-| Key | An RX3 encryption key file, which this project does not distribute |
-| Disk | About 1.5 GB for the separation runtime, plus 50 MB to 650 MB per model |
+| --- | --- |
+| 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` only at the moment |
+| 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
+| 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
+| 🔑 **A key file** | Not distributed here — [see below](#the-key-file) |
+| 📀 **Disk space** | ~1.5 GB, only if you want stems |
 
-Time: about 20 minutes to set everything up, then a few minutes of separation
-per track. An NVIDIA, AMD or Apple Silicon GPU changes that by an order of
-magnitude.
+About **20 minutes** to set everything up. After that, stems take from a few
+seconds to a few minutes per track. A GPU (NVIDIA, AMD, or Apple Silicon) makes
+that dramatically faster.
 
-The encryption key is not in this repository and never will be. It exists in
-source code Pioneer published publicly. Finding it, **and deciding whether you may use it, is on you**. However, the Pioneer-distributed archives `pioneerdj_xdj_rx3.tar.bz2.00` and `pioneerdj_xdj_rx3.tar.bz2.01` available on the [Pioneer GPL/LGPL source code site](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/) does contain the material to compile the RX3's Linux `initramfs`, which does happen to expose the key in `/usr/local/pdj/aes256.key`. See [Extracting the initramfs](docs/extract-initramfs.md).
+---
 
 ## Before you start
 
-Read this please.
+**Read this bit.** It is short.
 
-Nothing is written to any ROM, NAND or flash memory ofthe RX3. The way this unit boots, and the way Pionner wanted to be able to run on it their own maintenance/repair scripts made this possible "live", on RAM, without any flash.
+- **Nothing is flashed.** The toolkit does not write to the player's internal
+  storage. It uses the maintenance mechanism Pioneer built into the RX3 to run
+  software from a USB stick, and everything lives in memory until you power off.
+- **There is a safety net.** If the modified player does not survive the first
+  few seconds, the original one is put back automatically.
+- **It can still crash.** Modified software on a live machine is modified
+  software on a live machine. That matters rather a lot when the thing is
+  plugged into a 20 kW PA. **Test at home. Test the actual stick, the actual
+  tracks, several times. Keep a clean Rekordbox stick in the bag.**
+- **Warranty.** Running unofficial software on consumer hardware may affect what
+  the manufacturer is willing to do for you. Nothing here is permanent, but that
+  is not a promise about anyone's warranty decisions.
+- **Liability.** This is an educational and experimental project. If it crashes
+  during your $50,000 set, that would be unfortunate. I do wish you the $50,000
+  set.
+- **Music.** Separation happens on your computer, on your files. What you are
+  allowed to copy, process and perform depends on your licences and your
+  jurisdiction, not on this tool.
+- **Affiliation.** Not affiliated with, endorsed by, or connected to Pioneer DJ
+  or AlphaTheta. Product names identify compatible gear and nothing more.
 
-When the patch is applied, if the application does not survive eight seconds, the previous
-unpatched is restored automatically. Power off, remove the drive, power on, and the
-device is stock (and very probably under warranty) again. 
+---
 
-There is no firmware backup step because there is nothing to back up.
+## Quick start
 
-What can still go wrong is a crash or an unresponsive interface, which is a real
-problem in the middle of a set even though it costs you nothing permanently.
-Test at home first. Keep a second, unmodified Rekordbox drive in the bag.
+Do these in order. For your first go, I'd suggest you use a spare USB stick and two or three
+tracks.
 
-Running unofficial code on any device is in general likely to affect the manufacturer warranty. As usual on that kind of projects, assume it does, but I'm confident it does not on that very specific device
+### 1. Check your firmware
 
-This is for educational purposes. I cannot be held responsible if it causes a
-crash during a $50k DJ set, or, far less plausibly, if it bricks your device. I
-do wish you the opportunity to play the $50k gig tho.
+Remove every USB stick, power the RX3 on, hold **MENU (UTILITY)** for a second,
+scroll to the bottom.
 
-This project is not affiliated with, endorsed by, or connected to Pioneer DJ or
-AlphaTheta. Product names identify the tested hardware and nothing more.
+```text
+VERSION No. 1.19
+```
 
-The Vocal Stems tab separates the tracks you feed it, on your computer. What you are
-entitled to do with those tracks, and with the stems that come out, is your
-responsibility and depends on where you live and what you licensed.
+Anything else and you should stop here — the toolkit is built against this exact
+version and simply will not apply itself to another one. AlphaTheta documents
+updating [in its support article](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
 
-## Quick Start
+Power the RX3 back off.
 
-Do the steps in order. 
+### 2. Download the app
 
-This guide assumes you already have at least one Rekordbox prepared USB stick with some songs and playlists in it.
+Grab the build for your computer from the [**Releases page**](../../releases) and
+unpack it wherever you keep applications.
 
-### 1. Check the firmware version
+<details>
+<summary><b>macOS says the app is damaged / Windows shows a warning</b></summary>
 
-Disconnect every USB drive from the RX3 and power it on normally. Hold
-**MENU (UTILITY)** for more than one second, then scroll to the bottom of the
-Utility screen.
+The app is not code-signed yet, hich means your computer suspects it could be malicious.
 
-**What you should see:** a line reading `VERSION No.` followed by `1.19`.
-
-**If it does not work:** if the version is anything other than `1.19`, stop
-here. This project neither updates nor downgrades firmware, and applying it to
-another version does nothing, because the RX3 refuses a player binary it does
-not recognise. AlphaTheta documents the update procedure
-[in its own support article](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
-
-Close Utility and power the RX3 off.
-
-### 2. Download XDJ-RX3 Toolkit
-
-Go to the [Releases page](../../releases) and download the XDJ-RX3 Toolkit
-archive matching your computer: Windows x64, macOS Apple Silicon, macOS Intel,
-or Linux x64. Unpack it wherever you keep applications.
-
-Both halves are in that one application: there is nothing else to download.
-
-### 3. Clear the macOS quarantine attribute
-
-Skip this step on Windows and Linux.
-
-The application is unsigned, so macOS refuses to open it and often reports it as
-damaged. The **quarantine attribute** is a marker your browser attaches to
-anything it downloads, and clearing it is what lets an unsigned application run.
-In the terminal from step 2, type the line below, replacing the path with the
-real location of the unpacked application. Drag the application onto the
-terminal window to insert its path.
+**macOS** — clear the quarantine flag your browser put on the download. Open the Terminal application, (in the Utilities folder), type `xattr rc` then drag the app into the window to fill in the path:
 
 ```sh
 xattr -rc "/Applications/XDJ-RX3 Toolkit.app"
 ```
 
-**If it does not work:** `No such file or directory` means the path is wrong.
-Run the command against the unpacked `.app` wherever you actually put it, not
-against the `.zip` and not against a folder containing it. 
+`No such file or directory` means the path is wrong: it must point at the
+unpacked `.app` itself, not the `.zip` and not the folder around it.
 
-On Windows, expect a SmartScreen dialog instead; choose **More info**, then **Run anyway**.
+**Windows** — SmartScreen will complain. Choose **More info → Run anyway**.
 
-### 4. Optional : Stems
+**Linux** — unpack and run; you may need to mark the file executable first.
 
-#### a. Optional : Generate a stem dedicated playlists
+</details>
 
-In Rekordbox, generate a playlist with the name you want and put all the songs you want stem generated into it. 
-> I recommend you to try with a few songs first.
+### 3. Prepare your stems *(optional)*
 
-#### b. Export your Rekordbox collection as XML
+Skip this if you only want the longer beat jumps.
 
-In Rekordbox, use the collection XML export. The Vocal Stems tab reads this file
-to find where your audio files live on disk and which tracks belong to which
-playlist.
+1. In Rekordbox, make a playlist with the tracks you want stems for. Two or
+   three, for a first run.
+2. Export your Rekordbox collection **as XML** (Preferences → *Advanced* or
+   *View*, depending on your version). This is not the same as exporting to a
+   stick. The app reads it to find where your audio files are.
+3. Open the app, go to the **Stems preparation** tab, and hit **Set up… → Install**.
+   Separation needs a lot of software that is too big to ship in the download,
+   so it gets installed once into its own private folder. You need an internet
+   connection, ~1.5 GB free, and Python 3.10–3.13
+   ([python.org](https://www.python.org/downloads/) if you have none — take 3.13).
+   If it stops halfway, press **Install** again; it picks up where it left off.
+4. Select your XML, your playlist, and your Rekordbox USB stick.
+5. Pick a quality: **Fast** for big libraries, **High quality** for exposed
+   acapellas. 
+6. Start it. The app estimates how long the run will take, then corrects itself
+   after the first track and remembers your machine's speed for next time.
 
-**If it does not work:** the option lives in Rekordbox preferences, under the
-Advanced or View section depending on your version. It is a different thing from
-exporting to a drive, which you did at step 6.
-
-#### c. Open the Vocal Stems tab
-
-Launch XDJ-RX3 Toolkit and select the **Vocal Stems** tab.
-
-**If it does not work:** on macOS, a "damaged" or "cannot be opened" dialog
-means step 3 did not take effect. Repeat it against this exact `.app`.
-
-#### d. Install the separation runtime
-
-Select **Set up…**, then **Install**.
-
-Separation needs a large amount of software that is not in the download:
-audio-separator, PyTorch and FFmpeg together weigh far more than the
-application, which installs them into a **virtual environment**: a private
-folder of Python packages that does not touch the rest of your computer.
-
-**What you should see:** a progress log, then the setup panel disappearing.
-This needs an internet connection, about 1.5 GB of disk space, and a Python
-interpreter between 3.10 and 3.13 already installed on your computer.
-
-**If it does not work:** if it refuses to start and mentions Python, install
-Python 3.13 from [python.org](https://www.python.org/downloads/) and try again.
-If it stops partway, select **Install** again; the same button completes an
-environment that already exists rather than starting over.
-
-#### e. Load the XML file, the playlist and the destination
-
-In the Vocal Stems tab, select the XML file, then the playlist to
-convert stems from, then your USB drive that contains the original songs you're converting.
-
-> Exporting the stem dedicated playlist to USB is not necessary. The RX3 matches the stems with original songs via filename.
-
-
-#### f. Choose the quality, then generate
-
-Pick **Fast** or **High quality**. Both use the best-scoring separation model;
-the difference is how many overlapping passes it makes over each track. Fast
-makes fewer, so it finishes sooner and leaves a little more instrumental in the
-vocal. **Custom** is what the setting becomes if you tune anything by hand in
-Advanced options.
-
-Once a playlist is selected the tab shows an estimate — track count, total
-audio, and how long the run should take on your hardware. The first estimate is
-rough; it is corrected as soon as the first track finishes, and the measured
-speed is remembered for the next run.
-
-Start the job.
-
-Each track is decoded, separated, and written as one `.rx3stem` file. That file
-is a **sidecar**: it sits beside the audio and carries the vocal part, and the
-RX3 subtracts it from the mix to produce the instrumental. Separation is the
-slow phase, a few minutes per track, and it will keep your machine busy: keep
-the computer plugged in and awake, and close other demanding applications. If
-your computer has a GPU, it will be much faster.
-
-While it runs, the status line names the track being worked on, its position in
-the playlist, and the time remaining.
-
-**If it does not work:** a track that fails is reported and the queue carries
-on, so let it finish and read the log. If every track fails immediately, the
-runtime is incomplete: use **Install** again in Advanced options, Runtime tab.
-Details in [Troubleshooting](troubleshooting.md#every-track-fails).
-
-### 5. Generate the mod
-
-Open the **USB Runtime** tab, and select firmware `1.19`.
-
-Select your RX3 encryption key file.
-
->[!CAUTION] 
-This project does not distribute that key and cannot. It exists in source code
-Pioneer published publicly. Obtaining it, and deciding whether you may use it,
-is your call, and it is the one step in this guide that nobody can do for you.
-
-Choose the root of the USB drive as the output folder, then select
-**Build autoexec.bin**. When it finishes, eject the drive properly.
-
-`autoexec.bin` is the encrypted file the RX3 looks for on every drive you
-insert. It is the entire mod.
-
-**What you should see:** the drive root now holding four entries.
+Each track produces a `.rx3stem` file in a `RX3_STEMS` folder on the output folder you chose. If you didn't chose your Rekordbox USB stick as an output path, it's time to move that folder at the root of it
 
 ```text
-USB drive/
-  autoexec.bin
-  RX3_STEMS/
-  Contents/
-  PIONEER/
+Your USB stick
+├── Contents    ← this holds your exported Rekordbox audio files
+├── PIONEER
+└── RX3_STEMS   ← the new one
 ```
 
-**If it does not work:** the generated image is decrypted and re-verified before
-it is accepted, so a failure here means the key is wrong rather than the drive.
-If an `autoexec.bin` already exists, the application asks before replacing it.
+> [!NOTE]
+> The stem playlist itself does **not** need to go on the stick, but it totally can. The player
+> matches stems automatically.
 
-### 6. Apply the mod
+Keep the laptop plugged in and awake. If one track fails the queue carries on —
+read the log at the end. If *every* track fails, the install is incomplete: run
+**Install** again. See [Troubleshooting](docs/troubleshooting.md#every-track-fails).
 
-Order matters. With the drive **disconnected**, power the RX3 on and wait until
-the interface is fully loaded and responsive. Only then insert the drive.
+### 4. The key file
 
-Do not touch the controls, do not remove the drive, and do not cut power while
-the interface stops and restarts.
+The file we will make needs to be encrypted for the player to load it, so the app needs the matching key to
+build it.
 
-**What you should see:** the interface goes away for a few seconds and comes
-back. On the drive, a new `RX3_RUNTIME/session.txt` file whose last line reads
-`=== complete ===`.
+> [!CAUTION]
+> **This project does not distribute that key, and never will.**
 
-**If it does not work:** if the interface does not come back, remove the drive
-and power cycle (which power chord if needed); the RX3 returns to stock. If `session.txt` contains a line
-starting with `STOP:` or `FAILED:`, delete `autoexec.bin` from the drive and
-read [Troubleshooting](troubleshooting.md#the-session-log-says-stop-or-failed).
+It is not a secret, though. Pioneer publishes the GPL/LGPL source archives for
+the XDJ-RX3 (`pioneerdj_xdj_rx3.tar.bz2.00` and `.01`) on its
+[open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/),
+and building the filesystem from them exposes the key. Getting it — and deciding
+whether you may use it where you live — is the one step nobody can do for you.
 
-### 7. Enjoy !
+Step-by-step: [**Extracting the RX3 initramfs**](docs/extract-initramfs.md).
 
-Load one of the tracks you prepared at step 5, then select Slip Loop mode.
+### 5. Build the file for your stick
 
-**What you should see:** pads 7 and 8 lit, pad 7 red for the instrumental and
-pad 8 green for the vocal. Each is an independent switch. Both on plays the full
-mix, one on plays that part alone, both off is silence. Press pad 8 and the
-vocal drops out.
+In the **Modules installation** tab: pick firmware `1.19`, choose the modules you want (some are automatically checked or unchecked depending on which mods you chose), pick your key file, pick the
+**root of your Rekordbox stick** as the destination, then **Mod your RX3 !**.
 
-While the sidecar is still loading, both pads blink; they hold their colour once
-it is loaded.
+Eject the stick
+properly. It should now look like:
 
-Open Beat Jump mode on the same track. Pads 7 and 8 now read `32` and jump 32
-beats, and repeated presses fire immediately instead of waiting for the grid.
+```text
+USB stick/
+├── autoexec.bin      ← the mod, this is the whole thing
+├── RX3_STEMS/
+├── Contents/
+└── PIONEER/
+```
 
-**If it does not work:** pads 7 and 8 creating loops as usual means no
-`.rx3stem` matched this track. That is the intended fallback, not a failure. The
-sidecar and the audio file must share exactly the same name before the
-extension. See
-[Troubleshooting](troubleshooting.md#a-prepared-track-has-no-stem-controls).
+### 6. Put it on the player
 
-### Returning to stock
+**Order matters.**
 
-Stop playback, power the RX3 off, remove the drive, and power on without it.
-Everything is gone.
+1. Power the RX3 on with the stick **out**.
+2. Wait until the interface is fully loaded and responsive.
+3. *Now* insert the stick.
 
-Leaving the drive in re-applies `autoexec.bin` on the next power-on. To stop
-that for good, delete `autoexec.bin` from the drive.
+The screen freezes, goes away for a few seconds and comes back. While that happens, do
+not pull the stick, do not cut power, and do not mash the controls because
+patience has apparently become obsolete.
+
+<details>
+<summary><b>Did it work?</b></summary>
+
+The stick now contains `RX3_RUNTIME/session.txt`. Its last line should read:
+
+```text
+=== complete ===
+```
+
+**Interface did not come back?** Pull the stick and power cycle — unplug the
+mains lead if you have to. The RX3 boots stock.
+
+**Log says `STOP:` or `FAILED:`?** Delete `autoexec.bin` from the stick, then see
+[Troubleshooting](docs/troubleshooting.md#the-session-log-says-stop-or-failed).
+
+</details>
+
+---
+
+## Playing with it
+
+Load one of your prepared tracks and open **Slip Loop**.
+
+Pads 7 and 8 blink while the stem loads, then settle on red and green. They are
+two independent switches — press pad 8 and the vocal drops out of the mix.
+
+Open **Beat Jump** on the same track: pads 7 and 8 now read `32`.
+
+Load a track with no stem and Slip Loop behaves exactly like stock. That is the
+intended fallback, not a failure — if a track you *did* prepare has no stem
+controls, then either you probably did something wron, or I did. See
+[Troubleshooting](docs/troubleshooting.md#a-prepared-track-has-no-stem-controls) and only after open an issue..
+
+---
+
+## Back to stock
+
+1. Stop playback.
+2. Power off.
+3. Pull the stick.
+4. Power on.
+
+Done. Nothing to uninstall, nothing to restore, nothing to reflash.
+
+Leaving the stick in re-applies the mod at the next power-on. To turn it back
+into an ordinary Rekordbox stick for good, delete `autoexec.bin` from it — your
+music and your stems can stay.
+
+---
+
+## FAQ
+
+<details>
+<summary><b>Does this flash custom firmware?</b></summary><br>
+
+No. Everything runs in memory and is gone the moment you power off without the
+stick.
+</details>
+
+<details>
+<summary><b>Can it brick my RX3?</b></summary><br>
+
+The project does not write to the player's permanent storage, which removes the
+usual reason custom firmware bricks things. That is not a mathematical proof that
+nothing can ever go wrong. Unofficial software, own risk.
+</details>
+
+<details>
+<summary><b>Can it crash?</b></summary><br>
+
+Yes. Test it at home before you rely on it. Using a show as your first test would
+be an admirably efficient way of turning software testing into performance art.
+</details>
+
+<details>
+<summary><b>Does every track need stems?</b></summary><br>
+
+No. Prepared and unprepared tracks live happily on the same stick.
+</details>
+
+<details>
+<summary><b>Are my original files modified?</b></summary><br>
+
+No. The stem is a separate sidecar file sitting next to the track.
+</details>
+
+<details>
+<summary><b>Why only firmware 1.19?</b></summary><br>
+
+The mod patches the player software at very specific places, and a firmware
+update moves that code around. So the toolkit checks it is looking at the player
+it expects, and refuses if it is not. Support
+for other versions has to be added and tested deliberately.
+</details>
+
+<details>
+<summary><b>Why are stems made on the computer and not on the player?</b></summary><br>
+
+Because separation models are big and expensive to run. Doing the heavy work on
+your laptop means better models, GPU acceleration, no waiting on the RX3, and
+untouched originals. Improving the model later does not mean rewriting anything
+on the player. The computer does the absurdly expensive maths; the DJ player gets
+to carry on being a DJ player.
+</details>
+
+<details>
+<summary><b>Can I update my firmware while this is installed?</b></summary><br>
+
+There is nothing installed. Pull the stick and the unit is stock. But after a
+firmware change, do not assume the toolkit still works — only use versions listed
+as supported.
+</details>
+
+---
 
 ## Documentation
 
-| Document | For |
-|---|---|
-| [Extracting the initramfs](docs/extract-initramfs.md) | How to extract the initramfs of the XDJ-RX3 from Pioneer GPL
-| [The RX3 mod](docs/mod-rx3.md) | Modules, applying, removing, reading the session log |
-| [Vocal stems](docs/stem-studio.md) | Quality presets, models, accelerators, tuning, managing the runtime |
-| [Troubleshooting](docs/troubleshooting.md) | Symptoms and fixes |
-| [Reference](docs/reference.md) | Commands, formats, addresses, hardware findings |
-| [Contributing](CONTRIBUTING.md) | Building from source, tests, adding a module |
-| [Changelog](CHANGELOG.md) | Renames, and what changed |
+| | |
+| --- | --- |
+| [Extracting the initramfs](docs/extract-initramfs.md) | Getting the key out of Pioneer's published sources |
+| [The RX3 mod](docs/mod-rx3.md) | Architecture, modules, applying and removing, session logs |
+| [Vocal stems](docs/stem-studio.md) | Models, presets, accelerators, tuning |
+| [Troubleshooting](docs/troubleshooting.md) | Symptoms, errors, fixes |
+| [Reference](docs/reference.md) | File formats, commands, addresses, hardware findings |
+| [Contributing](CONTRIBUTING.md) | Build from source, run the tests, write a module |
+| [Changelog](CHANGELOG.md) | What changed |
+
+---
+
+## Contributing
+
+Pull requests welcome — new modules, support for future firmware,
+reverse-engineering notes, UI work, faster separation, testing on other systems,
+or just better docs. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
+**Reporting a bug?** Include your firmware version, your OS, the toolkit version,
+the contents of `RX3_RUNTIME/session.txt`, and the steps to reproduce. For stem
+problems, add the model, the quality preset, your CPU/GPU, and whether it affects
+one track or all of them.
+
+Please do **not** attach encryption keys, manufacturer firmware or binaries, or
+copyrighted music.
+
+---
 
 ## License
 
-Original source code is under the [Mozilla Public License 2.0](LICENSE).
-Changes to MPL-covered files stay under the MPL; separate files may be combined
-into a larger work under different terms, as the license permits. Third-party
-components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Mozilla Public License 2.0](LICENSE). Changes to MPL-covered files stay under
+the MPL; separate files may be combined into a larger work under other terms, as
+the licence permits. Third-party components are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Keys, firmware, manufacturer binaries and compiled payloads are not included in
-this repository and are never release assets.
+Keys, firmware, manufacturer binaries and copyrighted music are not in this
+repository and are never release assets.
+
+Pioneer DJ, AlphaTheta, Rekordbox and XDJ-RX3 are trademarks of their respective
+owners, used here descriptively only.
+
+---
+
+## Acknowledgements
+
+The open-source software running inside the RX3, the GPL/LGPL sources Pioneer
+published, the reverse-engineering community, the people who build the
+audio-separation models — and everyone who has ever looked at a perfectly
+functional DJ player and asked:
+
+> *"Yes, but what else can it do?"*
