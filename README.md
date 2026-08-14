@@ -19,6 +19,7 @@
   <a href="#quick-start">Quick start</a> •
   <a href="#playing-with-it">Playing with it</a> •
   <a href="#back-to-stock">Back to stock</a> •
+  <a href="#roadmap">Roadmap</a> •
   <a href="#faq">FAQ</a> •
   <a href="#documentation">Docs</a>
 </p>
@@ -336,6 +337,24 @@ There is nothing installed. Pull the stick and the unit is stock. But after a
 firmware change, do not assume the toolkit still works — only use versions listed
 as supported.
 </details>
+
+---
+
+## Roadmap
+
+What is being worked on next. No dates, no promises but this is the direction.
+
+| | What it would give you | Status |
+| --- | --- | :--: |
+| **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang  | 💡 Planned |
+| **Key sync between decks** | Nudge a deck by one or two semitones so two compatible tracks plays hamrmonically together | 💡 Planned |
+| **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
+| **Polished interface** | Real icons, text and artwork for everything the mod adds, matching the stock look | 🚧 In progress |
+| **Full system emulator** | From the U-Boot to the beat, to develop and test mods from the sofa (and open to anyone who does not own an RX3) | 🚧 In progress |
+| **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
+
+Want one of these sooner ? Or something else ? Say so in an issue, or build it yourself (see
+[Contributing](#contributing)).
 
 ---
 
