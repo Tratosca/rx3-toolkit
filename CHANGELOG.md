@@ -1,6 +1,22 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
+## 0.5.2
+
+A runtime built on Windows loads its modules again.
+
+### Fixed
+
+- An `autoexec.bin` built on Windows no longer stops with
+  `STOP: one or more runtime modules violate their contract`, preceded by one
+  `FAILED: unsafe runtime module directory` per selected module. The module
+  index the runtime reads to know what to load is written line by line from
+  Python, which translates each newline to the platform's own unless it is told
+  not to. On Windows that appended a carriage return to every line, and the
+  shell that reads the index takes it as the last character of the directory
+  name, so no module passed the name check. Affects 0.5.0 and 0.5.1; builds
+  made on Linux and macOS were never affected, and 0.4.0 predates the index.
+
 ## 0.5.1
 
 Reinserting the drive works. It used to be refused, and before that it was what
