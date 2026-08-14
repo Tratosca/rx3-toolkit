@@ -197,9 +197,11 @@ whether you may use it where you live — is the one step nobody can do for you.
 
 Step-by-step: [**Extracting the RX3 initramfs**](docs/extract-initramfs.md).
 
+The file you're looking for will be called `aes256.key` when you'll have completed the steps above. 
+
 ### 5. Build the file for your stick
 
-In the **Modules installation** tab: pick firmware `1.19`, choose the modules you want (some are automatically checked or unchecked depending on which mods you chose), pick your key file, pick the
+Now that the hard part is done, in the **Modules installation** tab: pick firmware `1.19`, choose the modules you want (some are automatically checked or unchecked depending on which mods you chose), pick your key file, pick the
 **root of your Rekordbox stick** as the destination, then **Mod your RX3 !**.
 
 Eject the stick
