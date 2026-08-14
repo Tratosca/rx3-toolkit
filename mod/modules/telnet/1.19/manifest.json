@@ -1,7 +1,7 @@
 {
   "id": "telnet",
   "name": " Telnet access",
-  "description": "Enables Telnet access to the device (through the USB to computer port on 169.254.X.Y network). Only use this if you know what you are doing.",
+  "description": "Enables Telnet access to the device (through the USB to computer port on 169.254.X.Y network). Only use this if you know 1) what you are doing 2) the root password.",
   "firmware": "1.19",
   "default": false,
   "order": 90,

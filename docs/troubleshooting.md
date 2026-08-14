@@ -34,13 +34,38 @@ A key file that is empty, or that holds something other than the key on its
 first line, produces an `autoexec.bin` the RX3 decrypts to garbage and silently
 ignores. There is no error on the device.
 
+## The drive disappears after the patch is applied
+
+Applying a module restarts the player, and the restarted process misses the
+hotplug event that announced the drive, so media that is still mounted is no
+longer listed. Since `0.5.1` the mod asks the kernel to re-emit that event as
+soon as the replacement player is alive, about a second after the relaunch; the
+log says `re-announced /dev/... to the hotplug handler`.
+
+That is the runtime side of it. The drive can still take several seconds to
+come back, which is being looked into — see **Known issues** in the changelog.
+Waiting is the only thing to do; the drive is not lost.
+
 ## The interface does not come back
 
 Remove the drive and power cycle. The RX3 returns to stock, because nothing was
 written to it.
 
-Then read `RX3_RUNTIME/session.txt` from the drive on your computer, and see the
-next section.
+To find out why, rebuild with the **Session logging** module ticked, reproduce,
+and read `RX3_RUNTIME/session.txt` from the drive on your computer. See the two
+sections below.
+
+## There is no session log on the drive
+
+Expected. Session logging is a module of its own and is not selected by
+default, so an ordinary build writes nothing to the drive at all.
+
+Tick **Session logging** in the builder to get `RX3_RUNTIME/session.txt` and the
+player's output. **Eject the drive from the RX3 when that build is in use,
+never pull it out**: the player keeps the log file open for as long as it plays,
+so pulling the drive out mid-write can corrupt it. The open handle also stops
+the kernel releasing the device, which is why a drive pulled out while logging
+comes back under a different name.
 
 ## The session log says STOP or FAILED
 
@@ -51,8 +76,18 @@ one is `STOP: unsupported rbp SHA-1`, which means the player binary is not one
 the runtime recognises. That is firmware other than `1.19`, or a `1.19` build
 this project has not seen.
 
+A drive that was removed and pushed back in without a power cycle used to
+report that same `STOP`, because the player binary carried the writes of the
+first run and no longer matched the state it started from. It no longer does:
+the guarded words are put back to their stock values before the comparison, so
+an already-patched session is recognised and the log says
+`accepted rbp SHA-1: … (already patched; normalises to …)`.
+
 `FAILED:` means something went wrong during modification and the previous state
-was restored automatically.
+was restored automatically. The exception is a player that exits straight after
+being relaunched: there the previous state is what just died, so the stock
+binary is put back instead and this runtime's shared objects are taken out of
+the preload. The log then says `stock rbp restarted`.
 
 Either way, attach the full `session.txt` when reporting the problem.
 

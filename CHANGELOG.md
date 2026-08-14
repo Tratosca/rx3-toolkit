@@ -1,13 +1,54 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
-## Unreleased
+## 0.5.1
 
-The two applications became one, and the stems half answers the questions it
-used to leave the operator guessing at.
+Reinserting the drive works. It used to be refused, and before that it was what
+the deck made you do, because applying a module emptied the media list. The
+runtime also stops writing to the drive unless you ask it to.
+
+### Fixed
+
+- Reinserting a drive without a power cycle no longer stops with
+  `STOP: unsupported rbp SHA-1`. The check hashes the whole player binary, so a
+  session this runtime had already patched no longer matched the state it
+  started from. The guarded words are put back to their stock values before the
+  comparison, which answers the question the check means to ask — is this the
+  binary I know? — without being fooled by our own writes. A guarded word
+  holding neither value still survives normalisation, and the word-by-word
+  audit that follows still rejects it before anything is written.
+- Reinserting a drive no longer restarts the player. A drive pulled out as
+  `sda` comes back as `sdb`, so it mounts somewhere else; the sidecar directory
+  is read once at load time, so a moved path meant stopping and relaunching —
+  which froze the screen and emptied the media list, which is what made the
+  drive get pulled again. The player is handed one fixed path, re-pointed on
+  each insertion, and a reinsertion now changes nothing.
+- A player that exits straight after being relaunched is rolled back to the
+  stock binary instead of to the previous bytes. On a reinsertion those
+  previous bytes are the patched ones, so the rollback relaunched exactly what
+  had just died. The runtime's shared objects come out of `LD_PRELOAD` with it.
+- The log of the run that applied the patch survives the next insertion, in
+  `session-previous.txt`. The player's cumulative output carries a marker per
+  launch, so one run's crash no longer reads as the next run's.
+
+### Added
+
+- **Session logging** is a module of its own, and it is not selected by
+  default: an ordinary build now writes nothing to the drive at all. Tick it to
+  get `RX3_RUNTIME/session.txt` and the player's output — and eject the drive
+  rather than pulling it out while that build is in use, because the player
+  keeps the log open for as long as it plays. That open handle is also what
+  stopped the kernel releasing the device, which is why a drive came back under
+  another name.
+- The log names what forced a restart, and each module says what it saw that
+  made it ask.
 
 ### Changed
 
+- A relaunched player is given up to the same eight seconds, but the wait ends
+  as soon as every module has written its readiness file — a second, in
+  practice. The media that is already mounted is announced to it as soon as the
+  process is alive, rather than after the readiness verdict.
 - Everything the RX3 executes moved from `runtime/` to `mod/`. The word said
   *when* the code runs, which the directory above it does too — `apps/` and
   `tools/` are runtimes of their own, and two of them are literally named
@@ -15,6 +56,25 @@ used to leave the operator guessing at.
   documentation already uses when it speaks to a DJ. The `runtime_directory` key
   in a module manifest, the `RX3_RUNTIME/` folder written to the drive, and the
   separation runtime are unrelated names and keep theirs.
+
+### Known issues
+
+- A drive still takes several seconds to reappear after a module is applied.
+  The runtime announces it about a second after the player is relaunched, so
+  what remains is on the device side: the player is seen to crash twice before
+  a third launch sticks, and the log reports
+  `rejected: unexpected PcmReader::load prologue` on those attempts. The
+  binary patch that widens the image table stays applied even when the hook
+  gives up installing it, which leaves the player accepting identifiers it has
+  no records for. Under investigation.
+
+## 0.5.0
+
+The two applications became one, and the stems half answers the questions it
+used to leave the operator guessing at.
+
+### Changed
+
 - `RX3 Mod Generator` and `RX3 Stem Studio` ship as a single application,
   `XDJ-RX3 Toolkit`, with a **USB Runtime** tab and a **Vocal Stems** tab. One
   download per platform replaces two; the `XDJ-RX3-Mod-Generator-*` and

@@ -1,0 +1,15 @@
+{
+  "id": "logging",
+  "name": " Session logging",
+  "description": "Writes RX3_RUNTIME/session.txt and the player's output to the drive, for reporting a problem. ALWAYS EJECT THE USB DRIVE WHEN THIS IS ON, NEVER PULL IT OUT: IT CAN CORRUPT IT. Leave this off otherwise.",
+  "firmware": "1.19",
+  "default": false,
+  "order": 95,
+  "runtime_directory": "logging",
+  "namespace": "logging",
+  "requires": [],
+  "conflicts": [],
+  "files": [
+    {"source": "module.sh", "target": "module.sh", "executable": false}
+  ]
+}
