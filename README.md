@@ -296,6 +296,22 @@ music and your stems can stay.
 ## FAQ
 
 <details>
+<summary><b>How does it work?</b></summary><br>
+
+It happens that, by Pioneer design, the RX3 (and probably other boards too), which is based on Linux, looks at every USB stick you insert to see whether it carries an `autoexec.bin` file, and if that file decrypts with a specific key contained inside the player, it runs the script inside. That is the manufacturer's own maintenance mechanism, and it runs that script as the full privileged **root** account inside the player, so we can do basically anything a Linux system can do.
+
+The whole player interface is one Linux program called `rbp` (Rekordbox Portable ?), and when you boot the RX3, it's copied *in a temporary memory* to be used from there. That is done at every startup. Our script patches that live copy, and the new features are simply code running inside the player, using the player's own fonts, images and pads. Nothing is written to the permanent storage. Cut the power and the RAM forgets the whole affair, and next startup will have to copy the stock `rbp` to RAM again for the player to run. 
+
+"Patching" here means two things. A handful of individual and precise bytes are rewritten in place: that is all a beat jump of 32 instead of 8 really is. Everything bigger arrives as a *shared library* that gets preloaded next to `rbp` and hooks its functions from the inside, which is how you end up with vocals, instrumentals and a key shifter in a player that shipped with none of the three.
+
+The `KEY` and `STEMS` tabs are the same trick applied to the screen. Touch works because two native Beat FX zones were politely repurposed and handed back on the way out. The pads and the on-screen toggles blink in step because they both count from the same clock.
+
+If anything goes wrong within a few seconds after having applied the patch, the original bytes go back, the stock player starts again, and a log on your stick explains itself.
+
+Details for the curious: [The RX3 mod](docs/mod-rx3.md).
+</details>
+
+<details>
 <summary><b>Does this flash custom firmware?</b></summary><br>
 
 No. Everything runs in memory and is gone the moment you power off without the
