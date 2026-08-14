@@ -111,10 +111,31 @@ class ModGeneratorTests(unittest.TestCase):
             )
             self.assertEqual(result.patches, ("core", "keyshift"))
             plain = load_firmware_codec().read_autoexec(result.output, key)
-            normalized = plain.replace(b"\r\n", b"\n")
 
-            self.assertIn(b"compatibility\ncore\nkeyshift\n", normalized)
-            self.assertNotIn(b"\nstems\n", normalized)
+            self.assertIn(b"compatibility\ncore\nkeyshift\n", plain)
+            self.assertNotIn(b"\nstems\n", plain)
+
+    def test_the_module_index_is_written_with_unix_line_endings(self):
+        """The index is read line by line by /bin/sh on the player, where a
+        trailing CR is part of the directory name and fails the module-name
+        check. Python translates \\n to os.linesep unless told not to, so a
+        build made on Windows shipped an index no module could be loaded from.
+        The source assertion carries the test on Linux and macOS, where that
+        translation never happens and the built image cannot show the fault."""
+        builder = (REPOSITORY / "tools/rx3_runtime/build.py").read_text()
+        self.assertRegex(
+            builder, r'modules / "index"\)\.write_text\((?s:.*?)newline=""'
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            key = directory / "aes256.key"
+            key.write_bytes(b"0123456789012345678901234567890\n")
+            result = build_runtime(
+                "1.19", ["keyshift"], key, directory, root=REPOSITORY
+            )
+            plain = load_firmware_codec().read_autoexec(result.output, key)
+            self.assertNotIn(b"compatibility\r", plain)
 
     def test_the_session_log_ships_only_when_its_module_is_selected(self):
         """say() runs before any module is loaded, so the orchestrator reads
@@ -133,14 +154,14 @@ class ModGeneratorTests(unittest.TestCase):
                 "1.19", ["keyshift"], key, directory, root=REPOSITORY
             )
             self.assertNotIn("logging", quiet.patches)
-            index = codec.read_autoexec(quiet.output, key).replace(b"\r\n", b"\n")
+            index = codec.read_autoexec(quiet.output, key)
             self.assertNotIn(b"\nlogging\n", index)
 
             verbose = build_runtime(
                 "1.19", ["keyshift", "logging"], key, directory, root=REPOSITORY
             )
             self.assertIn("logging", verbose.patches)
-            index = codec.read_autoexec(verbose.output, key).replace(b"\r\n", b"\n")
+            index = codec.read_autoexec(verbose.output, key)
             self.assertIn(b"\nlogging\n", index)
 
     def test_the_logging_module_warns_about_pulling_the_drive_out(self):
