@@ -30,15 +30,28 @@
 
 ## What you get
 
-### 🎤 Vocal and instrumental on the pads
+### 🎤 Stems in standalone mode
 
-Prepare your tracks on your computer, load them on the RX3 the usual way, and
-**Slip Loop** mode turns into stem control:
+Prepare stems of your tracks on your computer, load them on the RX3 the usual
+way, and the **Slip Loop** PADs mode or **STEM** on screen tab turns into stem control:
 
 | Pad | Colour | What it does |
 | :--: | :--: | --- |
 | **7** | 🔴 Red | Instrumental on / off |
 | **8** | 🟢 Green | Vocal on / off |
+
+### 🎹 Key shift
+
+Tune the key of your songs to mix harmonically (or play for the Alvin & the
+Chipmunks). A **KEY** tab shows up on the screen:
+
+| Control | What it does |
+| --- | --- |
+| **KEY −** / **KEY +** | One semitone down or up, twelve either way |
+| **The number in the middle** | Tap it and the deck goes back to `0` |
+
+Pioneer actually shipped a pitch shifter for the Beat FX "PITCH". While it sounds gorgeous going down, the audio quality is like a
+broken fax going up. Our brand new AI-generated pitch shifter algorithm is exactly the opposite kind of bad. So the mod uses whichever one wins the direction you asked for.
 
 ### ⏭️ 32-beat Beat Jump
 
@@ -62,7 +75,7 @@ and nothing to uninstall.
 | 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` only at the moment |
 | 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
 | 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
-| 🔑 **A key file** | Not distributed here — [see below](#the-key-file) |
+| 🔑 **A key file** | Not distributed here — [see below](#4-the-key-file) |
 | 📀 **Disk space** | ~1.5 GB, only if you want stems |
 
 About **20 minutes** to set everything up. After that, stems take from a few
@@ -255,6 +268,10 @@ two independent switches — press pad 8 and the vocal drops out of the mix.
 
 Open **Beat Jump** on the same track: pads 7 and 8 now read `32`.
 
+Open the **KEY** tab on the screen and press `KEY +` a few times: the deck
+climbs a semitone at a time, up to twelve. The other deck does not follow — each
+one has its own key. Tap the number in the middle to come straight back to `0`.
+
 Load a track with no stem and Slip Loop behaves exactly like stock. That is the
 intended fallback, not a failure — if a track you *did* prepare has no stem
 controls, then either you probably did something wron, or I did. See
@@ -349,7 +366,7 @@ What is being worked on next. No dates, no promises but this is the direction.
 | | What it would give you | Status |
 | --- | --- | :--: |
 | **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang  | 💡 Planned |
-| **Key sync between decks** | Nudge a deck by one or two semitones so two compatible tracks plays hamrmonically together | 💡 Planned |
+| **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 💡 Planned |
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
 | **Polished interface** | Real icons, text and artwork for everything the mod adds, matching the stock look | 🚧 In progress |
 | **Full system emulator** | From the U-Boot to the beat, to develop and test mods from the sofa (and open to anyone who does not own an RX3) | 🚧 In progress |
