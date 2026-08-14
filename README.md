@@ -335,7 +335,7 @@ to carry on being a DJ player.
 
 There is nothing installed. Pull the stick and the unit is stock. But after a
 firmware change, do not assume the toolkit still works — only use versions listed
-as supported.
+as supported. **If you do update, please to a clean boot cycle, without the mod USB, just in case**.  
 </details>
 
 ---
