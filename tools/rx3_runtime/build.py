@@ -485,7 +485,12 @@ def build_runtime(
                     notify("Compiling the performance core…")
                     compile_arm_hook(patch.directory / patch.arm_hook.source, target)
         module_index = ["compatibility"] + [patch.runtime_directory for patch in selected]
-        (modules / "index").write_text("".join(f"{item}\n" for item in module_index), encoding="ascii")
+        # newline="" keeps Python from translating these \n to os.linesep. The
+        # index is read by /bin/sh on the player, where a trailing CR is part of
+        # the directory name and fails the module-name check on every line.
+        (modules / "index").write_text(
+            "".join(f"{item}\n" for item in module_index), encoding="ascii", newline="",
+        )
         (staging / "autoexec.sh").chmod(0o755)
 
         notify("Creating and encrypting autoexec.bin…")
