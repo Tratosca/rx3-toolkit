@@ -42,8 +42,7 @@ way, and the **Slip Loop** PADs mode or **STEM** on screen tab turns into stem c
 
 ### 🎹 Key shift
 
-Tune the key of your songs to mix harmonically (or play for the Alvin & the
-Chipmunks). A **KEY** tab shows up on the screen:
+Tune the key of your songs to mix harmonically (or play for Alvin & the Chipmunks). A **KEY** tab shows up on the screen:
 
 | Control | What it does |
 | --- | --- |
