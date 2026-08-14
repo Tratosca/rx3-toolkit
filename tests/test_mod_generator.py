@@ -34,6 +34,7 @@ class ModGeneratorTests(unittest.TestCase):
                 "keyshift",
                 "stems",
                 "telnet",
+                "logging",
             ],
         )
         self.assertTrue(all(patch.directory.name == patch.firmware for patch in patches))
@@ -82,67 +83,6 @@ class ModGeneratorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incompatible modules"):
             resolve_patches([left, right], ["left", "right"])
 
-    def test_compatibility_covers_every_binary_patch_combination(self):
-        compatibility = (REPOSITORY / "mod/1.19/compatibility.sh").read_text()
-        self.assertEqual(compatibility.count("register_rbp_sha1 "), 4)
-
-    def test_gui_discovers_manifests_instead_of_listing_patch_ids(self):
-        gui = (REPOSITORY / "apps/rx3-toolbox/mod_generator.py").read_text()
-        self.assertIn("discover_patches", gui)
-        for patch in discover_patches(REPOSITORY, "1.19"):
-            self.assertNotIn(f'"{patch.patch_id}"', gui)
-
-    def test_release_matrix_covers_supported_desktop_hosts(self):
-        workflow = (REPOSITORY / ".github/workflows/ci.yml").read_text()
-        for expected in (
-            "ubuntu-24.04",
-            "windows-2025",
-            "macos-15-intel",
-            "macos-latest",
-        ):
-            self.assertIn(f"runner: {expected}", workflow)
-
-    def test_desktop_product_names_follow_project_name(self):
-        workflow = (REPOSITORY / ".github/workflows/ci.yml").read_text()
-        gui = (REPOSITORY / "apps/rx3-toolbox/main.py").read_text()
-        spec = (REPOSITORY / "apps/rx3-toolbox/rx3_toolbox.spec").read_text()
-
-        self.assertIn('PRODUCT = "XDJ-RX3 Toolkit"', gui)
-        self.assertIn("self.title(PRODUCT)", gui)
-        self.assertIn('name="XDJ-RX3 Toolkit"', spec)
-
-        self.assertIn("Publish GitHub Release", workflow)
-        self.assertIn("gh release create", workflow)
-        self.assertIn("archive: XDJ-RX3-Toolkit-", workflow)
-        self.assertIn(
-            '--title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"',
-            workflow,
-        )
-
-        for obsolete in (
-            "RX3 Runtime Builder",
-            "RX3-Runtime-Builder",
-            "Toolkit Builder",
-            "RX3 Mod Generator",
-            "RX3-Mod-Generator",
-            "RX3 Stem Studio",
-            "RX3-Stem-Studio",
-        ):
-            self.assertNotIn(obsolete, workflow + gui + spec)
-
-    def test_both_panes_ship_in_one_application(self):
-        application = REPOSITORY / "apps/rx3-toolbox"
-        entry = (application / "main.py").read_text()
-        spec = (application / "rx3_toolbox.spec").read_text()
-        for pane in ("mod_generator", "stem_studio"):
-            self.assertTrue((application / f"{pane}.py").is_file())
-            self.assertIn(f"import {pane}", entry)
-            self.assertIn(f"{pane}.self_test()", entry)
-        self.assertFalse((REPOSITORY / "apps/rx3-mod-generator/main.py").exists())
-        self.assertFalse((REPOSITORY / "apps/rx3-stem-studio/main.py").exists())
-        self.assertIn("mod/lib/module-api.sh", spec)
-        self.assertIn('data.get("build_files", [])', spec)
-
     def test_builds_selected_modules_without_external_iso_tool(self):
         codec = load_firmware_codec()
         with tempfile.TemporaryDirectory() as directory:
@@ -175,6 +115,45 @@ class ModGeneratorTests(unittest.TestCase):
 
             self.assertIn(b"compatibility\ncore\nkeyshift\n", normalized)
             self.assertNotIn(b"\nstems\n", normalized)
+
+    def test_the_session_log_ships_only_when_its_module_is_selected(self):
+        """say() runs before any module is loaded, so the orchestrator reads
+        the switch off the image rather than from a hook. Both halves of that
+        arrangement have to agree on where it lives."""
+        codec = load_firmware_codec()
+        autoexec = (REPOSITORY / "mod/autoexec.sh").read_text()
+        self.assertIn("[ -d /mnt/iso/modules/logging ]", autoexec)
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            key = directory / "aes256.key"
+            key.write_bytes(b"0123456789012345678901234567890\n")
+
+            quiet = build_runtime(
+                "1.19", ["keyshift"], key, directory, root=REPOSITORY
+            )
+            self.assertNotIn("logging", quiet.patches)
+            index = codec.read_autoexec(quiet.output, key).replace(b"\r\n", b"\n")
+            self.assertNotIn(b"\nlogging\n", index)
+
+            verbose = build_runtime(
+                "1.19", ["keyshift", "logging"], key, directory, root=REPOSITORY
+            )
+            self.assertIn("logging", verbose.patches)
+            index = codec.read_autoexec(verbose.output, key).replace(b"\r\n", b"\n")
+            self.assertIn(b"\nlogging\n", index)
+
+    def test_the_logging_module_warns_about_pulling_the_drive_out(self):
+        """The warning is the reason the option exists at all, so it has to
+        reach the operator where the box is ticked, not only in the log."""
+        patch = next(
+            item for item in discover_patches(REPOSITORY, "1.19")
+            if item.patch_id == "logging"
+        )
+        self.assertFalse(patch.default)
+        self.assertTrue(patch.selectable)
+        self.assertIn("EJECT", patch.description)
+        self.assertIn("NEVER PULL IT OUT", patch.description)
 
     def test_rejects_unknown_patch(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -17,18 +17,47 @@ REPORT_HOOKS=""
 RBP_PRELOAD=""
 RBP_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
+RUNTIME_PRELOAD_ENTRIES=""
 PREVIOUS_PRELOAD=""
 NEED_RBP_RESTART=0
+RESTART_REQUESTED_BY=""
+RUNNING_HOOK=""
 LOADED_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
 
-mkdir -p "$OUT" 2>/dev/null
-: > "$LOG"
+# Diagnostics are a module like any other, ticked in the builder and absent by
+# default. It is read from the image rather than from the module's own hooks
+# because say() has to work from the line above this one, before any module has
+# been loaded - a run that fails while loading modules is exactly the run whose
+# log matters.
+#
+# Being off by default is not tidiness. A logging session leaves rbp holding
+# this file open for as long as it plays: on FAT that is how a drive pulled out
+# mid-write loses a directory, and the open handle also keeps the kernel from
+# releasing the device, so the drive comes back under another name and the
+# runtime sees a mount that moved.
+if [ -d /mnt/iso/modules/logging ]; then
+    LOGGING=1
+    mkdir -p "$OUT" 2>/dev/null
+    # The run worth reading is the one that applied the patch, and the next
+    # insertion is usually what the operator does to see whether it took. Keep
+    # one generation, or that second insertion truncates the only evidence.
+    [ -f "$LOG" ] && mv -f "$LOG" "$OUT/session-previous.txt" 2>/dev/null
+    : > "$LOG"
+    RBP_OUTPUT="$OUT/rbp_stdout.txt"
+    RBP_RESTORE_OUTPUT="$OUT/rbp_restore.txt"
+else
+    LOGGING=0
+    LOG=/dev/null
+    RBP_OUTPUT=/dev/null
+    RBP_RESTORE_OUTPUT=/dev/null
+fi
 
 say()
 {
+    [ "$LOGGING" = "1" ] || return 0
     echo "$@" >> "$LOG" 2>&1
 }
 
@@ -85,11 +114,13 @@ say "loaded modules:${LOADED_MODULES:- none}"
 
 say "=== RX3 volatile runtime, uid $(id -u) ==="
 say "firmware revision: $(cat /tmp/smdj2.rev 2>/dev/null || cat /tmp/smdj.rev 2>/dev/null)"
-say ""
-say "--- mounts ---"; cat /proc/mounts >> "$LOG" 2>&1
-say ""
-say "--- disk space ---"; df >> "$LOG" 2>&1
-say ""
+if [ "$LOGGING" = "1" ]; then
+    say ""
+    say "--- mounts ---"; cat /proc/mounts >> "$LOG" 2>&1
+    say ""
+    say "--- disk space ---"; df >> "$LOG" 2>&1
+    say ""
+fi
 
 ROOTFS=$(awk '$2=="/" {print $3}' /proc/mounts | tail -1)
 say "effective root type: ${ROOTFS:-unknown}"
@@ -104,30 +135,42 @@ if awk '$2=="/root/pdj"' /proc/mounts | grep -q .; then
 fi
 [ -x "$RBP" ] || { say "FAILED: $RBP is missing"; sync; exit 1; }
 
-RBP_SHA1=$(sha1sum "$RBP" 2>/dev/null | awk '{print $1}')
-case " $SUPPORTED_SHA1 " in
-    *" $RBP_SHA1 "*) ;;
-    *)
-        say "STOP: unsupported rbp SHA-1: ${RBP_SHA1:-unavailable}"
-        say "      No module was applied."
-        sync; exit 1
-        ;;
-esac
-say "accepted rbp SHA-1: $RBP_SHA1"
-say "volatile root confirmed: changes will be lost on power-off"
-
 rm -rf "$TMP"
 mkdir -p "$TMP" || { say "FAILED: /tmp is unavailable"; sync; exit 1; }
 
-i=0
-printf '%s\n' "$PATCH_TABLE" | while read -r OFF STOCK PATCHED LABEL; do
-    [ -n "$OFF" ] || continue
-    i=$((i+1))
-    printf "$STOCK" > "$TMP/stock$i"
-    printf "$PATCHED" > "$TMP/patched$i"
-done
+extract_guarded_words "$TMP"
 PATCH_COUNT=$(printf '%s\n' "$PATCH_TABLE" | awk '/^[0-9]/ {count++} END {print count+0}')
 say "$PATCH_COUNT guarded words registered"
+
+RBP_SHA1=$(sha1sum "$RBP" 2>/dev/null | awk '{print $1}')
+ACCEPTED=""
+case " $SUPPORTED_SHA1 " in
+    *" $RBP_SHA1 "*) ACCEPTED=$RBP_SHA1 ;;
+esac
+# A drive pulled out and pushed back in meets an rbp this runtime has already
+# patched, which is no longer any of the registered states. Putting the guarded
+# words back to stock and hashing that tells the two cases apart.
+if [ -z "$ACCEPTED" ] && [ "$PATCH_COUNT" != "0" ]; then
+    NORMALIZED=$(normalized_rbp_sha1 "$RBP" "$TMP")
+    if [ -z "$NORMALIZED" ]; then
+        say "guarded words are not aligned; identity cannot be normalised"
+    else
+        case " $SUPPORTED_SHA1 " in
+            *" $NORMALIZED "*) ACCEPTED=$NORMALIZED ;;
+        esac
+    fi
+fi
+if [ -z "$ACCEPTED" ]; then
+    say "STOP: unsupported rbp SHA-1: ${RBP_SHA1:-unavailable}"
+    say "      No module was applied."
+    rm -rf "$TMP"; sync; exit 1
+fi
+if [ "$ACCEPTED" = "$RBP_SHA1" ]; then
+    say "accepted rbp SHA-1: $RBP_SHA1"
+else
+    say "accepted rbp SHA-1: $RBP_SHA1 (already patched; normalises to $ACCEPTED)"
+fi
+say "volatile root confirmed: changes will be lost on power-off"
 
 read_word()
 {
@@ -151,7 +194,7 @@ done
 UNKNOWN=$(grep -c '^unknown ' "$TMP/state" 2>/dev/null); [ -n "$UNKNOWN" ] || UNKNOWN=0
 if [ "$UNKNOWN" != "0" ]; then
     say "STOP: $UNKNOWN unexpected patch word(s); nothing was changed."
-    grep '^unknown ' "$TMP/state" >> "$LOG" 2>&1
+    [ "$LOGGING" = "1" ] && grep '^unknown ' "$TMP/state" >> "$LOG" 2>&1
     rm -rf "$TMP"; sync; exit 1
 fi
 
@@ -196,6 +239,10 @@ if [ "$NEED_RBP_RESTART" = "0" ]; then
 fi
 
 echo applying > /tmp/rx3-patch.state
+# A restart is the expensive part of an insertion, so the log names what forced
+# it. On a drive that is merely being reinserted this line is the whole answer
+# to why the screen froze and the media list emptied.
+say "restart requested by:${RESTART_REQUESTED_BY:- unknown}"
 say "stopping rbp"
 kill "$PID" 2>/dev/null
 i=0
@@ -231,6 +278,12 @@ verify_words()
 launch_rbp()
 {
     target_log=$1
+    # rbp keeps writing here long after this script exits, and the file is
+    # never truncated, so without a marker one run's crash reads as the next
+    # run's. It is what told us the player dies twice on a relaunch.
+    [ "$LOGGING" = "1" ] && \
+        echo "--- launch, session pid $$, preload ${RBP_PRELOAD:-none} ---" \
+            >> "$target_log" 2>/dev/null
     cd "${CWD:-/root/pdj}" 2>/dev/null
     if [ -n "$RBP_PRELOAD" ]; then
         LD_PRELOAD="$RBP_PRELOAD" "$RBP" $ARGS >> "$target_log" 2>&1 &
@@ -238,6 +291,32 @@ launch_rbp()
         "$RBP" $ARGS >> "$target_log" 2>&1 &
     fi
     NEW=$!
+}
+
+# rbp learns that a drive exists from the hotplug event the kernel emits when it
+# appears. That event fired for this drive while the previous process was
+# running, so the replacement comes up blind to media that is still mounted, and
+# the operator has to pull the drive out and push it back to be seen - which is
+# exactly the reinsertion the identity check used to refuse. Asking the kernel to
+# re-emit the event puts the drive in front of the new process again without
+# unmounting anything.
+announce_media()
+{
+    media_device=$(awk -v mount="$USB" '$2 == mount {print $1}' /proc/mounts | tail -1)
+    case "$media_device" in
+        /dev/*) ;;
+        *) say "media re-announce skipped: $USB is not a block device mount"; return 0 ;;
+    esac
+    media_uevent=/sys/class/block/${media_device#/dev/}/uevent
+    [ -w "$media_uevent" ] || {
+        say "media re-announce skipped: $media_uevent is not writable"
+        return 0
+    }
+    if echo add > "$media_uevent" 2>/dev/null; then
+        say "re-announced $media_device to the hotplug handler"
+    else
+        say "WARNING: media re-announce failed for $media_device"
+    fi
 }
 
 append_diagnostics()
@@ -253,28 +332,41 @@ write_words patched
 FAILED=$(verify_words patched)
 if [ "$FAILED" != "0" ]; then
     say "FAILED: $FAILED patch word write(s); restoring previous bytes"
-    cat "$TMP/failed" >> "$LOG" 2>&1
+    [ "$LOGGING" = "1" ] && cat "$TMP/failed" >> "$LOG" 2>&1
     write_words previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
-    launch_rbp "$OUT/rbp_restore.txt"
+    launch_rbp "$RBP_RESTORE_OUTPUT"
     say "previous rbp restarted, pid=$NEW"
     rm -rf "$TMP"; sync; exit 1
 fi
 say "write verified: $PATCH_COUNT/$PATCH_COUNT words"
 
-launch_rbp "$OUT/rbp_stdout.txt"
-sleep 8
+launch_rbp "$RBP_OUTPUT"
+wait_for_rbp "$NEW"
 if [ ! -d "/proc/$NEW" ]; then
-    say "FAILED: replacement rbp exited; restoring previous bytes"
+    # The one failure where putting the previous bytes back is useless: on a
+    # reinsertion `previous` is the patched state, so restoring it relaunches
+    # exactly what just died. A binary that cannot survive its own launch goes
+    # back to stock, and our hook comes out of the preload with it.
+    say "FAILED: replacement rbp exited; restoring the stock binary"
     append_diagnostics
-    write_words previous
-    RBP_PRELOAD=$PREVIOUS_PRELOAD
-    echo patched > /tmp/rx3-patch.state
-    launch_rbp "$OUT/rbp_restore.txt"
-    say "previous rbp restarted, pid=$NEW"
+    write_words stock
+    STOCK_FAILED=$(verify_words stock)
+    [ "$STOCK_FAILED" = "0" ] || \
+        say "WARNING: $STOCK_FAILED stock word(s) could not be restored"
+    RBP_PRELOAD=$(preload_without_runtime "$PREVIOUS_PRELOAD")
+    echo stock > /tmp/rx3-patch.state
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    say "stock rbp restarted, pid=$NEW, preload=${RBP_PRELOAD:-none}"
     rm -rf "$TMP"; sync; exit 1
 fi
+# As soon as the process is alive the drive goes back in front of it. What
+# follows only decides whether this rbp is kept, and holding the media list
+# hostage to that verdict buys no safety: a rollback relaunches and announces
+# again anyway.
+announce_media
+
 MISSING_READY=""
 for ready_file in $RBP_READY_FILES; do
     [ -s "$ready_file" ] || MISSING_READY="$MISSING_READY $ready_file"
@@ -286,7 +378,9 @@ if [ -n "$MISSING_READY" ]; then
     write_words previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
-    launch_rbp "$OUT/rbp_restore.txt"
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
     say "previous rbp restarted, pid=$NEW"
     rm -rf "$TMP"; sync; exit 1
 fi

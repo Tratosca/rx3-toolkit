@@ -52,6 +52,55 @@ require(
     and "a prepare hook failed; no guarded word was written" in AUTOEXEC,
     "module collisions and failed preparation must stop before executable writes",
 )
+require(
+    AUTOEXEC.index('extract_guarded_words "$TMP"')
+    < AUTOEXEC.index('normalized_rbp_sha1 "$RBP" "$TMP"')
+    < AUTOEXEC.index("STOP: unsupported rbp SHA-1")
+    < AUTOEXEC.index("unexpected patch word(s); nothing was changed"),
+    "reinsertion must normalise the guarded words before the identity check, "
+    "and the word-by-word audit must still follow it",
+)
+require(
+    "announce_media" in AUTOEXEC
+    and 'wait_for_rbp "$NEW"' in AUTOEXEC
+    and AUTOEXEC.index("\nannounce_media\n")
+        < AUTOEXEC.index("missed readiness")
+        < AUTOEXEC.index("OK: rbp active"),
+    "a restarted rbp must be told about media that is already mounted, and the "
+    "drive must come back before the readiness verdict rather than after it",
+)
+exit_paths = AUTOEXEC.split('launch_rbp "$RBP_OUTPUT"', 1)[1]
+require(
+    "write_words stock" in exit_paths
+    and 'preload_without_runtime "$PREVIOUS_PRELOAD"' in exit_paths
+    and exit_paths.index("replacement rbp exited")
+        < exit_paths.index("write_words stock")
+    and exit_paths.index("write_words stock")
+        < exit_paths.index("missed readiness"),
+    "an rbp that cannot survive its own launch must go back to stock, because "
+    "on a reinsertion the previous bytes are the ones that just died; a "
+    "readiness miss is not a crash and keeps restoring them",
+)
+require(
+    "[ -d /mnt/iso/modules/logging ]" in AUTOEXEC
+    and AUTOEXEC.index("[ -d /mnt/iso/modules/logging ]")
+        < AUTOEXEC.index("say()\n{")
+    and 'LOGGING=1' in AUTOEXEC and 'LOG=/dev/null' in AUTOEXEC,
+    "session logging must be decided from the image before say() exists, "
+    "because a run that fails while loading modules is the one worth logging",
+)
+require(
+    'mv -f "$LOG" "$OUT/session-previous.txt"' in AUTOEXEC
+    and '--- launch, session pid' in AUTOEXEC,
+    "a second insertion must not truncate the log of the run that applied the "
+    "patch, and the player's cumulative output must say where a run begins",
+)
+require(
+    'say "restart requested by:' in AUTOEXEC
+    and AUTOEXEC.index('say "restart requested by:')
+        < AUTOEXEC.index('say "stopping rbp"'),
+    "the log must name what forced a restart before rbp is stopped",
+)
 # The beat jump tables and the decoder-sleep hook used to be asserted here.
 # They belong to those modules, not to the core: see
 # tests/test_module_consistency.py, which compares the offline and on-device
