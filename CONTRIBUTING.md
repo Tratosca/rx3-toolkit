@@ -24,15 +24,15 @@ release assets.
 
 ## Repository layout
 
-Everything under `runtime/` executes on the RX3, as root. Everything above it
+Everything under `mod/` executes on the RX3, as root. Everything above it
 runs on your computer.
 
 | Path | Contents |
 |---|---|
-| `runtime/autoexec.sh` | On-device orchestrator: indexed module loading, validation, guarded writes, rollback, logging |
-| `runtime/lib/module-api.sh` | Registration contract shared by every on-device module |
-| `runtime/<firmware>/compatibility.sh` | Accepted `rbp` SHA-1 values for that firmware |
-| `runtime/modules/<id>/<firmware>/` | One directory per module, named after its manifest `id`, versioned by firmware |
+| `mod/autoexec.sh` | On-device orchestrator: indexed module loading, validation, guarded writes, rollback, logging |
+| `mod/lib/module-api.sh` | Registration contract shared by every on-device module |
+| `mod/<firmware>/compatibility.sh` | Accepted `rbp` SHA-1 values for that firmware |
+| `mod/modules/<id>/<firmware>/` | One directory per module, named after its manifest `id`, versioned by firmware |
 | `apps/rx3-toolbox/` | The one Tkinter application: a tab over the build engine, a tab over the stem pipeline |
 | `tools/rx3_runtime/` | Build engine and its CLI |
 | `tools/rx3_patcher/` | Offline counterparts to the on-device byte patches, for an extracted `rbp` |
@@ -100,7 +100,7 @@ runtime change works:
 
 ## Adding a module
 
-Each module lives in `runtime/modules/<id>/<firmware>/`, where `<id>` is the
+Each module lives in `mod/modules/<id>/<firmware>/`, where `<id>` is the
 `id` its `manifest.json` declares, and provides a valid `manifest.json`. The
 GUI, the CLI and the release packager must keep discovering the same manifest
 rather than maintaining separate feature lists. The schema is in
@@ -111,7 +111,7 @@ Nothing else needs editing to add a module: `make test` picks up a
 module's headers as prerequisites.
 
 A module that also ships an offline patcher puts it in `tools/rx3_patcher/`,
-not under `runtime/` — everything under `runtime/` executes on the deck. The
+not under `mod/` — everything under `mod/` executes on the deck. The
 patcher declares `MODULE_ID` so `tests/test_module_consistency.py` can prove
 its table and the module's `register_patch` calls agree.
 

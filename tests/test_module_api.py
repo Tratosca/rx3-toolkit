@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_API = ROOT / "runtime/lib/module-api.sh"
+MODULE_API = ROOT / "mod/lib/module-api.sh"
 
 HARNESS = r'''
 say() { :; }

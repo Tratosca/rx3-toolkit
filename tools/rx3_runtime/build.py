@@ -77,7 +77,7 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
     patches = []
     seen = set()
     runtime_directories = set()
-    for manifest_path in sorted((root / "runtime/modules").glob("**/manifest.json")):
+    for manifest_path in sorted((root / "mod/modules").glob("**/manifest.json")):
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         required = {
             "id", "name", "description", "firmware", "runtime_directory",
@@ -449,7 +449,7 @@ def build_runtime(
     definitions = discover_patches(root, firmware)
     selected = resolve_patches(definitions, patch_ids)
 
-    compatibility = root / f"runtime/{firmware}/compatibility.sh"
+    compatibility = root / f"mod/{firmware}/compatibility.sh"
     if not compatibility.is_file():
         raise ValueError(f"firmware {firmware} has no runtime compatibility definition")
 
@@ -458,10 +458,10 @@ def build_runtime(
         staging = pathlib.Path(temporary) / "runtime"
         modules = staging / "modules"
         modules.mkdir(parents=True)
-        shutil.copy2(root / "runtime/autoexec.sh", staging / "autoexec.sh")
+        shutil.copy2(root / "mod/autoexec.sh", staging / "autoexec.sh")
         library = staging / "lib"
         library.mkdir()
-        shutil.copy2(root / "runtime/lib/module-api.sh", library / "module-api.sh")
+        shutil.copy2(root / "mod/lib/module-api.sh", library / "module-api.sh")
         compatibility_target = modules / "compatibility/module.sh"
         compatibility_target.parent.mkdir(parents=True)
         shutil.copy2(compatibility, compatibility_target)

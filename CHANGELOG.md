@@ -8,6 +8,13 @@ used to leave the operator guessing at.
 
 ### Changed
 
+- Everything the RX3 executes moved from `runtime/` to `mod/`. The word said
+  *when* the code runs, which the directory above it does too — `apps/` and
+  `tools/` are runtimes of their own, and two of them are literally named
+  `rx3_runtime`. `mod/` says what the directory holds and matches the word the
+  documentation already uses when it speaks to a DJ. The `runtime_directory` key
+  in a module manifest, the `RX3_RUNTIME/` folder written to the drive, and the
+  separation runtime are unrelated names and keep theirs.
 - `RX3 Mod Generator` and `RX3 Stem Studio` ship as a single application,
   `XDJ-RX3 Toolkit`, with a **USB Runtime** tab and a **Vocal Stems** tab. One
   download per platform replaces two; the `XDJ-RX3-Mod-Generator-*` and

@@ -244,7 +244,7 @@ relies on the stock login account.
 
 ### Supported player binaries
 
-`runtime/1.19/compatibility.sh` registers four accepted `rbp` SHA-1 values. An
+`mod/1.19/compatibility.sh` registers four accepted `rbp` SHA-1 values. An
 unlisted hash aborts the run with `STOP: unsupported rbp SHA-1` before anything
 is modified. They correspond to firmware `1.19`, which has no sub-revisions.
 
@@ -325,7 +325,7 @@ That calls `playengine::Player::setDecoderSleep` for each deck, changing the
 decoder-thread sleep interval from the stock 1 ms to 0.1 ms. The setting is
 volatile and alters neither NAND nor the `rbp` executable. It costs CPU, and it
 does not guarantee any fixed reduction in end-to-end audio latency. See the
-[module documentation](../runtime/modules/decoder-sleep/1.19/README.md).
+[module documentation](../mod/modules/decoder-sleep/1.19/README.md).
 
 ## Stems internals
 

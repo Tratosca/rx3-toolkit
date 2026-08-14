@@ -10,11 +10,11 @@ PYTHON ?= python3
 BUILD_DIR ?= build
 FIRMWARE ?= 1.19
 MODULES ?=
-CORE_DIR := runtime/modules/core/$(FIRMWARE)
+CORE_DIR := mod/modules/core/$(FIRMWARE)
 # One directory per module, so a new module is picked up without editing this
 # file: its headers become hook prerequisites and its guards join `make test`.
-MODULE_HEADERS := $(wildcard runtime/modules/*/$(FIRMWARE)/*.h)
-MODULE_GUARDS := $(wildcard runtime/modules/*/$(FIRMWARE)/test_regressions.py)
+MODULE_HEADERS := $(wildcard mod/modules/*/$(FIRMWARE)/*.h)
+MODULE_GUARDS := $(wildcard mod/modules/*/$(FIRMWARE)/test_regressions.py)
 HOOK := $(BUILD_DIR)/librx3_core.so
 EMULATOR_HOOK := $(BUILD_DIR)/librx3_core_emulator.so
 AUTOEXEC := $(BUILD_DIR)/autoexec.bin

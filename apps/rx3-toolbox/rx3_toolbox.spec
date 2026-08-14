@@ -14,14 +14,14 @@ repository = pathlib.Path(SPECPATH).parents[1]
 resources = [
     (str(repository / "LICENSE"), "."),
     (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
-    (str(repository / "runtime/autoexec.sh"), "resources/runtime"),
-    (str(repository / "runtime/lib/module-api.sh"), "resources/runtime/lib"),
+    (str(repository / "mod/autoexec.sh"), "resources/mod"),
+    (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
     (str(repository / "tools/rx3_firmware/firmware_image.py"), "resources/tools/rx3_firmware"),
 ]
-for compatibility in (repository / "runtime").glob("*/compatibility.sh"):
+for compatibility in (repository / "mod").glob("*/compatibility.sh"):
     destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
     resources.append((str(compatibility), destination))
-for manifest in (repository / "runtime/modules").glob("**/manifest.json"):
+for manifest in (repository / "mod/modules").glob("**/manifest.json"):
     destination = f"resources/{manifest.parent.relative_to(repository).as_posix()}"
     resources.append((str(manifest), destination))
     data = json.loads(manifest.read_text(encoding="utf-8"))

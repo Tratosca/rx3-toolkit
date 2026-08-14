@@ -7,20 +7,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 REPOSITORY = ROOT.parents[3]
-AUTOEXEC = (REPOSITORY / "runtime/autoexec.sh").read_text()
-MODULE_API = (REPOSITORY / "runtime/lib/module-api.sh").read_text()
+AUTOEXEC = (REPOSITORY / "mod/autoexec.sh").read_text()
+MODULE_API = (REPOSITORY / "mod/lib/module-api.sh").read_text()
 HOOK = (ROOT / "rx3_core_hook.c").read_text()
 CORE_MODULE = (ROOT / "module.sh").read_text()
 CORE_MANIFEST = (ROOT / "manifest.json").read_text()
 FEATURE_API = (ROOT / "rx3_feature_api.h").read_text()
 STEMS_PANEL = (
-    REPOSITORY / "runtime/modules/stems/1.19/rx3_stems_panel.h"
+    REPOSITORY / "mod/modules/stems/1.19/rx3_stems_panel.h"
 ).read_text()
 STEMS_FEATURE = (
-    REPOSITORY / "runtime/modules/stems/1.19/rx3_stems_feature.h"
+    REPOSITORY / "mod/modules/stems/1.19/rx3_stems_feature.h"
 ).read_text()
 KEYSHIFT_FEATURE = (
-    REPOSITORY / "runtime/modules/keyshift/1.19/rx3_keyshift_feature.h"
+    REPOSITORY / "mod/modules/keyshift/1.19/rx3_keyshift_feature.h"
 ).read_text()
 
 

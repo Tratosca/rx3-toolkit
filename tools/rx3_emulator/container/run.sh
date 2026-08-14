@@ -28,13 +28,13 @@ PRELOAD=/root/pdj/rx3emu-fbshim.so
 if [ "$PROFILE" != stock ]; then
     test -r /repo/build/librx3_core_emulator.so
     cp /repo/build/librx3_core_emulator.so /rx3/root/pdj/librx3_core.so
-    cp /repo/runtime/modules/core/1.19/assets/key-selected.rgb565 \
+    cp /repo/mod/modules/core/1.19/assets/key-selected.rgb565 \
        /rx3/root/pdj/rx3-key-selected.rgb565
-    cp /repo/runtime/modules/core/1.19/assets/stems-selected.rgb565 \
+    cp /repo/mod/modules/core/1.19/assets/stems-selected.rgb565 \
        /rx3/root/pdj/rx3-stems-selected.rgb565
-    cp /repo/runtime/modules/core/1.19/assets/none-selected.rgb565 \
+    cp /repo/mod/modules/core/1.19/assets/none-selected.rgb565 \
        /rx3/root/pdj/rx3-none-selected.rgb565
-    cp /repo/runtime/modules/core/1.19/assets/status-none-selected.rgb565 \
+    cp /repo/mod/modules/core/1.19/assets/status-none-selected.rgb565 \
        /rx3/root/pdj/rx3-status-none-selected.rgb565
 
     # NS_GetImageInfoByID: movw r3,#0x15cc -> movw r3,#0x1603. This is the

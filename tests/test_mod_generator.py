@@ -83,7 +83,7 @@ class ModGeneratorTests(unittest.TestCase):
             resolve_patches([left, right], ["left", "right"])
 
     def test_compatibility_covers_every_binary_patch_combination(self):
-        compatibility = (REPOSITORY / "runtime/1.19/compatibility.sh").read_text()
+        compatibility = (REPOSITORY / "mod/1.19/compatibility.sh").read_text()
         self.assertEqual(compatibility.count("register_rbp_sha1 "), 4)
 
     def test_gui_discovers_manifests_instead_of_listing_patch_ids(self):
@@ -140,7 +140,7 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertIn(f"{pane}.self_test()", entry)
         self.assertFalse((REPOSITORY / "apps/rx3-mod-generator/main.py").exists())
         self.assertFalse((REPOSITORY / "apps/rx3-stem-studio/main.py").exists())
-        self.assertIn("runtime/lib/module-api.sh", spec)
+        self.assertIn("mod/lib/module-api.sh", spec)
         self.assertIn('data.get("build_files", [])', spec)
 
     def test_builds_selected_modules_without_external_iso_tool(self):

@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../../runtime/modules/stems/1.19/rx3_pitch_shift.h"
+#include "../../mod/modules/stems/1.19/rx3_pitch_shift.h"
 
 int main(int argc, char **argv)
 {

@@ -41,7 +41,7 @@ USB insertion
     runs ./autoexec.sh <usb-mount> as root
 ```
 
-`runtime/autoexec.sh` holds the shared lifecycle: discovery, RAM-root
+`mod/autoexec.sh` holds the shared lifecycle: discovery, RAM-root
 validation, guarded writes, process restart, rollback and logging. Each module
 owns its own adapter and payload. Adding or removing one requires no change to
 the orchestrator.
