@@ -9,13 +9,15 @@ KEYSHIFT_READY=0
 
 keyshift_prepare()
 {
-    [ -r /mnt/iso/modules/core/librx3_core.so ] || {
+    [ -r "$CORE_OBJECT" ] || {
         say "Key shift disabled: the performance core is not selected"
         return 1
     }
     export RX3_KEYSHIFT=1
     KEYSHIFT_READY=1
-    if [ "$(rbp_environment_value RX3_KEYSHIFT)" != "1" ]; then
+    running=$(rbp_environment_value RX3_KEYSHIFT)
+    if [ "$running" != "1" ]; then
+        say "Key shift needs a restart: running rbp carries RX3_KEYSHIFT=[${running:-none}]"
         request_rbp_restart
     fi
     say "Key shift prepared: -12..+12 semitones per deck"

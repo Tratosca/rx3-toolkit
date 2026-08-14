@@ -38,12 +38,13 @@ require(
     "the module must own and publish its lifecycle and panel sources",
 )
 require(
-    "librx3_core.so" in MODULE,
+    '[ -r "$CORE_OBJECT" ]' in MODULE,
     "the module must decline when the performance core is not selected",
 )
 require(
-    "librx3" not in MODULE.replace("librx3_core.so", ""),
-    "the stems module must no longer install a shared object of its own",
+    "librx3" not in MODULE,
+    "the stems module must no longer install a shared object of its own; the "
+    "core it depends on is named through CORE_OBJECT, not by path",
 )
 require(
     "uint32_t channel = *(const uint32_t *)(led + 4u);" in FEATURE

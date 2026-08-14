@@ -33,7 +33,7 @@ require(
     "key shift must declare its core dependency and own its adapters",
 )
 require(
-    "librx3_core.so" in MODULE,
+    '[ -r "$CORE_OBJECT" ]' in MODULE,
     "the module must decline when the performance core is not selected",
 )
 require(

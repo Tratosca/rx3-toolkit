@@ -6,11 +6,19 @@
 module_begin stems stems
 
 STEMS_DIR="$USB/RX3_STEMS"
+# A drive does not come back under the same device node: pulled out as sda and
+# pushed back in as sdb, it mounts somewhere else, and the absolute path handed
+# to rbp on the first insertion goes stale. rbp reads this once at load time, so
+# a moved path used to mean stopping and relaunching the player - which freezes
+# the screen and empties the media list, the very thing that made the drive get
+# pulled again. One fixed path, re-pointed on each insertion, makes the loop go
+# away: the running player keeps resolving it, and nothing has to restart.
+STEMS_LINK=/tmp/rx3-stems
 STEMS_READY=0
 
 stems_prepare()
 {
-    [ -r /mnt/iso/modules/core/librx3_core.so ] || {
+    [ -r "$CORE_OBJECT" ] || {
         say "Stems disabled: the performance core is not selected"
         return 1
     }
@@ -21,14 +29,24 @@ stems_prepare()
         count=$((count+1))
     done
 
-    export RX3_STEMS_DIR="$STEMS_DIR"
+    published=$STEMS_DIR
+    if [ ! -e "$STEMS_LINK" ] || [ -L "$STEMS_LINK" ]; then
+        rm -f "$STEMS_LINK"
+        ln -s "$STEMS_DIR" "$STEMS_LINK" 2>/dev/null && published=$STEMS_LINK
+    fi
+    [ "$published" = "$STEMS_LINK" ] || \
+        say "Stems: $STEMS_LINK cannot be published, falling back to the mount path"
+
+    export RX3_STEMS_DIR="$published"
     STEMS_READY=1
-    # Only a change of directory needs a restart; the core decides for itself
-    # whether the binary changed.
-    if [ "$(rbp_environment_value RX3_STEMS_DIR)" != "$STEMS_DIR" ]; then
+    # Only a change of the published directory needs a restart; the core decides
+    # for itself whether the binary changed.
+    running=$(rbp_environment_value RX3_STEMS_DIR)
+    if [ "$running" != "$published" ]; then
+        say "Stems needs a restart: running rbp carries [${running:-none}], this drive is [$published]"
         request_rbp_restart
     fi
-    say "Stems prepared: $count sidecar(s), asynchronous basename lookup"
+    say "Stems prepared: $count sidecar(s) at $STEMS_DIR, asynchronous basename lookup"
 }
 
 stems_after_launch()
