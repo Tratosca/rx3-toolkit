@@ -74,7 +74,7 @@ and nothing to uninstall.
 | 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` only at the moment |
 | 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
 | 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
-| 🔑 **A key file** | Not distributed here — [see below](#4-the-key-file) |
+| 🧱 **A root filesystem** | Built on your machine from the manufacturer's published GPL sources — [see below](#4-building-a-root-filesystem) |
 | 📀 **Disk space** | ~1.5 GB, only if you want stems |
 
 About **20 minutes** to set everything up. After that, stems take from a few
@@ -171,10 +171,24 @@ Skip this if you only want the longer beat jumps.
    ([python.org](https://www.python.org/downloads/) if you have none — take 3.13).
    If it stops halfway, press **Install** again; it picks up where it left off.
 4. Select your XML, your playlist, and your Rekordbox USB stick.
-5. Pick a quality: **Fast** for big libraries, **High quality** for exposed
-   acapellas. 
+5. Pick a quality:
+
+   | Preset | Use it when |
+   | --- | --- |
+   | **High quality** | The stems are going in a set |
+   | **Normal** | Most of the time |
+   | **Very fast** | Auditioning a playlist, or a long queue has to finish tonight |
+
+   The top two are the same model at two settings, so switching between them
+   downloads nothing and costs you no quality — only time. Only **Very fast**
+   swaps the model itself. What the app can actually reach depends on your
+   graphics card, and the line under the selector tells you what *your* machine
+   resolves to rather than what is true in general.
+
 6. Start it. The app estimates how long the run will take, then corrects itself
-   after the first track and remembers your machine's speed for next time.
+   after the first track and remembers your machine's speed for next time. If it
+   works out at more than ten minutes it asks first, because it will occupy the
+   machine — keep the computer plugged in and awake.
 
 Each track produces a `.rx3stem` file in a `RX3_STEMS` folder on the output folder you chose. If you didn't chose your Rekordbox USB stick as an output path, it's time to move that folder at the root of it
 
@@ -187,34 +201,88 @@ Your USB stick
 
 > [!NOTE]
 > The stem playlist itself does **not** need to go on the stick, but it totally can. The player
-> matches stems automatically.
+> matches stems automatically — by filename, so a stem sits next to the track it
+> came from and neither has to be renamed.
 
 Keep the laptop plugged in and awake. If one track fails the queue carries on —
 read the log at the end. If *every* track fails, the install is incomplete: run
 **Install** again. See [Troubleshooting](docs/troubleshooting.md#every-track-fails).
 
-### 4. The key file
+An interrupted run picks up where it stopped: stems already made are kept.
 
-The file we will make needs to be encrypted for the player to load it, so the app needs the matching key to
-build it.
+<details>
+<summary><b>Where does all that software actually go?</b></summary>
+
+Not into the app, and not into your system. It lives in one folder you can
+delete:
+
+| | |
+| --- | --- |
+| **macOS** | `~/Library/Application Support/RX3 Stem Studio` |
+| **Windows** | `%LOCALAPPDATA%\RX3 Stem Studio` |
+| **Linux** | `~/.local/share/rx3-stem-studio` |
+
+The folder keeps the name an earlier, separate stems application used, so that if
+you had it, its runtime is found instead of downloaded all over again.
+`RX3_STEM_STUDIO_HOME` moves it somewhere else.
+
+**Advanced options…** is where you uninstall it, pick a different graphics
+accelerator, or browse the model list. Changing accelerator means installing
+again — a processor-only build cannot be accelerated afterwards.
+
+If you already have `audio-separator` and `ffmpeg` on your machine, they get used
+as they are and nothing is installed. `RX3_SEPARATOR` and `RX3_FFMPEG` point at
+specific ones.
+
+</details>
+
+### 4. Building a root filesystem
+
+The player only loads the file we are about to build if it is encrypted the way
+its own maintenance path expects, so the app needs that material to author it.
+You build it yourself, on your own machine, from sources the manufacturer
+publishes.
 
 > [!CAUTION]
-> **This project does not distribute that key, and never will.**
+> **Nothing of the sort is distributed here.** This step is yours to run, and it
+> is the longest one.
 
-It is not a secret, though. Pioneer publishes the GPL/LGPL source archives for
-the XDJ-RX3 (`pioneerdj_xdj_rx3.tar.bz2.00` and `.01`) on its
-[open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/),
-and building the filesystem from them exposes the key. Getting it — and deciding
-whether you may use it where you live — is the one step nobody can do for you.
-
-Step-by-step: [**Extracting the RX3 initramfs**](docs/extract-initramfs.md).
-
-The file you're looking for will be called `aes256.key` when you'll have completed the steps above. 
+The XDJ-RX3 runs Linux, so under the GPL/LGPL Pioneer publishes the corresponding
+source archives on its [open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/).
+Building a root filesystem from those archives is described in
+[**Building a root filesystem**](docs/extract-initramfs.md). The build leaves
+what the app needs on your disk; point the app at it in the next step.
 
 ### 5. Build the file for your stick
 
-Now that the hard part is done, in the **Modules installation** tab: pick firmware `1.19`, choose the modules you want (some are automatically checked or unchecked depending on which mods you chose), pick your key file, pick the
+Now that the hard part is done, in the **Modules installation** tab: pick firmware `1.19`, choose the modules you want, pick what step 4 produced, pick the
 **root of your Rekordbox stick** as the destination, then **Mod your RX3 !**.
+
+Here is what you are choosing from:
+
+| Module | What it does | On by default |
+| --- | --- | :--: |
+| **Stems control** | Slip Loop pads 7 and 8 become independent vocal and instrumental switches, on tracks that have a stem file | ✅ |
+| **Per-deck key shift** | A **KEY** tab on screen, twelve semitones either way, independently per deck | ✅ |
+| **Beat Jump ±32** | Beat Jump pads 7 and 8 become −32 and +32 instead of −8 and +8 | ✅ |
+| **Immediate Beat Jump** | Repeated jumps fire straight away instead of waiting for the grid. Quantize, Hot Cues, loops and Beat FX are untouched | ✅ |
+| **No more wait between beatjumps** | Makes the player access audio files faster when beatjumping, so big jumps can be repeated sooner. Nothing to see, it just helps the two above | ✅ |
+| **Session logging** | Writes what happened to `RX3_RUNTIME/session.txt` on the stick. Tick it when something went wrong and you want to know why | ❌ |
+| **Diagnostic Telnet access** | Opens a shell for inspection. You do not need this | ❌ |
+
+Some boxes tick and untick themselves, and that is on purpose: a few modules
+genuinely need another one to work.
+
+> [!WARNING]
+> **Session logging** is off by default for a reason that will cost you a stick
+> if you ignore it. While it is on, the player holds that log file open for as
+> long as it plays. **Eject the drive from the RX3 — never just pull it out.** On
+> a FAT stick, yanking it mid-write is how you lose a folder.
+
+> [!WARNING]
+> **Diagnostic Telnet** is off by default and should stay that way unless you
+> know why you want it. The traffic is unencrypted, and it is reachable through
+> the rear computer USB port. The root password won't be provided here. 
 
 Eject the stick
 properly. It should now look like:
@@ -242,19 +310,37 @@ patience has apparently become obsolete.
 <details>
 <summary><b>Did it work?</b></summary>
 
-The stick now contains `RX3_RUNTIME/session.txt`. Its last line should read:
+The honest answer is: load a track and try the pads. There is no log by default,
+on purpose — see **Session logging** in the module list above.
+
+**Interface did not come back?** Pull the stick and power cycle — unplug the
+mains lead if you have to. The RX3 boots stock.
+
+**Something is off and you want to know why?** Build the stick again with
+**Session logging** ticked and reproduce it. That writes
+`RX3_RUNTIME/session.txt`, whose last line should read:
 
 ```text
 === complete ===
 ```
 
-**Interface did not come back?** Pull the stick and power cycle — unplug the
-mains lead if you have to. The RX3 boots stock.
+The other lines worth recognising:
 
-**Log says `STOP:` or `FAILED:`?** Delete `autoexec.bin` from the stick, then see
+| Line | What it means |
+| --- | --- |
+| `=== complete ===` | The run finished. This is what a good run ends on. |
+| `OK: rbp active` | The player was restarted and came back. |
+| `nothing to apply: ...` | Everything you picked was already running. Not an error. |
+| `STOP: ...` | Something was not as expected, so **nothing was touched**. |
+| `FAILED: ...` | Something went wrong partway, and the previous state was put back. |
+
+On `STOP:` or `FAILED:`, delete `autoexec.bin` from the stick, then see
 [Troubleshooting](docs/troubleshooting.md#the-session-log-says-stop-or-failed).
 
 </details>
+
+Putting the stick back in later costs nothing: anything already running is
+recognised and left alone, so the interface does not freeze a second time.
 
 ---
 
@@ -308,7 +394,7 @@ The `KEY` and `STEMS` tabs are the same trick applied to the screen. Touch works
 
 If anything goes wrong within a few seconds after having applied the patch, the original bytes go back, the stock player starts again, and a log on your stick explains itself.
 
-Details for the curious: [The RX3 mod](docs/mod-rx3.md).
+Details for the curious: [how a mod runs without flashing anything](REFERENCES.md#2-how-a-mod-runs-without-flashing-anything).
 </details>
 
 <details>
@@ -384,7 +470,6 @@ What is being worked on next. No dates, no promises but this is the direction.
 | **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 💡 Planned |
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
 | **Polished interface** | Real icons, text and artwork for everything the mod adds, matching the stock look | 🚧 In progress |
-| **Full system emulator** | From the U-Boot to the beat, to develop and test mods from the sofa (and open to anyone who does not own an RX3) | 🚧 In progress |
 | **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
 
 Want one of these sooner ? Or something else ? Say so in an issue, or build it yourself (see
@@ -396,12 +481,11 @@ Want one of these sooner ? Or something else ? Say so in an issue, or build it y
 
 | | |
 | --- | --- |
-| [Extracting the initramfs](docs/extract-initramfs.md) | Getting the key out of Pioneer's published sources |
-| [The RX3 mod](docs/mod-rx3.md) | Architecture, modules, applying and removing, session logs |
-| [Vocal stems](docs/stem-studio.md) | Models, presets, accelerators, tuning |
+| [Building the RX3 filesystem](docs/extract-initramfs.md) | Building a Linux filesystem from the published GPL sources |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms, errors, fixes |
-| [Reference](docs/reference.md) | File formats, commands, addresses, hardware findings |
+| [Reference](REFERENCES.md) | How it all works: the platform, patching, the display, stems, the build, everything |
 | [Contributing](CONTRIBUTING.md) | Build from source, run the tests, write a module |
+| [Legal position](LEGAL.md) | What this project does, what it does not distribute, and on what basis |
 | [Changelog](CHANGELOG.md) | What changed |
 
 ---
@@ -412,13 +496,12 @@ Pull requests welcome — new modules, support for future firmware,
 reverse-engineering notes, UI work, faster separation, testing on other systems,
 or just better docs. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Reporting a bug?** Include your firmware version, your OS, the toolkit version,
-the contents of `RX3_RUNTIME/session.txt`, and the steps to reproduce. For stem
+**Reporting a bug?** Enable the logging module on the mod, reproduce the bug, include your firmware version, your OS, the toolkit version, `RX3_RUNTIME/session.txt` log, and the steps to reproduce. For stem
 problems, add the model, the quality preset, your CPU/GPU, and whether it affects
 one track or all of them.
 
 Please do **not** attach encryption keys, manufacturer firmware or binaries, or
-copyrighted music.
+copyrighted material.
 
 ---
 

@@ -72,7 +72,7 @@ def to_rgb565(image) -> bytes:
 # That was first inferred from the caption pixels; it is now confirmed at the
 # source, because the firmware's own font file is 4 bpp: NS_FONT_ID_ISO8859_w.bin
 # stores 189-byte cells of 14x27 pixels at one nibble each, coverage 0..15.
-# See docs/rx3-font-format.md.
+# See REFERENCES.md, "The bitmap font".
 #
 # Supersampling matches the coverage totals but fails the eye, and the reason is
 # visible at high zoom: Pioneer's vertical stems are solid white with hard

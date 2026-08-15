@@ -104,7 +104,7 @@ space, a different dash character, or a renamed audio file all break the match.
 
 Compare the names on the drive, not the names in your library. Rekordbox cuts a
 filename to 44 characters when it exports the track, so a long title reaches the
-drive shortened while the library keeps it whole. Stem Studio applies the same
+drive shortened while the library keeps it whole. The app applies the same
 cut. A sidecar generated before it did needs the same treatment: keep the first
 44 characters of the name and the `.rx3stem` extension.
 
@@ -126,7 +126,7 @@ for lossy sources that declare padding, which is why some of your tracks work.
 If the run reports that the padding could not be measured, the source is one the
 pipeline could not line up. Convert it to WAV or FLAC and generate it again.
 
-## Stem Studio reports a missing runtime
+## The app reports a missing runtime
 
 Use **Install** in Advanced options, Runtime tab. Or point `RX3_SEPARATOR` and
 `RX3_FFMPEG` at your own installation of audio-separator and FFmpeg, which the

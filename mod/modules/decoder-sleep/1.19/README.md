@@ -1,44 +1,35 @@
-# Decoder polling interval, firmware 1.19
+# ⚡ No more wait between beatjumps
 
-This module reduces the time for which the RX3 decoder thread sleeps between
-iterations of its stream-reading loop. Its purpose is to make decoded audio
-become available sooner after a seek or a large Beat Jump, where the stock
-1 ms polling interval can contribute to a perceptible delay while the reader
-refills or catches up.
+The helper module. Nothing to see, nothing to press — it just makes the two Beat
+Jump modules feel right.
 
-The module changes the interval from `1000000` ns (1 ms) to `100000` ns
-(0.1 ms) on both decks. This increases the decoder's polling frequency by a
-factor of ten. It does **not**:
+The player checks for freshly decoded audio on a timer. Stock, that timer ticks
+every millisecond, which is fine when you are playing forwards and noticeable
+when you have just thrown the track thirty-two beats. This makes it tick ten
+times more often, so audio turns up sooner after a big jump or a seek.
 
-- enlarge the audio ring buffer;
-- change Beat Jump distance, Quantize, or grid calculations;
-- preload an entire track;
-- guarantee a fixed 0.9 ms reduction in end-to-end audio latency.
+On by default, and the app ticks it automatically whenever you pick either Beat
+Jump module. You can also select it on its own if that is all you want.
 
-The effective improvement depends on whether decoder scheduling is the active
-bottleneck. More frequent wake-ups can also increase CPU usage. The 0.1 ms
-value is therefore a responsiveness trade-off, not a general buffer-size
-optimization.
+## Being honest about it
 
-This is a volatile runtime setting, not a binary patch. Power cycling restores
-the stock value. `module.sh` registers `apply.sh` as a post-launch action with
-the root runtime orchestrator.
+This is a real improvement in one specific place and not a magic latency fix.
+It does **not**:
 
-The observed command path is:
+- make the buffer bigger;
+- change jump distances, Quantize, or the grid;
+- preload the track;
+- promise you a fixed number of milliseconds back.
 
-```text
-UDP 127.0.0.1:20000
-  -> allinone_debug::bufsleep
-  -> playengine::Player::setDecoderSleep
-```
+Whether you notice it depends on whether that timer was the thing holding you up.
+Waking up more often also costs the player a little CPU. It is a trade, chosen
+deliberately, not a free win.
 
-A different positive interval can be supplied explicitly:
+Nothing is patched here at all — it is a setting sent to the running player, and
+a power cycle puts it back. If it fails, it says so and the player carries on
+with the stock timing.
 
-```sh
-./apply.sh 100000 /tmp/decoder-sleep.log
-```
+---
 
-The script waits up to 20 seconds for the local debug console, validates the
-interval, applies `bufsleep 0 <ns>` and `bufsleep 1 <ns>`, and reports failure
-without modifying an executable or persistent storage. A failure leaves `rbp`
-running with its existing decoder interval.
+How the setting is sent, and why it is not a binary patch:
+[Reference → Faster decoder polling](../../../../REFERENCES.md#8-faster-decoder-polling).

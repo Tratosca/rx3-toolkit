@@ -2242,7 +2242,7 @@ static void emulator_hardware_touch(int x, int y)
  * 16-bit code at +8, the 1-based channel at +10, and press or release in the
  * low nibble of +11.
  *
- * Codes are from docs/rx3-key-codes.md, recovered from keyCodeAsText().
+ * Codes are from REFERENCES.md appendix A, recovered statically.
  */
 static void emulator_press_player_key(unsigned int code, unsigned int deck)
 {
