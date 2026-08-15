@@ -1,4 +1,4 @@
-# Extracting `initramfs.tar.gz` from the XDJ-RX3 Source Package
+# Building a root filesystem from the published GPL sources
 
 The XDJ-RX3 source package is distributed as two ZIP files:
 
