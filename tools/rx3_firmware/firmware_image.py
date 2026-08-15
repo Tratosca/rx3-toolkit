@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Inspect, decrypt, encrypt, and build XDJ-RX3 firmware images.
+"""Build and inspect the runtime image this toolkit writes to a USB volume.
 
-The format follows the official GPL sources in decrypt_update.sh and the
-cryptoloop implementation used by util-linux-ng 2.14.2:
+The image is an ISO 9660 filesystem carrying `autoexec.sh` and the runtime it
+launches, encrypted independently per 512-byte sector with AES-256-CBC. The IV
+is the sector index encoded as a 32-bit little-endian integer followed by 12
+zero bytes, matching the cryptoloop implementation in util-linux-ng 2.14.2:
 
-    cat /usr/local/pdj/aes256.key | losetup -e aes -p 0 DEVICE IMAGE
+    cat KEYFILE | losetup -e aes -p 0 DEVICE IMAGE
 
-Update container:
-    [encrypted payload, aligned to 512 bytes]
-    [model and version field, 12 bytes]
-    [CRC32 of encrypted payload, little-endian, 4 bytes]
+The key is supplied by the operator and is never held in this repository.
 
-The payload is an ISO 9660 filesystem encrypted independently per 512-byte
-sector with AES-256-CBC. The IV is the sector index encoded as a 32-bit
-little-endian integer followed by 12 zero bytes.
+This module builds the toolkit's own runtime image and reads back one it built.
+It handles no update container: there is no trailer parser, no CRC check
+against a model and version field, and no path that produces or consumes a
+vendor update package.
 """
 
 import argparse
@@ -22,15 +22,11 @@ import io
 import pathlib
 import struct
 import subprocess
-import sys
 import tempfile
-import zlib
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 SECTOR = 512
-TRAILER = 16
-MODEL = b"XDJ-RX3"
 ISO_BLOCK = 2048
 ISO_PADDING_BLOCKS = 150
 
@@ -60,64 +56,6 @@ def crypt(body, key, decrypt):
         block = body[offset:offset + SECTOR]
         output[offset:offset + SECTOR] = operation.update(block) + operation.finalize()
     return bytes(output)
-
-
-def split(blob):
-    """Return payload, model, version, stored CRC32, and calculated CRC32."""
-    if len(blob) < TRAILER:
-        raise ValueError("update image is shorter than its trailer")
-    body, trailer = blob[:-TRAILER], blob[-TRAILER:]
-    model = trailer[:7]
-    version = trailer[7:12].rstrip(b"\0").decode("ascii", "replace")
-    stored = struct.unpack("<I", trailer[12:])[0]
-    actual = zlib.crc32(body) & 0xFFFFFFFF
-    return body, model, version, stored, actual
-
-
-def build(payload, version):
-    """Append the RX3 model/version field and encrypted-payload CRC32."""
-    encoded_version = version.encode("ascii")
-    trailer = MODEL + encoded_version.ljust(5, b"\0")
-    if len(trailer) != 12:
-        raise ValueError(f"version is too long: {version!r}")
-    crc = zlib.crc32(payload) & 0xFFFFFFFF
-    return payload + trailer + struct.pack("<I", crc)
-
-
-def cmd_verify(args):
-    body, model, version, stored, actual = split(pathlib.Path(args.file).read_bytes())
-    print(f"Model          : {model.decode('ascii', 'replace')}")
-    print(f"Version        : {version}")
-    print(f"Payload        : {len(body):,} bytes ({len(body) // SECTOR} sectors)")
-    print(f"Stored CRC32   : 0x{stored:08X}")
-    print(f"Calculated CRC : 0x{actual:08X} -> {'OK' if stored == actual else 'FAILED'}")
-    if not args.key:
-        return 0 if stored == actual else 1
-
-    iv = struct.pack("<I", 64) + bytes(12)
-    decryptor = Cipher(algorithms.AES(load_key(args.key)), modes.CBC(iv)).decryptor()
-    pvd = decryptor.update(body[64 * SECTOR:65 * SECTOR]) + decryptor.finalize()
-    valid = pvd[1:6] == b"CD001"
-    suffix = ""
-    if valid:
-        volume = pvd[40:72].decode("ascii", "replace").rstrip(" \0")
-        suffix = f"; volume {volume!r}"
-    print(f"ISO 9660 at crypto sector 64: {'YES' if valid else 'NO'}{suffix}")
-    return 0 if valid else 1
-
-
-def cmd_decrypt(args):
-    body, model, version, stored, actual = split(pathlib.Path(args.input).read_bytes())
-    if stored != actual:
-        raise ValueError(f"CRC mismatch: stored 0x{stored:08X}, calculated 0x{actual:08X}")
-    plain = crypt(body, load_key(args.key), True)
-    pathlib.Path(args.output).write_bytes(plain)
-    print(
-        f"{args.output}: {len(plain):,} bytes "
-        f"(model {model.decode('ascii', 'replace')}, version {version})"
-    )
-    if plain[64 * SECTOR + 1:64 * SECTOR + 6] != b"CD001":
-        print("WARNING: ISO signature is missing; the supplied key is likely incorrect")
 
 
 def read_autoexec(path, key_path):
@@ -236,39 +174,9 @@ def cmd_autoexec(args):
     print(f"{args.output}: {size:,} bytes ({size // SECTOR} sectors)")
 
 
-def cmd_encrypt(args):
-    plain = pathlib.Path(args.input).read_bytes()
-    if len(plain) % SECTOR:
-        padding = SECTOR - (len(plain) % SECTOR)
-        plain += b"\0" * padding
-        print(f"Added {padding} bytes to align the payload", file=sys.stderr)
-    update = build(crypt(plain, load_key(args.key), False), args.version)
-    pathlib.Path(args.output).write_bytes(update)
-    crc = struct.unpack("<I", update[-4:])[0]
-    print(f"{args.output}: {len(update):,} bytes; trailer {update[-16:-4]!r}; CRC32 0x{crc:08X}")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
-
-    command = commands.add_parser("decrypt")
-    command.add_argument("input")
-    command.add_argument("output")
-    command.add_argument("--key", required=True)
-    command.set_defaults(function=cmd_decrypt)
-
-    command = commands.add_parser("encrypt")
-    command.add_argument("input")
-    command.add_argument("output")
-    command.add_argument("--key", required=True)
-    command.add_argument("--version", required=True)
-    command.set_defaults(function=cmd_encrypt)
-
-    command = commands.add_parser("verify")
-    command.add_argument("file")
-    command.add_argument("--key")
-    command.set_defaults(function=cmd_verify)
 
     command = commands.add_parser("verify-autoexec", help="verify a raw autoexec image")
     command.add_argument("file")

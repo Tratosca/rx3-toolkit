@@ -36,7 +36,7 @@ runs on your computer.
 | `apps/rx3-toolbox/` | The one Tkinter application: a tab over the build engine, a tab over the stem pipeline |
 | `tools/rx3_runtime/` | Build engine and its CLI |
 | `tools/rx3_patcher/` | Offline counterparts to the on-device byte patches, for an extracted `rbp` |
-| `tools/rx3_firmware/` | AES sector crypto, CRC32 trailer, ISO 9660 authoring |
+| `tools/rx3_firmware/` | AES sector crypto and ISO 9660 authoring for `autoexec.bin` |
 | `tools/rx3_stems/` | Rekordbox parsing, provisioning, separation, sidecar encoding |
 | `scripts/` | Release packaging and the publication preflight |
 | `tests/` | Unit tests |
@@ -104,7 +104,7 @@ Each module lives in `mod/modules/<id>/<firmware>/`, where `<id>` is the
 `id` its `manifest.json` declares, and provides a valid `manifest.json`. The
 GUI, the CLI and the release packager must keep discovering the same manifest
 rather than maintaining separate feature lists. The schema is in
-[docs/reference.md](docs/reference.md#module-manifests).
+[REFERENCES.md](REFERENCES.md#modules).
 
 Nothing else needs editing to add a module: `make test` picks up a
 `test_regressions.py` placed beside the manifest, and `make hook` treats the
@@ -126,7 +126,7 @@ contracts only; device mutation belongs in a registered lifecycle hook.
 The performance core owns executable hook installation. Optional features own
 their state and hook group, depend only on core services, and must remove only
 their own hooks on failure. See
-[ADR-001](docs/architecture/ADR-001-modular-runtime.md).
+[the orchestrator](REFERENCES.md#the-orchestrator).
 
 ## Supporting another firmware build
 
