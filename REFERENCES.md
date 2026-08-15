@@ -914,11 +914,16 @@ modified. This is the same refuse-rather-than-guess rule as every patch site.
 
 ### On the root password
 
-The runtime does not need one. During filesystem analysis the stock password
-hash was found to use a legacy algorithm with no adaptive work factor that
-considers only the first eight characters, and it fell in about three minutes.
-Neither the hash nor the plaintext is published. Only the optional remote-shell
-module, disabled by default, uses the stock account at all.
+The runtime does not need one. During filesystem analysis, on 10 August 2026,
+the stock password hash was found to use a legacy algorithm with no adaptive
+work factor that considers only the first eight characters, and it fell in about
+three minutes. Neither the hash nor the plaintext is published. Only the
+optional remote-shell module, disabled by default, uses the stock account at
+all.
+
+The finding has not been reported to the manufacturer, and no report is
+planned. It is recorded here so that the state of it is not left to inference:
+what is written above is the whole of what this project has done with it.
 
 ---
 
