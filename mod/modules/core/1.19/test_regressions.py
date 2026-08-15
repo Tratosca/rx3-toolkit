@@ -215,9 +215,14 @@ require(
     "STATUS/BEAT FX must redraw both performance parents after leaving a "
     "custom panel",
 )
+beatfx_rebuild = HOOK.split("static void *finish_beatfx_reselect", 1)[1].split(
+    "\nstatic void hooked_set_beatfx_selected", 1
+)[0]
 require(
-    "usleep(60000u);" in HOOK
-    and HOOK.count("usleep(30000u);") == 1
+    "usleep(60000u);" in beatfx_rebuild
+    # Scoped to the rebuild: the emulator's browse-key injector waits the same
+    # one cycle, and a file-wide count would read that as a second rebuild.
+    and beatfx_rebuild.count("usleep(30000u);") == 1
     and "The native state-7 rebuild paints Aqua/Default/Yellow" in HOOK
     and "original_set_beatfx_selected(0);" in beatfx_setter
     and "finish_beatfx_reselect" in beatfx_setter
@@ -266,8 +271,44 @@ require(
     "on-screen toggles must share the pads' blink origin",
 )
 require(
-    'text_patched[] = {\'P\',\'A\',\'T\',\'C\',\'H\',\'E\',\'D\',0}' in HOOK,
-    "the visible patch badge must contain only PATCHED",
+    "text_patched" not in HOOK
+    and "draw_performance_overlay" not in HOOK
+    and "RENDER_CUR_POS" not in HOOK,
+    "the mod must not paint a badge over Pioneer's own header",
+)
+# The palette is measured (frame 0x632c, selected fill 0x7bef) but the encoding
+# the glyph's colour fields want is not: NS_PALRender_DrawText picks one of three
+# decodings from the window's pixel format. Inheriting is the honest answer until
+# that format is identified, so keep the reasoning attached to the stub.
+require(
+    "DS_GR_GetWindowInfo" in HOOK
+    and "0x632c" in HOOK and "0x7bef" in HOOK,
+    "the theme stub must record the measured palette and why it is not applied",
+)
+draw_text_body = HOOK.split("static void hooked_draw_text", 1)[1].split(
+    "\nstatic int performance_overlay_is_visible", 1
+)[0]
+require(
+    "pad_text_template" in HOOK
+    and "pad_button_face" in HOOK
+    and draw_text_body.index("capture_pad_text_template(text, window_layer);")
+        < draw_text_body.index("is_performance_pad_subtree(window_layer))"),
+    "the controls must wear a cloned pad label, captured before the draw that "
+    "would replace it",
+)
+require(
+    "is_performance_pad_subtree" in HOOK
+    and "(window == 6u || window == 7u)" not in HOOK,
+    "only the performance pad subtree may be replaced; other deck widgets in "
+    "the same windows must reach the native renderer",
+)
+require(
+    "image_id == 0x14e9u || image_id == 0x14eau" in HOOK
+    and "release_native_performance_touch" in HOOK
+    and HOOK.count("release_native_performance_touch();") == 3
+    and "pressed_deck" in HOOK,
+    "the row must be painted once per pass from the pane backdrop, and every "
+    "release edge must repaint the control it lit",
 )
 require(
     'register_ready_file "$CORE_READY"' in CORE_MODULE

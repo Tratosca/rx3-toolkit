@@ -9,7 +9,7 @@ RUN apt-get update -qq \
 COPY fbshim.c /opt/rx3emu/fbshim.c
 COPY run.sh /opt/rx3emu/run.sh
 
-RUN gcc -shared -fPIC -O2 -Wall -Wextra \
+RUN gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
       -o /opt/rx3emu/fbshim.so /opt/rx3emu/fbshim.c -ldl \
  && chmod 755 /opt/rx3emu/run.sh
 

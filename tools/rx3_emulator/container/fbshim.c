@@ -14,35 +14,69 @@
 #include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/epoll.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #define MAX_TRACKED_FDS 64
+/* A shim that floods the log distorts rbp's timing enough to break
+   DirectFBCreate, which is a real failure mode of this harness. */
+#define TRACE_READ_LIMIT 400
 
 struct fake_device {
     const char *path;
     int fifo;
     const char *initial;
+    /* Minimum file length, and the byte to fill it with. Register-style nodes
+       are addressed by lseek and must answer a byte at every offset the caller
+       selects: a short file returns EOF instead. The value matters as much as
+       the length -- these lines are active-low. */
+    off_t length;
+    unsigned char fill;
 };
 
+/* Each absent device has to be replaced according to its nature, and getting it
+   wrong fails in two different ways: a register-style node simulated by a pipe
+   answers ESPIPE, while an event stream simulated by a regular file is always
+   "ready", so a reader spins.
+
+   Pioneer's /proc/udev_usb* look like event streams -- a read blocks until the
+   USB state changes, which is why a plain `cp` on one freezes on the device --
+   and UsbStorageManager is the last thing in UiObjectManager::init() that can
+   reach a read at all, so they were the obvious suspect for the stall.
+   Measured twice, both negative: turning them into FIFOs changes nothing, and
+   neither does reporting a stick present ("1") instead of absent -- rbp stops
+   at exactly the same point either way. They stay regular files answering "no
+   USB", which is at least an answer rather than EAGAIN. */
 static const struct fake_device fake_devices[] = {
-    { "/proc/udev_usb1", 0, "0\n" },
-    { "/dev/snd/seq", 1, NULL },
-    { "/dev/aloadSEQ", 1, NULL },
-    { "/proc/udev_usbctn1", 0, "0\n" },
-    { "/proc/udev_usbctn2", 0, "0\n" },
-    { "/sys/devices/platform/pwm-backlight.1/backlight/pwm-backlight.1/max_brightness", 0, "255\n" },
-    { "/sys/devices/platform/pwm-backlight.1/backlight/pwm-backlight.1/brightness", 0, "180\n" },
-    { "/proc/udev_usb2", 0, "0\n" },
-    { "/sys/class/paudiog/paudiog0/connect", 0, "0\n" },
-    { "/dev/gpiodrv", 0, NULL },
-    { "/dev/hidg0", 1, NULL },
-    { "/dev/subucom_spi1.0", 1, NULL },
-    { "/dev/subucom_spi2.0", 1, NULL },
-    { "/dev/subucom_spi_rdy3.0", 1, NULL },
-    { "/dev/subucom_spi_rdy4.0", 1, NULL },
-    { "/dev/tsc2007_2-0048", 1, NULL },
-    { NULL, 0, NULL }
+    { "/proc/udev_usb1", 0, "0\n", 0, 0 },
+    { "/dev/snd/seq", 1, NULL, 0, 0 },
+    { "/dev/aloadSEQ", 1, NULL, 0, 0 },
+    { "/proc/udev_usbctn1", 0, "0\n", 0, 0 },
+    { "/proc/udev_usbctn2", 0, "0\n", 0, 0 },
+    { "/sys/devices/platform/pwm-backlight.1/backlight/pwm-backlight.1/max_brightness", 0, "255\n", 0, 0 },
+    { "/sys/devices/platform/pwm-backlight.1/backlight/pwm-backlight.1/brightness", 0, "180\n", 0, 0 },
+    { "/proc/udev_usb2", 0, "0\n", 0, 0 },
+    { "/sys/class/paudiog/paudiog0/connect", 0, "0\n", 0, 0 },
+    /* gpiodrv is addressed by lseek: the offset selects the GPIO and every
+       read returns exactly one byte, so the file is padded to cover
+       IMX_GPIO_NR(bank,nr) = (bank-1)*32+nr.
+
+       Filled with 1, not 0, because these lines are active-low. GPIOs 0x7e and
+       0xcc are the USB over-current inputs: UsbStorageManager::handleGpioMessage
+       forwards them to notify_over_current, which returns immediately on 1 and
+       on 0 tears the USB stack down through a virtual call and
+       request_usb_stop. Reading 0 therefore reports a permanent over-current
+       fault, during construction, and is what hung UiObjectManager::init(). */
+    { "/dev/gpiodrv", 0, NULL, 256, 1 },
+    { "/dev/hidg0", 1, NULL, 0, 0 },
+    { "/dev/subucom_spi1.0", 1, NULL, 0, 0 },
+    { "/dev/subucom_spi2.0", 1, NULL, 0, 0 },
+    { "/dev/subucom_spi_rdy3.0", 1, NULL, 0, 0 },
+    { "/dev/subucom_spi_rdy4.0", 1, NULL, 0, 0 },
+    { "/dev/tsc2007_2-0048", 1, NULL, 0, 0 },
+    { NULL, 0, NULL, 0, 0 }
 };
 
 static int (*real_open)(const char *, int, ...);
@@ -50,6 +84,9 @@ static int (*real_open64)(const char *, int, ...);
 static int (*real_ioctl)(int, unsigned long, ...);
 static int (*real_select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 static ssize_t (*real_write)(int, const void *, size_t);
+static ssize_t (*real_read)(int, void *, size_t);
+static int (*real_epoll_create)(int);
+static int (*real_epoll_ctl)(int, int, int, struct epoll_event *);
 static void *(*real_mmap)(void *, size_t, int, int, int, off_t);
 static void *(*real_mmap64)(void *, size_t, int, int, int, off64_t);
 
@@ -62,7 +99,11 @@ static char output_directory[256] = "/tmp/rx3emu";
 static int framebuffer_fds[MAX_TRACKED_FDS];
 static int framebuffer_count;
 static int fake_fds[MAX_TRACKED_FDS];
+static const char *fake_names[MAX_TRACKED_FDS];
 static int fake_count;
+static int trace_reads;
+static int traced_lines;
+static const char *fake_name_of(int fd);
 static void *framebuffer_address;
 static size_t framebuffer_mapping_size;
 static int exporter_started;
@@ -205,8 +246,19 @@ static void initialize(void)
     real_ioctl = dlsym(RTLD_NEXT, "ioctl");
     real_select = dlsym(RTLD_NEXT, "select");
     real_write = dlsym(RTLD_NEXT, "write");
+    real_read = dlsym(RTLD_NEXT, "read");
+    real_epoll_create = dlsym(RTLD_NEXT, "epoll_create");
+    real_epoll_ctl = dlsym(RTLD_NEXT, "epoll_ctl");
     real_mmap = dlsym(RTLD_NEXT, "mmap");
     real_mmap64 = dlsym(RTLD_NEXT, "mmap64");
+    /* rbp writes its progress with printf, and the runner redirects stdout to
+       a file, so libc buffers it in 4 KiB blocks. A process that stops before
+       filling one loses every line it printed -- which is exactly the case we
+       are trying to diagnose, and is why rbp.log has never held more than the
+       four lines flushed at exit. Unbuffered here rather than line-buffered:
+       the point is to survive a process that never returns. */
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
     configured = getenv("RX3EMU_OUTPUT");
     if (configured && configured[0]) {
         strncpy(output_directory, configured, sizeof(output_directory) - 1);
@@ -214,6 +266,8 @@ static void initialize(void)
     }
     configured = getenv("RX3EMU_SEMIHOSTING");
     semihosting_enabled = configured && !strcmp(configured, "1");
+    configured = getenv("RX3EMU_TRACE_READS");
+    trace_reads = configured && !strcmp(configured, "1");
 }
 
 static int tracked(const int *fds, int count, int fd)
@@ -343,29 +397,86 @@ static int open_fake(const struct fake_device *device)
         mkfifo(path, 0666);
         descriptor = real_open(path, O_RDWR | O_NONBLOCK);
     } else {
-        fresh = access(path, F_OK) != 0;
-        descriptor = real_open(path, O_RDWR | O_CREAT, 0666);
-        if (descriptor >= 0 && fresh && device->initial) {
-            real_write(descriptor, device->initial, strlen(device->initial));
+        /* rbp opens these from several threads -- GpioManager alone is built
+           sixteen times -- so "test, create, then fill" is a race: one thread
+           can create the file and another can open it before the contents are
+           written, read a zero where a one belongs, and take a fault path.
+           That is an intermittent hang of exactly the kind this shim once had
+           permanently. O_EXCL elects a single writer; everyone else waits for
+           the file to reach full size before using it. */
+        off_t wanted = device->length;
+        if (device->initial && (off_t)strlen(device->initial) > wanted)
+            wanted = (off_t)strlen(device->initial);
+        descriptor = real_open(path, O_RDWR | O_CREAT | O_EXCL, 0666);
+        fresh = descriptor >= 0;
+        if (!fresh)
+            descriptor = real_open(path, O_RDWR, 0666);
+        if (descriptor >= 0 && fresh) {
+            unsigned char padding[64];
+            off_t written = 0;
+            if (device->initial) {
+                size_t size = strlen(device->initial);
+                if (real_write(descriptor, device->initial, size) > 0)
+                    written = (off_t)size;
+            }
+            memset(padding, device->fill, sizeof(padding));
+            while (written < device->length) {
+                size_t chunk = (size_t)(device->length - written);
+                if (chunk > sizeof(padding))
+                    chunk = sizeof(padding);
+                if (real_write(descriptor, padding, chunk) <= 0)
+                    break;
+                written += (off_t)chunk;
+            }
             lseek(descriptor, 0, SEEK_SET);
+        } else if (descriptor >= 0 && wanted) {
+            /* Bounded: a writer that died mid-fill must not hang the reader. */
+            int spins = 0;
+            struct stat status;
+            while (spins++ < 2000 && !fstat(descriptor, &status) &&
+                   status.st_size < wanted)
+                usleep(1000);
         }
     }
+    if (descriptor >= 0 && fake_count < MAX_TRACKED_FDS)
+        fake_names[fake_count] = base;
     remember(fake_fds, &fake_count, descriptor);
     return descriptor;
+}
+
+/* Under RX3EMU_TRACE_READS, log every path this shim is asked for and what it
+   answered. The startup failure this exists for leaves no framebuffer at all,
+   and the question it settles is whether DirectFB ever asks for /dev/fb0. */
+static void trace_open(const char *path, int descriptor)
+{
+    if (!trace_reads || traced_lines >= TRACE_READ_LIMIT)
+        return;
+    traced_lines++;
+    fprintf(stderr, "RX3EMU: open %s -> %d\n", path ? path : "(null)", descriptor);
 }
 
 static int redirected_open(const char *path, int flags, mode_t mode, int use_open64)
 {
     const struct fake_device *device;
+    int descriptor;
     initialize();
-    if (path && !strcmp(path, "/dev/fb0"))
-        return open_framebuffer();
+    if (path && !strcmp(path, "/dev/fb0")) {
+        descriptor = open_framebuffer();
+        trace_open(path, descriptor);
+        return descriptor;
+    }
     device = find_fake(path);
-    if (device)
-        return open_fake(device);
-    if (use_open64 && real_open64)
-        return real_open64(path, flags, mode);
-    return real_open(path, flags, mode);
+    if (device) {
+        descriptor = open_fake(device);
+        trace_open(path, descriptor);
+        return descriptor;
+    }
+    descriptor = (use_open64 && real_open64) ? real_open64(path, flags, mode)
+                                             : real_open(path, flags, mode);
+    /* Everything else is traced too: the failing runs stop before /dev/fb0 is
+       ever asked for, so what matters is what it asked for instead. */
+    trace_open(path, descriptor);
+    return descriptor;
 }
 
 int open(const char *path, int flags, ...)
@@ -479,6 +590,89 @@ int ioctl(int descriptor, unsigned long request, ...)
     default:
         return 0;
     }
+}
+
+/*
+ * TouchPanel::run() registers its device with epoll and, if either epoll_ctl
+ * fails, skips its whole loop and returns without printing anything -- so a
+ * failure here is indistinguishable from a thread that simply never read.
+ * These two wrappers make the difference visible. Both are called a handful of
+ * times, so they are logged unconditionally rather than sampled.
+ */
+int epoll_create(int size)
+{
+    int result;
+    initialize();
+    if (!real_epoll_create)
+        return (int)syscall(SYS_epoll_create1, 0);
+    result = real_epoll_create(size);
+    if (trace_reads)
+        fprintf(stderr, "RX3EMU: epoll_create(%d) -> %d\n", size, result);
+    return result;
+}
+
+int epoll_ctl(int epfd, int operation, int descriptor, struct epoll_event *event)
+{
+    int result;
+    const char *name;
+    initialize();
+    if (!real_epoll_ctl)
+        return (int)syscall(SYS_epoll_ctl, epfd, operation, descriptor, event);
+    result = real_epoll_ctl(epfd, operation, descriptor, event);
+    if (trace_reads) {
+        name = fake_name_of(descriptor);
+        fprintf(stderr, "RX3EMU: epoll_ctl(ep=%d op=%d fd=%d%s%s) -> %d%s\n",
+                epfd, operation, descriptor, name ? " " : "", name ? name : "",
+                result, result < 0 ? " FAILED" : "");
+    }
+    return result;
+}
+
+static const char *fake_name_of(int fd)
+{
+    int index;
+    for (index = 0; index < fake_count; index++)
+        if (fake_fds[index] == fd)
+            return fake_names[index] ? fake_names[index] : "?";
+    return NULL;
+}
+
+/*
+ * Answers one question and no other: is rbp consuming what we write into a
+ * faked device, or not? Only reads that actually returned bytes are logged, so
+ * the polling loops that dominate this process stay silent -- their reads come
+ * back empty. The cap is there because a shim that floods the log distorts
+ * rbp's timing badly enough to break DirectFBCreate, which is a real failure
+ * mode of this harness and not a hypothetical one.
+ *
+ * No thread-local state: a __thread guard here pulls in ld-linux-armhf.so.3,
+ * which the firmware rootfs does not have, and rbp then refuses to start.
+ * real_read may still be unresolved when dlsym itself reads, so the raw
+ * syscall is the fallback rather than a null call.
+ */
+
+ssize_t read(int descriptor, void *buffer, size_t length)
+{
+    ssize_t result;
+    const char *name;
+    initialize();
+    if (!real_read)
+        return (ssize_t)syscall(SYS_read, descriptor, buffer, length);
+    result = real_read(descriptor, buffer, length);
+    if (!trace_reads || result <= 0 || traced_lines >= TRACE_READ_LIMIT)
+        return result;
+    name = fake_name_of(descriptor);
+    if (name) {
+        const unsigned char *bytes = buffer;
+        size_t shown = (size_t)result < 8u ? (size_t)result : 8u;
+        size_t index;
+        traced_lines++;
+        fprintf(stderr, "RX3EMU: read %s -> %zd :", name, result);
+        for (index = 0; index < shown; index++)
+            fprintf(stderr, " %02x", bytes[index]);
+        fprintf(stderr, "\n");
+    }
+    return result;
 }
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,

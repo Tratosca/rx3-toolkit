@@ -447,8 +447,11 @@ offset `+4` in each 44-byte `uif::Led` entry.
 
 While a sidecar is being read, both pads blink, then hold their colour once the
 payload is resident and the toggles take effect. The blink uses the firmware's
-own `uif::Led::State` 2 with a 50 ms period rather than a toggle driven from the
-hook, so its cadence does not depend on how often the LED refresh calls back.
+own `uif::Led::State` 2 with a 500 ms period rather than a toggle driven from
+the hook, so its cadence does not depend on how often the LED refresh calls
+back. That period is a half-period: `SubMiconTx::setFullColorLed` lights the LED
+while `floor((now - started_at) / period)` is even, so 500 ms is one second on,
+one second off.
 
 The waveform is not modified. Its internal three-band representation is not the
 PCM buffer processed by `getStreamAt`.
