@@ -5,31 +5,14 @@
 
 ### Added
 
-- The emulator window is watchable. When Pillow is importable the framebuffer is
-  unpacked in C and handed to Tk in memory as a PPM, rather than being encoded
-  to PNG and re-read from disk every tick: 3.5 ms per frame against 220 ms, and
-  the archive PNG that `report.json` cites is now written on a slow tick instead
-  of on every refresh. The pure-stdlib path is unchanged and still the fallback,
-  so a clean clone gains no dependency. Pillow's `BGR;16` widens 5- and 6-bit
-  channels with its own rounding, so a correction table — measured at import,
-  not hard-coded — keeps the two paths identical across all 65 536 RGB565 words.
-- A front-panel strip under the screen: STATUS, BEAT FX, the tabs a profile
-  installs, and the open panel's control row for both decks. The rows are
-  rebuilt when the tab changes, because KEY has three control columns and STEMS
-  two. A test reads the geometry back out of the hook's C and fails if the two
-  copies drift.
-- `--duration 0` runs until the window is closed, so a session can be left open.
-- The physical keys above the screen — SOURCE, BROWSE, TAG LIST, PLAYLIST,
-  SEARCH, MENU, the encoder push, BACK and the two LOAD keys — are injectable,
-  through rbp's own dispatch rather than a synthesised device. `InitUiBrowseKey`
-  registers each into a 230-entry table at `pushKey + index * 16 + 12`, and
-  `UiKey_KeyPush` marking a record is the whole of pressing a key. MENU is held
-  for three seconds, as it is on the deck, because the handler measures the
-  duration. Both entry points are prologue-guarded like every other direct call
-  into rbp.
+- `make payload` assembles the mods into a runnable payload directory: a
+  manifest, the preloaded hook and the assets. That directory is the whole of
+  what this project exposes to anything that runs it — no import, no path and no
+  target reaches the other way. A test reads the performance-row geometry back
+  out of the hook's C and fails if the two copies drift.
 
 - The complete `ui::KeyInput::KeyCode` table, 146 codes with their names, in
-  `docs/rx3-key-codes.md`. Extracted statically from `keyCodeAsText()`, which is
+  REFERENCES.md appendix A. Extracted statically from `keyCodeAsText()`, which is
   a comparison tree over the same 16-bit field the stems feature already reads:
   decompile it, take the (code, pointer) pairs, resolve the pointers in
   `.rodata`. The four pad-mode selectors are `0x4113`–`0x4116` and the eight pads
@@ -38,51 +21,10 @@
   unrelated route. Six codes the decompiler folded into range comparisons were
   read off their guards rather than guessed.
 
-- The emulator window can press rbp's own player keys: the four pad-mode
-  selectors and the eight pads, per deck. These are `PlayerInnards` methods
-  rather than browse-table entries, so pressing one needs a real object and a
-  real `uif::IKeyInput`. The object is latched from the `PlayerInnards`
-  constructor, since no physical key ever arrives under emulation to supply
-  one; the event carries the code at `+8`, the 1-based channel at `+10` and
-  press or release in the low nibble of `+11`, with `ui::KeyInput`'s vtable at
-  `+0` — omitting that vtable segfaulted rbp, because `IKeyInput` is an
-  interface and the handlers call virtual methods on it.
-
-  With this the mod's own pad hooks execute under emulation for the first time:
-  a HOT CUE press produces `pad mode selected: custom panel returned to STATUS`
-  from `hooked_on_key_hot_cue`, which had never once run outside hardware.
-
-- The emulator command channel is a plain file rather than a FIFO. The FIFO
-  needed a rendezvous on both sides and delivery was unreliable in practice —
-  whole runs arrived in which no command was seen at all while every readiness
-  check passed, and holding one descriptor open made it no better. The runner
-  already wrote the same command to `touch.command` and replaced it atomically,
-  so reading that has no rendezvous to miss and nothing to lose; the sequence
-  number was always what distinguished a new command from a re-read.
-
-- The emulator starts far more often, though not reliably. Twelve consecutive
-  runs brought DirectFB up, which was claimed here as fixed; a later control run
-  failed again at 4/10 checks, so the rate improved and the fault did not go
-  away. Treat any single run as evidence only once `directfb_started` is true. The emulator's own command-poll thread
-  was competing with `DirectFBCreate` from the moment the library loaded — the
-  FIFO it used to wait on blocked, so the thread cost nothing during startup,
-  while polling a file costs a wake-up per interval. It now stays quiet for the
-  first eight seconds and polls every 150 ms rather than every 50 ms, which is
-  still well inside a click's reaction time. Nothing can be sent before the
-  window exists anyway.
-
-- The container's shim is built with `-Werror`, as the ARM hook already was.
-  Its absence had just cost six runs out of six: a tracing helper was added
-  whose definition never landed, because the edit matched a signature that had
-  four parameters written as one. The calls compiled anyway on an implicit
-  declaration and every run died at load with `undefined symbol: trace_open`.
-  A warning was the only thing standing between that and a silent, total
-  failure, and it was not being treated as one.
-
-- Pioneer's bitmap font format, decoded, in `docs/rx3-font-format.md`.
-  `NS_FONT_ID_ISO8859_w.bin` has no header and no offset table: it is a flat
-  array of 189-byte cells, 14 x 27 pixels at **4 bpp**, 422 glyphs indexed by
-  `codepoint - 0x20`, covering ASCII, Latin-1, Greek, Cyrillic and the euro
+- Pioneer's bitmap font format, decoded, in REFERENCES.md under "The bitmap
+  font". `NS_FONT_ID_ISO8859_w.bin` has no header and no offset table: it is a
+  flat array of 189-byte cells, 14 x 27 pixels at **4 bpp**, 422 glyphs indexed
+  by `codepoint - 0x20`, covering ASCII, Latin-1, Greek, Cyrillic and the euro
   sign. The file is 42 bytes short of 422 full cells because the last glyph's
   all-zero descender rows are not written. Earlier attempts read it as 1 bpp and
   4 bpp at several widths and got noise; the cell height was the missing piece,
@@ -103,8 +45,8 @@
   `bcmp`, which rbp's libc does not export; the library then fails to load with
   no link error and no warning, because the rewrite happens in the optimiser,
   after every diagnostic the front end could have produced. The symptom looked
-  nothing like the cause: the emulator painted 17 730 non-black pixels, exactly
-  the stock figure, which reads as a startup problem rather than a missing mod.
+  nothing like the cause: a run painted 17 730 non-black pixels, exactly the
+  stock figure, which reads as a startup problem rather than a missing mod.
   `-fno-builtin-memcmp` suppresses the rewrite, and `tests/test_hook_symbols.py`
   now reads the `.dynsym` of both builds — with its own small ELF parser, so no
   external tool is needed — and fails on `bcmp`, on any import outside the set
@@ -113,14 +55,14 @@
   round; it is the first time a test will catch it.
 - The label generator's typeface was refitted against ground truth and is now
   Helvetica Neue **Regular at 22**, not Light at 24. The fourteen BEAT FX
-  captions in `imagedata.dat` segment cleanly into individual letters, giving
+  captions in the caption artwork segment cleanly into individual letters, giving
   nineteen of Pioneer's own capitals — cap height a consistent 16 px with
   `O C G S` overshooting to 17, which is itself evidence they are font
   renderings rather than hand artwork. Sweeping face against size over those
   glyphs, Regular 22 gives 29.3 mean absolute error per pixel where Light 24
   gives 61.3. The earlier fit matched whole-word ink extents, which is a weaker
   signal because weight and size trade against each other and still fit a box.
-- `docs/reference.md` said the pad blink uses a 50 ms period; it is 500 ms, and
+- The reference said the pad blink uses a 50 ms period; it is 500 ms, and
   that is a half-period — one second on, one second off.
 - The performance row is painted once per pass instead of once per intercepted
   draw — 6 draws where there were 331 over the same run. Deciding what to
@@ -133,99 +75,31 @@
 - The green `PATCHED` badge is gone. The `KEY` and `STEMS` tabs already answer
   the question it was there to answer, and the header is Pioneer's again.
 
-- **`UiObjectManager::init()` completes, and `startUp()` runs.** This is the
-  blocker every other emulator limitation hung from, and it was one wrong byte
-  in the shim.
+- The hook finishes a browse key the way rbp does. `BrowseUiIf::InputKey`
+  (`0x000cfc58`) marks the record with `UiKey_KeyPush` and, if it is accepted,
+  posts an eventflag with `set_flg(*0x032671f4, 1)`; `Ui_EventTask`
+  (`0x001e79a0`) consumes it and runs `BrowseKeyProcessing` inside the rest of
+  the transaction — `CheckBrowseRequestCancelCommand`, a 300 ms repeat window,
+  `BrowseCommandCancel`, and the `KeyComplete`/repaint. Calling the handler
+  directly skipped all of that, so the hook now posts the flag and falls back to
+  the direct pump only when the flag id looks uncreated. Whether this moves the
+  browse mode on screen is not demonstrated.
 
-  `common::GpioManager::GpioManager` opens `/dev/gpiodrv`, `lseek`s to the GPIO
-  number and reads one byte, then hands it to a `GpioCallback` through a vtable
-  slot. For `UsbStorageManager` that callback is `handleGpioMessage`, which
-  filters GPIOs `0x7e` and `0xcc` — the USB **over-current** inputs — and
-  forwards them to `notify_over_current`. Those lines are **active-low**:
-  reading 1 returns immediately, reading 0 means a fault and tears the USB
-  stack down through another virtual call and `request_usb_stop`. Our fake
-  `/dev/gpiodrv` was an empty file, so every GPIO read either hit EOF or, once
-  padded, read 0 — a permanent over-current fault, raised during construction,
-  from which `init()` never returned.
+- The update-container codec is gone from `tools/rx3_firmware/`, along with its
+  description in the documentation. The toolkit authors `autoexec.bin` and
+  nothing else, which is what the build engine has always used; a test asserts
+  the removed symbols stay removed, and another fails the build if the container
+  format is described in prose again.
 
-  Filling that file with `1` instead of `0` is the entire fix. Every breadcrumb
-  now balances, `init()` returns, and rbp opens 13 devices instead of 8 —
-  including `/dev/subucom_spi1.0`, `/dev/subucom_spi2.0` and
-  `/dev/tsc2007_2-0048`, i.e. opens #62–64 of the reference trace captured on
-  real hardware. The front-panel micros and the touch panel are open for the
-  first time under emulation.
+- Tools address the files an operator keeps locally by the role they fill, not
+  by a path asserting where they came from, resolved through a gitignored
+  `artifacts.toml`. See `docs/artifacts.md`.
 
-  **Confirmed against the hardware.** Read over telnet from a running RX3, with
-  a stick inserted: GPIO 126 and GPIO 204 both return `1`. The lines do idle
-  high, so the emulator reports what the deck reports and the fix is right
-  rather than merely effective. The same session confirmed the deck runs
-  `/root/pdj/rbp` with no `-a`, where the emulator passes `-a`.
-
-  Found with `--trace-init`, which installs guarded entry/exit breadcrumbs on
-  the constructors `init()` calls: `PcController` entered and left,
-  `UsbStorageManager` entered and never left, and one level down `GpioManager`
-  entered 15 times but left 14. The vtable hop is exactly the edge a static call
-  graph cannot follow, which is why a reverse walk from every blocking primitive
-  had found no path from `init()` to any wait.
+- The emulator moved to its own repository. What remains here is the payload
+  format it consumes.
 
 ### Known issues
 
-- The browse keys dispatch but change nothing on screen. Re-measured now that
-  `init()` completes, and the browse mode is read directly out of `uiBrowse`
-  (`0x0326f8b8`, since `getBrowseMode` is nothing but a `movw`/`movt` and an
-  `ldr`): pressing SOURCE, BROWSE or TAG LIST leaves it at 1, on both routes.
-
-  How rbp itself finishes a browse key is now known, from
-  `BrowseUiIf::InputKey` (`0x000cfc58`): `UiKey_KeyPush` marks the record, and
-  if it is accepted, `set_flg(*0x032671f4, 1)` posts an eventflag. `Ui_EventTask`
-  (`0x001e79a0`) blocks in `wai_flg` on it and, for bit 1, calls
-  `BrowseKeyProcessing` itself — wrapped in the rest of the transaction:
-  `CheckBrowseRequestCancelCommand`, a 300 ms repeat window, `BrowseCommandCancel`
-  and the `KeyComplete`/repaint. Driving the pump directly from the mod's own
-  thread runs the handler and skips all of that. The hook now posts the flag
-  instead, falling back to the direct pump when the flag id looks uncreated, and
-  `--pump {0,1}` forces either route.
-
-  Two things this ruled out. `UiCom_SndR232c` is not a message queue but the
-  serial debug logger — a `vfprintf` behind a verbosity level — so its presence
-  in `ChangeBrowseMode` meant nothing. And `ChangeBrowseMode` (`0x0010167c`)
-  does not change the mode: it writes a pending flag and the requested mode into
-  `browseCommand` at `0x0326906c` and returns 1 unconditionally, so its success
-  never implied anything happened.
-
-  Not yet answered: whether the eventflag route moves the mode at all. The
-  probe that would say so — sampling the mode over a second and reading
-  `browseCommand` beside it, to tell "nobody consumed the request" from "it was
-  consumed and the mode still did not move" — has not yet produced a reading,
-  because the run that carried it failed to paint. Note also that the eventflag
-  **does** exist under emulation (id 17), so the task that consumes it is
-  probably running; and that four earlier measurements were void, two from
-  scripting mistakes and two because `run.sh` defaulted `RX3_EMULATOR_PUMP` to
-  1 while the CLI never passed it through, so the eventflag route had never once
-  executed.
-- Real touch reaches rbp, but only sometimes. The emulator pushes a 6-byte
-  `ts_data` into `/dev/tsc2007_2-0048` under a `<seq> t <x> <y>` verb — layout
-  and calibration from 700 packets captured on hardware, X inverted, eight
-  consecutive samples because `TouchAdValueHysteresis` debounces, then two
-  releases. Breadcrumbs prove the chain works end to end: `TouchPanel::run` is
-  alive, `TouchPanelComm::readFd` fires only when a packet is written, and
-  `solveCoordToKey` — rbp's own resolver, never reached before in this project
-  — has been observed firing.
-
-  What is not reliable is delivery. Whole runs occur in which no command
-  reaches the hook at all, including the coordinate and browse-key verbs that
-  are otherwise dependable, while every readiness check in `report.json`
-  passes. The prime suspect is scheduling rather than the channel: since
-  `startUp()` began running, rbp spawns `SCHED_FIFO` priority-98 threads
-  (`TouchPanel::run` calls `setschedparamFIFO(0x62)`, and the panel comms
-  thread runs at the same priority on a 3 ms timer), and the emulator's poll
-  loop is an ordinary `SCHED_OTHER` thread. Under QEMU with few cores that is
-  enough to starve it. Holding one `O_RDWR` descriptor instead of re-opening
-  per poll was tried and made things no better, so it was reverted to the
-  rendezvous form that has the longer track record.
-- `tools/rx3_emulator/patches.py` (the forced `startUp()` branch) is no longer
-  needed: `init()` returns on its own, so `main` takes that branch unaided. It
-  stays, off by default, as a documented negative result.
 - **The pad row draws no text at all**, so the pad-label template can never be
   captured as designed. Measured: twelve window subtrees issue text draws —
   `0x01 0x02 0x03 0x06 0x07 0x08 0x09 0x0b 0x0c 0x10 0x11 0x16` — and the pad
@@ -233,13 +107,12 @@
   in the source describing the template as a clone of "the stock deck-2 KEY
   label" describes something that does not exist.
 
-- **Pioneer's own artwork settles the style, and it is in `imagedata.dat`.**
-  That file is a table of 44-byte records at offset 0 followed by pixel data —
-  the same record layout the mod already manipulates in memory, with width at
-  `+4`, height at `+6`, format at `+0x18` and the pixel offset at `+0x20`. The
-  first pixel offset is exactly 5581 x 44, and format 2 is RGB565 with the
-  palette offset set to the file length as a no-palette sentinel. Reading it
-  needs nothing new.
+- **Pioneer's own artwork settles the style.** The image table is a run of
+  44-byte records at offset 0 followed by pixel data — the same record layout
+  the mod already manipulates in memory, with width at `+4`, height at `+6`,
+  format at `+0x18` and the pixel offset at `+0x20`. The first pixel offset is
+  exactly 5581 x 44, and format 2 is RGB565 with the palette offset set to the
+  file length as a no-palette sentinel. Reading it needs nothing new.
 
   Ids `0x1439..0x1470` hold the BEAT FX captions at 160x40, and every caption
   ships four variants: dim or white lettering on a black or blue ground. That is
@@ -252,25 +125,14 @@
   the real captions they are 11.1 px and 14.8 px out, so Decker is a display
   face and sazanami the CJK fallback. The UI font is
   `gui/pset/fontdata/NS_FONT_ID_ISO8859_w.bin`, 79 758 bytes in Pioneer's own
-  format — not a linear bitmap at 1 or 4 bits per pixel, so it carries an offset
-  table or per-glyph records and was left undecoded.
+  format — since decoded, above.
 
   Rasterisation was matched rather than the file. Pioneer's glyphs quantise to
   sixteen grey levels, which is 4-bit anti-aliasing, and their vertical stems
   are solid with the anti-aliasing only on curves — hinting. Supersampling
   matched the pixel totals but softened the stems and looked wrong at zoom, so
-  the lettering is drawn once at final size, hinted, in Light to reach their
-  stroke mass, with the coverage quantised to sixteen steps.
-
-  Fitting fourteen of those captions gives the face: **Helvetica Neue Light at
-  24**, at 1.1 px mean error — closer to Pioneer's own bitmap font than either
-  TrueType Pioneer ships, which suggests theirs was rasterised from Helvetica or
-  a metric clone of it. Earlier text here said Helvetica Neue at 23;
-  reproducing Pioneer's widths to 1.3 px mean. An earlier fit against the
-  KEY/STEMS tab artwork had chosen Arial Narrow Bold, which is 10.6 px out — the
-  tab strip is the project's own drawing, not Pioneer's, and was never a valid
-  reference. The generated labels now sit beside the stock ones essentially
-  indistinguishable.
+  the lettering is drawn once at final size, hinted, to reach their stroke mass,
+  with the coverage quantised to sixteen steps.
 
 - **Cloning does not carry the font.** With the donor made selectable, four
   different donor subtrees were captured successfully and every one rendered the
@@ -294,6 +156,10 @@
   layers is identified, the drawing code inherits those colours rather than
   guessing at them — which is also the explanation for an older note in the
   source that every literal colour "looked foreign".
+
+  The eight prepared tab bitmaps are still shipped and still loaded at run time,
+  because that colour question is what stands between the row and being drawn
+  entirely from the host's own model. They go when it is answered.
 
 ## 0.5.2
 
