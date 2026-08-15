@@ -5,7 +5,7 @@
 Both hook builds are `-nostdlib` shared objects that resolve their imports
 against whatever rbp already has loaded. An import rbp does not export is not a
 link error and not a warning: the library simply fails to load at run time, the
-mod goes silent, and the emulator paints stock output that looks like a
+mod goes silent, and what is drawn is stock output that looks like a
 different bug entirely. That failure has cost this project two long debugging
 rounds -- once on a missing definition in the shim, once on `bcmp`.
 
@@ -26,7 +26,7 @@ import unittest
 
 REPOSITORY = pathlib.Path(__file__).resolve().parent.parent
 BUILD = REPOSITORY / "build"
-HOOKS = ("librx3_core.so", "librx3_core_emulator.so")
+HOOKS = ("librx3_core.so", "librx3_core_payload.so")
 
 # Everything rbp itself is known to export. A new name here is a deliberate
 # decision -- confirm rbp really provides it before adding one.
@@ -84,7 +84,7 @@ class HookSymbolTests(unittest.TestCase):
         # Build rather than trusting whatever is lying in build/, so the test
         # measures the Makefile's current flags and not a stale artefact.
         result = subprocess.run(
-            ["make", "hook", "emulator-hook"],
+            ["make", "hook", "payload-hook"],
             cwd=REPOSITORY, capture_output=True, text=True,
         )
         if result.returncode != 0:
