@@ -3,12 +3,14 @@
 
 from pathlib import Path
 from struct import pack_into, unpack_from
+from sys import path as import_path
+
+import_path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from rx3_artifacts import resolve  # noqa: E402
 
 
 RBP = Path("/tmp/rx3-rbp-live")
-IMAGE_DATA = Path(
-    "local/firmware/rx3/extracted/119/gui/pset/imagedata/imagedata.dat"
-)
 FUNCTION_FILE_OFFSET = 0x001C992C
 STOCK_COUNT = 0x15CD
 EXTENDED_COUNT = 0x1604
@@ -26,7 +28,7 @@ def main() -> None:
     # movw r3,#0x15cc -> movw r3,#0x1603 (little-endian ARM words).
     assert int.from_bytes(bytes.fromhex("033601e3"), "little") == 0xE3013603
 
-    source = IMAGE_DATA.read_bytes()
+    source = resolve("imagedata").read_bytes()
     official_end = STOCK_COUNT * 44
     assert min(
         unpack_from("<I", source, image * 44 + 0x20)[0]
