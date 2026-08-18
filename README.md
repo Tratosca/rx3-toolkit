@@ -57,6 +57,55 @@ broken fax going up. Our brand new AI-generated pitch shifter algorithm is exact
 Beat Jump gets a new **32-beat** mode. Repeated presses also fire
 straight away instead of waiting for the grid to catch up.
 
+# Now Playing export
+
+Exposes the track loaded on each deck so a computer can display it — for OBS,
+VJ overlays, or track ID logging — while the RX3 plays standalone, with no
+rekordbox and no PRO DJ LINK.
+
+The code lives in the performance core's shared object; this module only decides
+whether it runs. It **patches nothing**: it rides the core's existing per-deck
+`track_did_load` dispatch, so selecting or dropping it never alters `rbp`'s
+executable words. Pull the stick and the player is stock.
+
+## What it does
+
+On every deck load the core hands the module the deck index and the loaded
+track's file path (the first field of `track_info`, the same datum the stems
+module reads). The module keeps the current path per deck and publishes both:
+
+* writes `/tmp/rx3-nowplaying.txt` on the device, and
+* UDP-broadcasts them on port **50123** to `255.255.255.255` and the APIPA
+  directed broadcast `169.254.255.255`, so a computer connected to the rear
+  computer USB type-B port (which exposes an Ethernet interface in the
+  `169.254.x.y` range) receives them without a telnet login.
+
+A 2-second beacon re-broadcasts the current state so a computer that connects
+after a track was loaded still catches up.
+
+## Wire format
+
+One UTF-8 datagram, newline-separated. A leading heartbeat line lets a listener
+confirm the module is alive before any track is loaded:
+
+    hb        RX3 nowplaying alive
+    0 <deck 1 file path>
+    1 <deck 2 file path>
+
+The file path is what the RX3 loaded (e.g. a rekordbox export path); a consumer
+typically derives artist/title from the basename.
+
+## Reading it on a computer
+
+Any UDP listener bound to port 50123 works. Allow inbound UDP 50123 through the
+computer's firewall.
+
+## Enabling
+
+Off by default. Select it in the app, or:
+
+    make autoexec KEY=/path/to/aes256.key MODULES="nowplaying"
+
 ### 🔌 Lives on the USB stick, not in the player
 
 Everything runs from the stick and disappears when the power goes off. Any RX3 you plug your stick on will be modded. Nothing

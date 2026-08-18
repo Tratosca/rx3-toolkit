@@ -1,0 +1,18 @@
+{
+  "id": "nowplaying",
+  "name": "Now Playing export",
+  "description": "Writes each deck's loaded track path to /tmp/rx3-nowplaying.txt for a computer to read over the USB-Ethernet link.",
+  "firmware": "1.19",
+  "default": false,
+  "order": 45,
+  "runtime_directory": "nowplaying",
+  "namespace": "nowplaying",
+  "requires": ["core"],
+  "conflicts": [],
+  "files": [
+    { "source": "module.sh", "target": "module.sh", "executable": false }
+  ],
+  "build_files": [
+    "rx3_nowplaying_feature.h"
+  ]
+}

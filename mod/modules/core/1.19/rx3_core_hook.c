@@ -322,7 +322,13 @@ static void keyshift_feature_track_did_load(unsigned int deck, void *reader,
 static const struct rx3_panel_feature keyshift_panel;
 static const struct rx3_panel_feature stems_panel;
 
-#define RUNTIME_FEATURE_COUNT 2u
+static int nowplaying_feature_configured(void);
+static int nowplaying_feature_install(void);
+static void nowplaying_feature_remove(void);
+static void nowplaying_feature_track_did_load(unsigned int deck, void *reader,
+                                              const void *track_info);
+
+#define RUNTIME_FEATURE_COUNT 3u
 
 static struct rx3_runtime_feature runtime_features[RUNTIME_FEATURE_COUNT] = {
     {
@@ -337,6 +343,12 @@ static struct rx3_runtime_feature runtime_features[RUNTIME_FEATURE_COUNT] = {
         stems_feature_configured, stems_feature_install,
         stems_feature_remove, stems_feature_track_will_load,
         stems_feature_track_did_load, 0, 0, stems_feature_destroy_deck
+    },
+    {
+        "nowplaying", 0, 0,
+        nowplaying_feature_configured, nowplaying_feature_install,
+        nowplaying_feature_remove, 0, nowplaying_feature_track_did_load,
+        0, 0, 0
     }
 };
 
@@ -1967,6 +1979,7 @@ static void apply_mix(struct stems_deck_context *context,
 /* Shared hook replacement. Feature-specific hooks are composed below. */
 #include "../../keyshift/1.19/rx3_keyshift_feature.h"
 #include "../../stems/1.19/rx3_stems_feature.h"
+#include "../../nowplaying/1.19/rx3_nowplaying_feature.h"
 
 static int hooked_load(void *reader, const void *track_info)
 {
