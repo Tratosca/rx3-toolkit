@@ -259,7 +259,7 @@ point the app at it in the next step.
 ### 5. Build the file for your stick
 
 Now that the hard part is done, in the **Modules installation** tab: pick firmware `1.19`, choose the modules you want, pick what step 4 produced, pick the
-**root of your Rekordbox stick** as the destination, then **Mod your RX3 !**.
+**root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
 
 Here is what you are choosing from:
 
@@ -285,7 +285,7 @@ genuinely need another one to work.
 > [!WARNING]
 > **Diagnostic Telnet** is off by default and should stay that way unless you
 > know why you want it. The traffic is unencrypted, and it is reachable through
-> the rear computer USB port. The root password won't be provided here. 
+> the rear computer USB port. The root password won't be provided here.
 
 Eject the stick
 properly. It should now look like:
@@ -389,7 +389,7 @@ music and your stems can stay.
 
 It happens that, by Pioneer design, the RX3 (and probably other boards too), which is based on Linux, looks at every USB stick you insert to see whether it carries an `autoexec.bin` file, and if that file decrypts with a specific key contained inside the player, it runs the script inside. That is the manufacturer's own maintenance mechanism, and it runs that script as the full privileged **root** account inside the player, so we can do basically anything a Linux system can do.
 
-The whole player interface is one Linux program called `rbp` (Rekordbox Portable ?), and when you boot the RX3, it's copied *in a temporary memory* to be used from there. That is done at every startup. Our script patches that live copy, and the new features are simply code running inside the player, using the player's own fonts, images and pads. Nothing is written to the permanent storage. Cut the power and the RAM forgets the whole affair, and next startup will have to copy the stock `rbp` to RAM again for the player to run. 
+The whole player interface is one Linux program called `rbp` (Rekordbox Portable?), and when you boot the RX3, it's copied *in a temporary memory* to be used from there. That is done at every startup. Our script patches that live copy, and the new features are simply code running inside the player, using the player's own fonts, images and pads. Nothing is written to the permanent storage. Cut the power and the RAM forgets the whole affair, and next startup will have to copy the stock `rbp` to RAM again for the player to run.
 
 "Patching" here means two things. A handful of individual and precise bytes are rewritten in place: that is all a beat jump of 32 instead of 8 really is. Everything bigger arrives as a *shared library* that gets preloaded next to `rbp` and hooks its functions from the inside, which is how you end up with vocals, instrumentals and a key shifter in a player that shipped with none of the three.
 
@@ -458,7 +458,7 @@ to carry on being a DJ player.
 
 There is nothing installed. Pull the stick and the unit is stock. But after a
 firmware change, do not assume the toolkit still works — only use versions listed
-as supported. **If you do update, do one clean boot cycle without the mod stick first, just in case**.  
+as supported. **If you do update, do one clean boot cycle without the mod stick first, just in case**.
 </details>
 
 ---
@@ -469,13 +469,13 @@ What is being worked on next. No dates, no promises but this is the direction.
 
 | | What it would give you | Status |
 | --- | --- | :--: |
-| **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang  | 💡 Planned |
+| **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang | 💡 Planned |
 | **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 💡 Planned |
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
 | **Polished interface** | Real icons, text and artwork for everything the mod adds, matching the stock look | 🚧 In progress |
 | **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
 
-Want one of these sooner ? Or something else ? Say so in an issue, or build it yourself (see
+Want one of these sooner? Or something else? Say so in an issue, or build it yourself (see
 [Contributing](#contributing)).
 
 ---

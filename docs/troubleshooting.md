@@ -118,7 +118,7 @@ The vocal pad works, the instrumental pad does not, and the vocal is as loud as
 ever rather than merely leaking. The stem and the audio the deck plays are on
 different timelines.
 
-You used an older version: please generate the track again with a current version. 
+You used an older version: please generate the track again with a current version.
 An MP3 or AAC file declares samples its encoder prepended, which FFmpeg drops but the deck plays; a sidecar
 built without accounting for them sits about 25 ms early, which is far more than
 subtraction tolerates. Releases before this handling shipped are affected only
