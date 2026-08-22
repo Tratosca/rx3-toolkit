@@ -5,6 +5,10 @@
 
 ### Added
 
+- `make new-module ID=<id>` writes the manifest, the shell contract, the guards and the README a module is made of, namespaced and ordered. `CORE=1` writes the performance-core variant as well, with the feature header and the `module.sh` that declines when the core is not selected. These four names and the order field were discoverable only by reading a neighbouring module, and a guard copied that way landed where `make test` does not look for it.
+
+- A pull request template carrying the sections a reviewer reads, Summary, Changes, Testing and Legal, and the two prose rules a contribution is most often sent back for.
+
 - `make payload` assembles the mods into a runnable payload directory: a manifest, the preloaded hook and the assets. That directory is the whole of what this project exposes to anything that runs it. No import, no path and no target reaches the other way. A test reads the performance-row geometry back out of the hook's C and fails if the two copies drift.
 
 - The complete `ui::KeyInput::KeyCode` table, 146 codes with their names, in REFERENCES.md appendix A. Extracted statically from `keyCodeAsText()`, which is a comparison tree over the same 16-bit field the stems feature already reads: decompile it, take the (code, pointer) pairs, resolve the pointers in `.rodata`. The four pad-mode selectors are `0x4113`-`0x4116` and the eight pads `0x4117`-`0x411e`; the extraction independently reproduces `Pad7 = 0x411d` and `Pad8 = 0x411e`, the two values the mod already had hard-coded from an unrelated route. Six codes the decompiler folded into range comparisons were read off their guards rather than guessed.
@@ -20,6 +24,8 @@
 - The performance row is painted once per pass instead of once per intercepted draw: 6 draws where there were 331 over the same run. Deciding what to replace was also keyed on the deck's window, which a deck shares with its info strip; it now keys on the widget subtree that actually owns the pads, so nothing outside the row is intercepted on the way past.
 
 ### Changed
+
+- `tests/test_mod_generator.py` no longer holds the list of modules. It derives what it expects from the directories on disk and checks the properties that matter, that every manifest is discovered and that the load order puts a dependency before its dependent. CONTRIBUTING.md promised that adding a module needed no edit elsewhere; that list was the edit, and it failed on the first outside contribution that added one.
 
 - The `PATCHED` badge is gone. The `KEY` and `STEMS` tabs already answer the question it was there to answer, and the header is Pioneer's again.
 

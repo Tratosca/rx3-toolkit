@@ -19,41 +19,66 @@ def load_firmware_codec():
     return module
 
 
+def dependencies_met_late(patches):
+    """Modules a caller would meet before the module they depend on."""
+    offences = []
+    seen = set()
+    for patch in patches:
+        offences += [
+            f"{patch.patch_id} precedes {required}"
+            for required in patch.requires
+            if required not in seen
+        ]
+        seen.add(patch.patch_id)
+    return offences
+
+
 class ModGeneratorTests(unittest.TestCase):
-    def test_manifests_are_versioned_and_unique(self):
+    def test_every_module_directory_is_discovered(self):
+        """Adding a module is adding its directory, and nothing else.
+
+        Nothing here may name the modules. A list to edit is a step a
+        contributor is not told about until a test they did not write fails on
+        it, and CONTRIBUTING.md promises that step does not exist.
+        """
         patches = discover_patches(REPOSITORY, "1.19")
-        self.assertEqual(
-            [patch.patch_id for patch in patches],
-            [
-                "core",
-                # decoder-sleep precedes the beat jump modules that now require
-                # it: the build engine enforces dependency-first manifest order.
-                "decoder-sleep",
-                "beatjump-32bars",
-                "beatjump-no-quantize",
-                "keyshift",
-                "stems",
-                "telnet",
-                "logging",
-            ],
+        on_disk = sorted(
+            path.parent
+            for path in (REPOSITORY / "mod/modules").glob("*/1.19/manifest.json")
         )
-        self.assertTrue(all(patch.directory.name == patch.firmware for patch in patches))
-        self.assertFalse(next(patch for patch in patches if patch.patch_id == "telnet").default)
+        self.assertTrue(on_disk, "no module manifest was found to check")
+        self.assertEqual(sorted(patch.directory for patch in patches), on_disk)
+        for patch in patches:
+            with self.subTest(module=patch.patch_id):
+                self.assertEqual(patch.directory.name, patch.firmware)
+                self.assertEqual(
+                    patch.directory.parent.name, patch.patch_id,
+                    "a module directory is named after the id its manifest declares",
+                )
+
+    def test_the_discovered_order_is_dependency_first(self):
+        """`resolve_patches` filters this order rather than sorting again, so a
+        dependency landing after its dependent is also loaded after it."""
+        self.assertEqual(
+            dependencies_met_late(discover_patches(REPOSITORY, "1.19")), []
+        )
+
+    def test_the_order_guard_would_actually_catch_a_regression(self):
+        """A guard nobody has seen fail is a guard nobody knows works."""
+        patches = discover_patches(REPOSITORY, "1.19")
         core = next(patch for patch in patches if patch.patch_id == "core")
-        self.assertFalse(core.selectable)
+        keyshift = next(patch for patch in patches if patch.patch_id == "keyshift")
         self.assertEqual(
-            next(patch for patch in patches if patch.patch_id == "keyshift").requires,
-            ("core",),
+            dependencies_met_late([keyshift, core]), ["keyshift precedes core"]
         )
-        self.assertEqual(
-            next(patch for patch in patches if patch.patch_id == "stems").requires,
-            ("core",),
-        )
-        for identifier in ("beatjump-32bars", "beatjump-no-quantize"):
-            self.assertEqual(
-                next(patch for patch in patches if patch.patch_id == identifier).requires,
-                ("decoder-sleep",),
-            )
+
+    def test_what_the_application_offers_and_what_it_does_not(self):
+        """Two decisions the manifests carry that a reader cannot infer."""
+        patches = discover_patches(REPOSITORY, "1.19")
+        core = next(patch for patch in patches if patch.patch_id == "core")
+        self.assertFalse(core.selectable, "the core is a service, not a feature to pick")
+        telnet = next(patch for patch in patches if patch.patch_id == "telnet")
+        self.assertFalse(telnet.default, "a shell on the deck is never open unless asked for")
 
     def test_dependency_resolution_is_explicit_and_stable(self):
         patches = discover_patches(REPOSITORY, "1.19")

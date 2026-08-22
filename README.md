@@ -395,7 +395,9 @@ Want one of these sooner? Or something else? Say so in an issue, or build it you
 
 ## Contributing
 
-Pull requests welcome — new modules, support for future firmware, reverse-engineering notes, UI work, faster separation, testing on other systems, or just better docs. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Pull requests welcome: new modules, support for future firmware, reverse-engineering notes, UI work, faster separation, testing on other systems, or just better docs. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
+A new module starts with one command, `make new-module ID=your-module`, which writes the files it is made of. `make hook test preflight` then runs everything CI will.
 
 **Reporting a bug?** Enable the logging module on the mod, reproduce the bug, include your firmware version, your OS, the toolkit version, `RX3_RUNTIME/session.txt` log, and the steps to reproduce. For stem problems, add the model, the quality preset, your CPU/GPU, and whether it affects one track or all of them.
 

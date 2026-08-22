@@ -40,7 +40,7 @@ LDFLAGS := -fuse-ld=lld -shared -nostdlib \
 
 .DEFAULT_GOAL := help
 
-.PHONY: help hook payload-hook autoexec app payload test preflight clean
+.PHONY: help hook payload-hook autoexec app payload new-module test preflight clean
 
 help:
 	@printf '%s\n' \
@@ -51,6 +51,8 @@ help:
 	  'make app                          open the XDJ-RX3 Toolkit' \
 	  'make payload                      assemble the mods into a runnable payload' \
 	  'make payload VARIANT=keyshift     assemble one variant only' \
+	  'make new-module ID=browse-lock    write the files a new module is made of' \
+	  'make new-module ID=x CORE=1       ... one that reacts while a track plays' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
@@ -85,6 +87,14 @@ app:
 payload: payload-hook
 	$(PYTHON) -m tools.rx3_payload.cli --variant "$(VARIANT)" \
 	  --output "$(PAYLOAD_DIR)" --version "$(VERSION)"
+
+# A module is four files whose names, namespacing and order field are
+# conventions. Guessing them from a neighbouring module is how a guard ends up
+# where `make test` does not look for it.
+new-module:
+	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock' >&2; exit 2; }
+	$(PYTHON) -m tools.rx3_runtime.scaffold --id "$(ID)" --name "$(NAME)" \
+	  --firmware "$(FIRMWARE)" $(if $(CORE),--core,)
 
 test:
 	@set -e; for guard in $(MODULE_GUARDS); do $(PYTHON) "$$guard"; done

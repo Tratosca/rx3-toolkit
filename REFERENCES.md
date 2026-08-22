@@ -92,7 +92,7 @@ Each feature is a directory under a firmware version, described by a `manifest.j
 | `build_files` | headers this module owns at compile time |
 | `arm_hook` | the ARM source and target this module compiles, if any |
 
-The build resolves dependencies, rejects cycles and conflicts, and writes the resolved load order into the image. Asking for one feature therefore pulls in the internal core it depends on, without the caller having to know.
+The build resolves dependencies, rejects cycles and conflicts, and writes the resolved load order into the image. Asking for one feature therefore pulls in the internal core it depends on, without the caller having to know. `make new-module ID=<id>` writes a directory that already satisfies the whole of the above, described in [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-module).
 
 ### The orchestrator
 
