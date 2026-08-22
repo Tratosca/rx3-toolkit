@@ -29,6 +29,8 @@
 
 - The scripts that model the player left this repository, for the unpublished one that holds the emulator: the pitch and UI harnesses, the shifter measurement, the image-table model, the Ghidra scripts, and the resolver that fed them. Nothing here imported any of it. What stays in `tools/rx3_firmware/` is `firmware_image.py`, which the build uses to author `autoexec.bin`.
 
+- The two teardown paths of the hook are one function. The installer's error exit and the destructor each carried their own copy of the same twenty calls, in the same order, so adding a hook and updating one copy left that hook installed on the path that only runs once something has already gone wrong. **Not yet run on hardware:** the generated code changes, so the acceptance sequence in CONTRIBUTING.md applies before this ships.
+
 - Three constants the hook defined and never used are gone: an LED state, a visibility timeout, and a file mode. Both libraries hash the same before and after, so nothing on a deck can tell the difference.
 
 - The test suite is cut to what it is for: 143 tests to 64, 3807 lines to 2424, and under six seconds to run. What stays fails when a deck would misbehave, when a stick or a track would be damaged, when the mod would load and silently do nothing, or when a commitment in LEGAL.md would break. What went was coverage: an estimator for a progress bar, a matrix of accelerator profiles restating a table the code reads, window theming, and a set of interface closures that replayed the dependency resolution already pinned elsewhere.

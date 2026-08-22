@@ -2755,6 +2755,34 @@ static void remove_features(void)
 
 /* Lifecycle. */
 
+/* Both teardown paths take the same hooks out in the same order: the error exit
+   of the installer, and the destructor. They were two copies, so adding a hook
+   and updating only one of them left that hook installed on the path nobody
+   exercises until something has already gone wrong. */
+static void uninstall_performance_hooks(void)
+{
+    configure_native_performance_touches(0);
+    remove_features();
+    uninstall_hook(&touch_xpad_hold_hook);
+    uninstall_hook(&touch_xpad_off_hook);
+    uninstall_hook(&touch_xpad_on_hook);
+    uninstall_hook(&touch_toggle_off_hook);
+    uninstall_hook(&touch_toggle_on_hook);
+    uninstall_hook(&touch_button_off_hook);
+    uninstall_hook(&touch_button_hold_hook);
+    uninstall_hook(&touch_button_on_hook);
+    uninstall_hook(&beatfx_xpad_ctor_hook);
+    uninstall_hook(&beat_jump_hook);
+    uninstall_hook(&slip_loop_hook);
+    uninstall_hook(&beat_loop_hook);
+    uninstall_hook(&hot_cue_hook);
+    uninstall_hook(&set_beatfx_hook);
+    uninstall_hook(&touch_hook);
+    uninstall_hook(&draw_image_hook);
+    uninstall_hook(&draw_text_hook);
+    uninstall_hook(&load_hook);
+}
+
 __attribute__((constructor)) static void initialize(void)
 {
     /* Each feature is a module of its own and announces itself through the
@@ -2918,26 +2946,7 @@ __attribute__((constructor)) static void initialize(void)
     return;
 
 reject_performance_hooks:
-    configure_native_performance_touches(0);
-    remove_features();
-    uninstall_hook(&touch_xpad_hold_hook);
-    uninstall_hook(&touch_xpad_off_hook);
-    uninstall_hook(&touch_xpad_on_hook);
-    uninstall_hook(&touch_toggle_off_hook);
-    uninstall_hook(&touch_toggle_on_hook);
-    uninstall_hook(&touch_button_off_hook);
-    uninstall_hook(&touch_button_hold_hook);
-    uninstall_hook(&touch_button_on_hook);
-    uninstall_hook(&beatfx_xpad_ctor_hook);
-    uninstall_hook(&beat_jump_hook);
-    uninstall_hook(&slip_loop_hook);
-    uninstall_hook(&beat_loop_hook);
-    uninstall_hook(&hot_cue_hook);
-    uninstall_hook(&set_beatfx_hook);
-    uninstall_hook(&touch_hook);
-    uninstall_hook(&draw_image_hook);
-    uninstall_hook(&draw_text_hook);
-    uninstall_hook(&load_hook);
+    uninstall_performance_hooks();
     original_touch_xpad_hold = 0;
     original_touch_xpad_off = 0;
     original_touch_xpad_on = 0;
@@ -2961,26 +2970,7 @@ reject_performance_hooks:
 __attribute__((destructor)) static void finalize(void)
 {
     state_thread_running = 0;
-    configure_native_performance_touches(0);
-    remove_features();
-    uninstall_hook(&touch_xpad_hold_hook);
-    uninstall_hook(&touch_xpad_off_hook);
-    uninstall_hook(&touch_xpad_on_hook);
-    uninstall_hook(&touch_toggle_off_hook);
-    uninstall_hook(&touch_toggle_on_hook);
-    uninstall_hook(&touch_button_off_hook);
-    uninstall_hook(&touch_button_hold_hook);
-    uninstall_hook(&touch_button_on_hook);
-    uninstall_hook(&beatfx_xpad_ctor_hook);
-    uninstall_hook(&beat_jump_hook);
-    uninstall_hook(&slip_loop_hook);
-    uninstall_hook(&beat_loop_hook);
-    uninstall_hook(&hot_cue_hook);
-    uninstall_hook(&set_beatfx_hook);
-    uninstall_hook(&touch_hook);
-    uninstall_hook(&draw_image_hook);
-    uninstall_hook(&draw_text_hook);
-    uninstall_hook(&load_hook);
+    uninstall_performance_hooks();
     for (unsigned int i = 0; i < 2u; i++) {
         for (unsigned int feature = 0;
              feature < RUNTIME_FEATURE_COUNT; feature++)
