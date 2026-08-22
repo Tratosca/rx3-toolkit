@@ -57,4 +57,4 @@ Two rules hold across all of it.
 
 ---
 
-How the on-screen additions are rendered, how the image table is extended, and the palette question that is still open: [Reference → The display](../../../../REFERENCES.md#4-the-display).
+How the on-screen additions are rendered, how the image table is extended, and the palette question that is still open: [Reference: the display](../../../../REFERENCES.md#4-the-display).
