@@ -503,7 +503,7 @@ would emit an inverted vocal. A 256-frame linear ramp covers each state change.
 
 ### Stems file format
 
-To encure perfect phase cancellation when playing only the instrumental, the stems needs to be PCM, that's whay they're heavier than the original audio files. 
+To encure perfect phase cancellation when playing only the instrumental, the stems needs to be PCM, that's whay they're heavier than the original audio files.
 
 A 64-byte little-endian header followed by interleaved stereo vocal audio:
 

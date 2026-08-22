@@ -193,7 +193,7 @@ At this point, the XDJ-RX3 source tree has been extracted.
 
 ## 5. Extract the filesystem
 
-Find it first: 
+Find it first:
 
 ### macOS / Linux
 
@@ -207,7 +207,7 @@ find . -type f -name initramfs.tar.gz
 Get-ChildItem -Recurse -Filter initramfs.tar.gz
 ```
 
-If the archive is there, unpack it and you're done: 
+If the archive is there, unpack it and you're done:
 
 ```bash
 mkdir ../initramfs
