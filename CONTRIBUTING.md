@@ -83,13 +83,15 @@ Static tests do not cover the device. Run this sequence before claiming a runtim
 
 ## Adding a module
 
-Start with the performance core, because whether your idea needs it decides everything else.
+### The performance core
 
 It is one shared object, `librx3_core.so`, built from `mod/modules/core/<firmware>/rx3_core_hook.c` and preloaded into the player's application. Its code runs inside that application, so it can intercept what the application does while it plays: a track being loaded, audio being pulled, a pad being pressed, the screen being drawn. It installs those interceptions once and hands them to whichever features are switched on.
 
 A feature is not a program of its own, and not a library of its own. It is C compiled into that same shared object, reached through the lifecycle contract in `rx3_feature_api.h`: `configured`, `install`, `remove`, and whichever callbacks it wants. Key shift and stems are the two that exist. So a core feature ships no code of its own to the deck. Its `module.sh` exports an environment flag, the core reads that flag and runs the feature, and the module declines when the core is not selected. The build pulls the core in through `requires`, which is why nobody picks it directly. [Its own README](mod/modules/core/1.19/README.md) covers the rest.
 
-That gives three shapes. The question is what your idea has to do, not what our internals are called.
+### Which shape your idea has
+
+The question is what your idea has to do, not what our internals are called.
 
 | What it has to do | What that makes it |
 | --- | --- |
@@ -97,14 +99,16 @@ That gives three shapes. The question is what your idea has to do, not what our 
 | Run alongside the application, without ever seeing inside it | a plain module, the way session logging and the diagnostic shell are |
 | Rewrite a few fixed bytes in the application, always on once applied | a byte patch, the way Beat Jump 32 is. It also has to clear the evidence bar under [Supporting another firmware build](#supporting-another-firmware-build) |
 
-Then write the files. The command produces the manifest, the shell contract, the guards and the README, correctly named and correctly namespaced:
+### Writing the files
+
+The command produces the manifest, the shell contract, the guards and the README, correctly named and correctly namespaced:
 
 ```sh
 make new-module ID=browse-lock NAME="Browse lock"
 make new-module ID=browse-lock NAME="Browse lock" CORE=1
 ```
 
-`CORE=1` is the first row. It also writes the feature header and the `module.sh` that declines when the core is not selected. The other two rows take the plain form.
+`CORE=1` is the first row above. It also writes the feature header and the `module.sh` that declines when the core is not selected. The other two rows take the plain form.
 
 It prints what to fill in, and for a core feature the edits `mod/modules/core/<firmware>/rx3_core_hook.c` needs. It refuses to touch a module that already exists, so if you picked the wrong shape before filling anything in, delete the directory and run it again.
 
