@@ -13,9 +13,6 @@
 # Private laboratory material
 /local/
 /work/
-# Maps artifact roles to paths on this machine. Never tracked: it is the one
-# file that says anything about where an operator keeps their own files.
-/artifacts.toml
 *.UPD
 *.upd
 *.iso
