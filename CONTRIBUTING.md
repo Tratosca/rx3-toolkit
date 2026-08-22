@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Contributing
 
 Contributions are limited to original source code, tests, and RX3

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 <h1 align="center">
   XDJ-RX3 Toolkit
 </h1>

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # 🔌 Diagnostic Telnet access
 
 Opens a shell on the player, over the rear computer USB port, for poking around.

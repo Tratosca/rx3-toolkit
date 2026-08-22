@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # 📝 Session logging
 
 Writes down what happened, onto the stick, so a bug report has something in it.

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # ⚡ No more wait between beatjumps
 
 The helper module. Nothing to see, nothing to press — it just makes the two Beat
