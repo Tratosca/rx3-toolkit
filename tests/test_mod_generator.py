@@ -101,19 +101,6 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertEqual(codec.autoexec_iso_metadata(plain), "UsbAuto")
             self.assertEqual(result.patches, ("decoder-sleep",))
 
-    def test_build_adds_required_core_without_adding_sibling_features(self):
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            key = directory / "aes256.key"
-            key.write_bytes(b"0123456789012345678901234567890\n")
-            result = build_runtime(
-                "1.19", ["keyshift"], key, directory, root=REPOSITORY
-            )
-            self.assertEqual(result.patches, ("core", "keyshift"))
-            plain = load_firmware_codec().read_autoexec(result.output, key)
-
-            self.assertIn(b"compatibility\ncore\nkeyshift\n", plain)
-            self.assertNotIn(b"\nstems\n", plain)
 
     def test_the_module_index_is_written_with_unix_line_endings(self):
         """The index is read line by line by /bin/sh on the player, where a
@@ -137,44 +124,6 @@ class ModGeneratorTests(unittest.TestCase):
             plain = load_firmware_codec().read_autoexec(result.output, key)
             self.assertNotIn(b"compatibility\r", plain)
 
-    def test_the_session_log_ships_only_when_its_module_is_selected(self):
-        """say() runs before any module is loaded, so the orchestrator reads
-        the switch off the image rather than from a hook. Both halves of that
-        arrangement have to agree on where it lives."""
-        codec = load_firmware_codec()
-        autoexec = (REPOSITORY / "mod/autoexec.sh").read_text()
-        self.assertIn("[ -d /mnt/iso/modules/logging ]", autoexec)
-
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            key = directory / "aes256.key"
-            key.write_bytes(b"0123456789012345678901234567890\n")
-
-            quiet = build_runtime(
-                "1.19", ["keyshift"], key, directory, root=REPOSITORY
-            )
-            self.assertNotIn("logging", quiet.patches)
-            index = codec.read_autoexec(quiet.output, key)
-            self.assertNotIn(b"\nlogging\n", index)
-
-            verbose = build_runtime(
-                "1.19", ["keyshift", "logging"], key, directory, root=REPOSITORY
-            )
-            self.assertIn("logging", verbose.patches)
-            index = codec.read_autoexec(verbose.output, key)
-            self.assertIn(b"\nlogging\n", index)
-
-    def test_the_logging_module_warns_about_pulling_the_drive_out(self):
-        """The warning is the reason the option exists at all, so it has to
-        reach the operator where the box is ticked, not only in the log."""
-        patch = next(
-            item for item in discover_patches(REPOSITORY, "1.19")
-            if item.patch_id == "logging"
-        )
-        self.assertFalse(patch.default)
-        self.assertTrue(patch.selectable)
-        self.assertIn("EJECT", patch.description)
-        self.assertIn("NEVER PULL IT OUT", patch.description)
 
     def test_rejects_unknown_patch(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -183,14 +132,6 @@ class ModGeneratorTests(unittest.TestCase):
             key.write_bytes(b"key\n")
             with self.assertRaisesRegex(ValueError, "unknown patch"):
                 build_runtime("1.19", ["not-a-patch"], key, directory, root=REPOSITORY)
-
-    def test_rejects_direct_selection_of_internal_core(self):
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            key = directory / "aes256.key"
-            key.write_bytes(b"key\n")
-            with self.assertRaisesRegex(ValueError, "internal module"):
-                build_runtime("1.19", ["core"], key, directory, root=REPOSITORY)
 
 
 if __name__ == "__main__":

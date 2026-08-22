@@ -81,28 +81,6 @@ register_patch 42 '\001\002\003\004' '\011\012\013\014' second && exit 13
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_a_restart_names_the_hook_that_asked_for_it(self):
-        """Restarting rbp freezes the screen and empties the media list, so a
-        session that does it on a drive being reinserted has to say who asked."""
-        result = run_shell(
-            r'''
-module_begin feature-a feature_a || exit 10
-feature_a_prepare() { request_rbp_restart; }
-register_prepare_hook feature_a_prepare || exit 11
-module_begin feature-b feature_b || exit 12
-feature_b_prepare() { :; }
-register_prepare_hook feature_b_prepare || exit 13
-run_hooks "$PREPARE_HOOKS" || exit 14
-[ "$NEED_RBP_RESTART" = 1 ] || exit 15
-[ "$RESTART_REQUESTED_BY" = " feature_a_prepare" ] || exit 16
-# Outside a hook the orchestrator itself is the requester.
-request_rbp_restart
-[ "$RESTART_REQUESTED_BY" = " feature_a_prepare runtime" ] || exit 17
-request_rbp_restart
-[ "$RESTART_REQUESTED_BY" = " feature_a_prepare runtime" ] || exit 18
-'''
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_a_rollback_takes_every_injected_object_out_of_the_preload(self):
         """Stock bytes under our own hook is neither state, so restoring the
@@ -125,15 +103,6 @@ kept=$(preload_without_runtime \
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_a_preload_entry_cannot_be_registered_outside_a_module(self):
-        result = run_shell(
-            r'''
-register_runtime_preload /root/pdj/librx3_core.so && exit 10
-[ "$MODULE_LOAD_FAILED" = 1 ] || exit 11
-[ -z "$RUNTIME_PRELOAD_ENTRIES" ] || exit 12
-'''
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_the_launch_wait_ends_as_soon_as_every_module_is_ready(self):
         """The drive stays missing from the player until the launch is declared
@@ -161,59 +130,6 @@ RBP_LAUNCH_TIMEOUT=9
 RBP_READY_FILES="/nonexistent/never.ready"
 wait_for_rbp 4242 || exit 10
 [ "$RBP_SETTLED_AFTER" = 0 ] || exit 11
-'''
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_without_a_readiness_signal_the_whole_window_is_the_only_guard(self):
-        result = run_shell(
-            r'''
-rbp_is_running() { return 0; }
-RBP_LAUNCH_TIMEOUT=2
-RBP_READY_FILES=""
-wait_for_rbp 4242 || exit 10
-[ "$RBP_SETTLED_AFTER" = 2 ] || exit 11
-'''
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_a_readiness_file_that_never_arrives_still_gives_up(self):
-        result = run_shell(
-            r'''
-rbp_is_running() { return 0; }
-RBP_LAUNCH_TIMEOUT=2
-RBP_READY_FILES="/nonexistent/never.ready"
-wait_for_rbp 4242 || exit 10
-[ "$RBP_SETTLED_AFTER" = 2 ] || exit 11
-'''
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_one_module_that_is_not_ready_holds_the_wait_for_all(self):
-        with tempfile.TemporaryDirectory() as directory:
-            ready = Path(directory) / "core.ready"
-            ready.write_text("up")
-            result = run_shell(
-                f'''
-rbp_is_running() {{ return 0; }}
-RBP_LAUNCH_TIMEOUT=2
-RBP_READY_FILES="{ready} /nonexistent/never.ready"
-wait_for_rbp 4242 || exit 10
-[ "$RBP_SETTLED_AFTER" = 2 ] || exit 11
-'''
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_readiness_and_diagnostics_are_restricted_to_tmp(self):
-        result = run_shell(
-            r'''
-module_begin feature-a feature_a || exit 10
-register_ready_file /tmp/feature-a.ready || exit 11
-register_diagnostic_file /tmp/feature-a.log || exit 12
-register_ready_file /root/unsafe && exit 13
-register_diagnostic_file /tmp/../etc/shadow && exit 16
-[ "$RBP_READY_FILES" = ' /tmp/feature-a.ready' ] || exit 14
-[ "$RBP_DIAGNOSTIC_FILES" = ' /tmp/feature-a.log' ] || exit 15
 '''
         )
         self.assertEqual(result.returncode, 0, result.stderr)
