@@ -74,7 +74,7 @@ and nothing to uninstall.
 | 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` only at the moment |
 | 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
 | 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
-| 🧱 **A root filesystem** | Built on your machine from the manufacturer's published GPL sources — [see below](#4-building-a-root-filesystem) |
+| 🧱 **A root filesystem** | Built on your machine from the manufacturer's published GPL sources — [see below](#4-getting-a-root-filesystem) |
 | 📀 **Disk space** | ~1.5 GB, only if you want stems |
 
 About **20 minutes** to set everything up. After that, stems take from a few
@@ -236,22 +236,24 @@ specific ones.
 
 </details>
 
-### 4. Building a root filesystem
+### 4. Getting a root filesystem
 
 The player only loads the file we are about to build if it is encrypted the way
 its own maintenance path expects, so the app needs that material to author it.
-You build it yourself, on your own machine, from sources the manufacturer
+You get it yourself, on your own machine, from sources the manufacturer
 publishes.
 
 > [!CAUTION]
-> **Nothing of the sort is distributed here.** This step is yours to run, and it
-> is the longest one.
+> **Nothing of the sort is distributed here.** This step is yours to run, and
+> what it leaves on your disk stays on your disk.
 
 The XDJ-RX3 runs Linux, so under the GPL/LGPL Pioneer publishes the corresponding
 source archives on its [open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/).
-Building a root filesystem from those archives is described in
-[**Building a root filesystem**](docs/extract-initramfs.md). The build leaves
-what the app needs on your disk; point the app at it in the next step.
+Getting a root filesystem out of those archives is described in
+[**Getting a root filesystem**](docs/extract-initramfs.md). It is archive
+handling, the same on all three systems. A Linux environment is needed only to
+rebuild that filesystem, not to read it. What comes out stays on your disk;
+point the app at it in the next step.
 
 ### 5. Build the file for your stick
 
@@ -481,7 +483,7 @@ Want one of these sooner ? Or something else ? Say so in an issue, or build it y
 
 | | |
 | --- | --- |
-| [Building the RX3 filesystem](docs/extract-initramfs.md) | Building a Linux filesystem from the published GPL sources |
+| [Getting the RX3 filesystem](docs/extract-initramfs.md) | Getting a Linux filesystem out of the published GPL sources |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms, errors, fixes |
 | [Reference](REFERENCES.md) | How it all works: the platform, patching, the display, stems, the build, everything |
 | [Contributing](CONTRIBUTING.md) | Build from source, run the tests, write a module |

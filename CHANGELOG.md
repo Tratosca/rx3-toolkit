@@ -98,6 +98,15 @@
 - The emulator moved to its own repository. What remains here is the payload
   format it consumes.
 
+- The root filesystem documentation no longer sends everyone through
+  `make_rootfs`. The published source package carries the built
+  `initramfs.tar.gz` beside the sources, so reading the filesystem is archive
+  handling on any of the three operating systems, and WSL2 is needed only by
+  someone who wants to rebuild it. Reported in #23. The document still stops at
+  an unpacked filesystem: it does not say what inside it the app is later
+  pointed at, and it says plainly that a manufacturer-built archive stays on the
+  machine that unpacked it.
+
 ### Known issues
 
 - **The pad row draws no text at all**, so the pad-label template can never be
