@@ -7,7 +7,7 @@ It is the part that draws things on the player's screen: the **KEY** and **STEMS
 
 ## What that means for you
 
-**There is no badge.** The mod does not announce itself anywhere. The way you know it loaded is that the **KEY** and **STEMS** tabs are there at all — if you see them, it is running.
+**There is no badge.** The mod does not announce itself anywhere. The way you know it loaded is that the **KEY** and **STEMS** tabs are there at all, if you see them, it is running.
 
 **The two features are independent.** Key shift works without any stem files, and stems work without key shift. Pick either, both, or neither.
 
@@ -24,20 +24,18 @@ Nothing is written to the player. Power off, pull the stick, and every trace of 
 
 # For whoever builds this
 
-`rx3_core_hook.c` compiles into two different libraries from the same source. Which one you get depends on a single definition, `RX3_EMULATOR_BUILD`, and nothing else.
+`rx3_core_hook.c` compiles into two libraries from one source. Which one you get depends on whether `RX3_EMULATOR_BUILD` is defined.
 
-```text
-mod/modules/core/1.19/rx3_core_hook.c   2994 lines
-        │
-        ├─ make hook           no -D                    → build/librx3_core.so
-        │                      2214 lines compiled         this is what goes on the stick
-        │
-        └─ make payload-hook   -DRX3_EMULATOR_BUILD=1   → build/librx3_core_payload.so
-                               2994 lines compiled         make payload ships it to the emulator,
-                                                           which lives in its own repository
+```mermaid
+flowchart LR
+    SRC["rx3_core_hook.c<br>2994 lines"]
+    SRC -->|"make hook"| DEV["librx3_core.so<br>2214 lines compiled"]
+    SRC -->|"make payload-hook<br>-DRX3_EMULATOR_BUILD=1"| PAY["librx3_core_payload.so<br>2994 lines compiled"]
+    DEV --> STICK["the stick, then the deck"]
+    PAY --> EMU["make payload, then the<br>emulator in its own repository"]
 ```
 
-So 780 lines — a quarter of the file — never reach a deck. They exist because a host running rbp under emulation has no front panel to press and no screen to look at. Everything in them either **injects** an input the hardware would have produced, or **reports** something you would otherwise have seen with your eyes.
+The 780 lines the deck never compiles are there because a host running rbp under emulation has no front panel to press and no screen to look at. Each branch either injects an input the hardware would have produced, or reports something a person would have seen.
 
 | Guarded branch | Lines | What it adds to the payload build | Why a deck does not need it |
 | --- | ---: | --- | --- |
