@@ -373,7 +373,7 @@ What is being worked on next. No dates, no promises but this is the direction.
 | **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang | 💡 Planned |
 | **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 💡 Planned |
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
-| **Polished interface** | Every button the mod adds looks like the player's own, down to the icons and the lettering | 🚧 In progress |
+| **Polished interface** | Icons and lettering on every button the mod adds, close enough to the player's own that you stop noticing which is which | 🚧 In progress |
 | **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
 
 Want one of these sooner? Or something else? Say so in an issue, or build it yourself (see [Contributing](#contributing)).
