@@ -21,9 +21,9 @@
 
 ### Changed
 
-- The green `PATCHED` badge is gone. The `KEY` and `STEMS` tabs already answer the question it was there to answer, and the header is Pioneer's again.
+- The `PATCHED` badge is gone. The `KEY` and `STEMS` tabs already answer the question it was there to answer, and the header is Pioneer's again.
 
-- The hook finishes a browse key the way rbp does. `BrowseUiIf::InputKey` (`0x000cfc58`) marks the record with `UiKey_KeyPush` and, if it is accepted, posts an eventflag with `set_flg(*0x032671f4, 1)`; `Ui_EventTask` (`0x001e79a0`) consumes it and runs `BrowseKeyProcessing` inside the rest of the transaction — `CheckBrowseRequestCancelCommand`, a 300 ms repeat window, `BrowseCommandCancel`, and the `KeyComplete`/repaint. Calling the handler directly skipped all of that, so the hook now posts the flag and falls back to the direct pump only when the flag id looks uncreated. Whether this moves the browse mode on screen is not demonstrated.
+- The payload build finishes a browse key the way rbp does, so the emulator can drive the browse section without a front panel. `BrowseUiIf::InputKey` (`0x000cfc58`) marks the record with `UiKey_KeyPush` and, if it is accepted, posts an eventflag with `set_flg(*0x032671f4, 1)`; `Ui_EventTask` (`0x001e79a0`) consumes it and runs `BrowseKeyProcessing` inside the rest of the transaction — `CheckBrowseRequestCancelCommand`, a 300 ms repeat window, `BrowseCommandCancel`, and the `KeyComplete`/repaint. Calling the handler directly skipped all of that, so the hook now posts the flag and falls back to the direct pump only when the flag id looks uncreated. Whether this moves the browse mode on screen is not demonstrated.
 
 - The update-container codec is gone from `tools/rx3_firmware/`, along with its description in the documentation. The toolkit authors `autoexec.bin` and nothing else, which is what the build engine has always used; a test asserts the removed symbols stay removed, and another fails the build if the container format is described in prose again.
 
