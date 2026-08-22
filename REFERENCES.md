@@ -439,11 +439,11 @@ Two artefacts remain, both inherent to time-domain shifting: roughly 2 dB of lev
 
 ### Measuring both
 
-Off the device, with both harnesses printing the same columns so the two can be read side by side. The first runs the firmware's real ARM code under emulation; the second compiles our shifter for the host.
+Off the device, with both harnesses printing the same columns so the two can be read side by side. The first runs the firmware's real ARM code under emulation; the second compiles our shifter for the host. Both live in the rx3-emulator repository, under `tools/rx3_analysis/`, with the rest of the scripts that model the player rather than build for it.
 
 ```sh
-python3 tools/rx3_firmware/emulate_pitch.py <application> --quality
-python3 tools/rx3_firmware/measure_shifter.py
+python3 tools/rx3_analysis/emulate_pitch.py <application> --quality
+python3 tools/rx3_analysis/measure_shifter.py
 ```
 
 ---

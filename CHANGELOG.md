@@ -27,9 +27,9 @@
 
 - The update-container codec is gone from `tools/rx3_firmware/`, along with its description in the documentation. The toolkit authors `autoexec.bin` and nothing else, which is what the build engine has always used; a test asserts the removed symbols stay removed, and another fails the build if the container format is described in prose again.
 
-- Tools address the files an operator keeps locally by the role they fill, not by a path asserting where they came from, resolved through a gitignored `artifacts.toml`. See `docs/artifacts.md`.
+- The scripts that model the player moved to the rx3-emulator repository, under `tools/rx3_analysis/`: the pitch and UI harnesses, the shifter measurement, the image-table model, the Ghidra scripts, and the role resolver that fed them. Nothing here imported any of it. What stays in `tools/rx3_firmware/` is `firmware_image.py`, which the build uses to author `autoexec.bin`.
 
-- The resolver keeps the role naming and the error message, and loses the rest. A profile grouping several devices and firmwares, a third lookup layer under `local/artifacts/`, and an unused reader were sized for a scale this project does not have: two roles, one caller. A role nobody has configured now resolves to nothing and says so, instead of pointing at a directory that was never going to exist.
+- A name that asserts where a file came from now fails the build. The resolver carried that rule and left with the scripts, so `tests/test_names.py` applies it to every tracked path and every Python name instead of to two roles.
 
 - The emulator moved to its own repository. What remains here is the payload format it consumes.
 

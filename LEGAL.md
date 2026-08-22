@@ -20,7 +20,7 @@ Nothing in this repository, its history, or its releases contains:
 - any binary authored by the manufacturer;
 - any font, typeface, or other licensed resource belonging to a third party.
 
-Where the toolkit needs material of that kind, the operator produces it on their own machine and points the toolkit at it. Locations are configured locally in a file that is never committed, described in [docs/artifacts.md](docs/artifacts.md). The project does not fetch such material, does not tell anyone where to find it, and does not accept contributions that add either capability.
+Where the toolkit needs material of that kind, the operator produces it on their own machine and points the toolkit at it. Locations are configured locally, in files that are never committed. The project does not fetch such material, does not tell anyone where to find it, and does not accept contributions that add either capability.
 
 Where the device runs software covered by the GPL or LGPL, this project relies on the sources the manufacturer publishes itself in satisfaction of those licences, and on nothing else.
 
