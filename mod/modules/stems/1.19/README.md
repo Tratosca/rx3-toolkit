@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # 🎤 Vocal and instrumental controls
 
 Drop the vocal, or keep only the vocal, on tracks you prepared beforehand.

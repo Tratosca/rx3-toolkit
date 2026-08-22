@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # ⚙️ Performance core
 
 You never tick this one. It has no controls, does nothing on its own, and the app

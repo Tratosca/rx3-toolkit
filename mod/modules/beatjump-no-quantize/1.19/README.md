@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # ⏩ Immediate Beat Jump
 
 Repeated Beat Jumps fire **straight away** instead of waiting for the grid to

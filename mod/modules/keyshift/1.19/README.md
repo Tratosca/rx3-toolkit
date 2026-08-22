@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # 🎹 Per-deck key shift
 
 Tune each deck up or down by up to twelve semitones, from the **KEY** tab on the

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Third-party software
 
 The Mozilla Public License 2.0 applies only to original source code identified

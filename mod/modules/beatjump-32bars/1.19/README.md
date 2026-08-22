@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # ⏭️ Beat Jump ±32
 
 The two outer Beat Jump pads become **−32** and **+32** beats instead of −8 and

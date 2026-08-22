@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Troubleshooting
 
 Symptoms, in the order you are likely to hit them. Each heading is linkable.

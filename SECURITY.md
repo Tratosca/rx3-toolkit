@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Security
 
 Do not open an issue containing an encryption key, firmware image, dump,
