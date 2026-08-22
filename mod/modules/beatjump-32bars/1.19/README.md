@@ -9,7 +9,7 @@ On by default. It needs *No more wait between beatjumps*, which the app ticks fo
 
 ## One cosmetic compromise
 
-The player ships no directional artwork for `32`, so the pads borrow the non-directional `32` image from the Beat Loop page. It reads correctly, it just is not a bespoke arrow.
+The player has no left or right `32` of its own, so the pads borrow the plain `32` from the Beat Loop page. It reads correctly, it just is not an arrow.
 
 The jog display is untouched: it is driven by a separate controller with its own fixed set of glyphs, and there is no `32` in it.
 
