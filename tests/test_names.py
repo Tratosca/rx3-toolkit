@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: MPL-2.0
 """A name says what a file is for, never where it came from.
 
-The resolver that carried this rule moved to the emulator repository with the
-scripts that used it. The rule did not move: it is a commitment in LEGAL.md,
-and it applies to every path and every identifier here. `extracted_rbp` names
-an act; `rbp` names a file. Only one of the two is anybody's business.
+This is a commitment in LEGAL.md, and it applies to every path and every
+identifier here. `extracted_rbp` names an act; `rbp` names a file. Only one of
+the two is anybody's business.
 """
 import re
 import subprocess
