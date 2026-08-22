@@ -21,12 +21,10 @@ class ArtifactResolutionTests(unittest.TestCase):
         patch.start()
         self.addCleanup(patch.stop)
 
-    def test_default_layout_is_role_and_profile_only(self):
+    def test_an_unconfigured_role_locates_nothing(self):
+        """No invented default: a role nobody has configured has no path."""
         with mock.patch.dict(os.environ, {}, clear=True):
-            located = rx3_artifacts.locate("imagedata")
-        self.assertEqual(located.name, "imagedata")
-        self.assertEqual(located.parent.name, rx3_artifacts.DEFAULT_PROFILE)
-        self.assertEqual(located.parent.parent.name, "artifacts")
+            self.assertIsNone(rx3_artifacts.locate("imagedata"))
 
     def test_environment_variable_wins(self):
         with mock.patch.dict(os.environ, {"RX3_IMAGE_DATA": "/tmp/somewhere"}):
@@ -37,18 +35,14 @@ class ArtifactResolutionTests(unittest.TestCase):
     def test_configuration_is_read_when_no_variable_is_set(self):
         with tempfile.TemporaryDirectory() as directory:
             configuration = Path(directory) / "artifacts.toml"
-            configuration.write_text(
-                'profile = "other"\n[artifacts]\nrbp = "/tmp/elsewhere"\n'
-            )
+            configuration.write_text('[artifacts]\nrbp = "/tmp/elsewhere"\n')
             with mock.patch.object(rx3_artifacts, "CONFIGURATION", configuration):
                 with mock.patch.dict(os.environ, {}, clear=True):
                     self.assertEqual(
                         rx3_artifacts.locate("rbp"), Path("/tmp/elsewhere")
                     )
-                    # A role the file omits still falls back, under its profile.
-                    self.assertEqual(
-                        rx3_artifacts.locate("imagedata").parent.name, "other"
-                    )
+                    # A role the file omits is simply not configured.
+                    self.assertIsNone(rx3_artifacts.locate("imagedata"))
 
     def test_missing_artifact_explains_the_role_without_sourcing_it(self):
         with mock.patch.dict(os.environ, {"RX3_RBP": "/nonexistent/rbp"}):
@@ -57,6 +51,16 @@ class ArtifactResolutionTests(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn("rbp", message)
         self.assertIn(rx3_artifacts.ROLES["rbp"]["description"], message)
+        self.assertIn(rx3_artifacts.DOCUMENTATION, message)
+
+    def test_an_unconfigured_role_explains_itself_too(self):
+        """The error has to work before anyone has configured anything."""
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(rx3_artifacts.ArtifactMissing) as raised:
+                rx3_artifacts.resolve("rbp")
+        message = str(raised.exception)
+        self.assertIn("rbp", message)
+        self.assertIn("RX3_RBP", message)
         self.assertIn(rx3_artifacts.DOCUMENTATION, message)
 
     def test_no_role_names_an_origin(self):
