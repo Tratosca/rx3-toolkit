@@ -14,5 +14,5 @@ these checks require validation against the exact target binary and hardware.
 Report a vulnerability through GitHub's private security advisory form on this
 repository, under Security, Report a vulnerability. Do not open a public issue.
 
-`[TODO: verify with maintainer]` No response or disclosure timeline is committed
-to yet.
+No response or disclosure timeline is committed to. A report is read and
+acknowledged, and you will be told what is being done about it.
