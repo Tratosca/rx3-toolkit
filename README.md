@@ -387,15 +387,15 @@ music and your stems can stay.
 <details>
 <summary><b>How does it work?</b></summary><br>
 
-It happens that, by Pioneer design, the RX3 (and probably other boards too), which is based on Linux, looks at every USB stick you insert to see whether it carries an `autoexec.bin` file, and if that file decrypts with a specific key contained inside the player, it runs the script inside. That is the manufacturer's own maintenance mechanism, and it runs that script as the full privileged **root** account inside the player, so we can do basically anything a Linux system can do.
+The RX3 runs Linux. By Pioneer's own design, it looks at every USB stick you insert for a file named `autoexec.bin`. If that file decrypts with a key held inside the player, the player runs the script in it. That is the manufacturer's maintenance mechanism, not a way in that anyone found. It runs the script as **root**, the account that is allowed to do anything, which is why a stick can change what the player does.
 
-The whole player interface is one Linux program called `rbp` (Rekordbox Portable?), and when you boot the RX3, it's copied *in a temporary memory* to be used from there. That is done at every startup. Our script patches that live copy, and the new features are simply code running inside the player, using the player's own fonts, images and pads. Nothing is written to the permanent storage. Cut the power and the RAM forgets the whole affair, and next startup will have to copy the stock `rbp` to RAM again for the player to run.
+The whole interface is one program, `rbp` (Rekordbox Portable?). At every start-up the player copies it into memory and runs it from there. Our script edits that copy, in memory. The new features are code running inside the player, using its own fonts, images and pads. Nothing touches permanent storage. Cut the power and the memory forgets all of it; the next start-up copies the stock `rbp` again.
 
-"Patching" here means two things. A handful of individual and precise bytes are rewritten in place: that is all a beat jump of 32 instead of 8 really is. Everything bigger arrives as a *shared library* that gets preloaded next to `rbp` and hooks its functions from the inside, which is how you end up with vocals, instrumentals and a key shifter in a player that shipped with none of the three.
+"Patching" means two things. A few precise bytes are rewritten in place — a beat jump of 32 instead of 8 is nothing more than that. Anything bigger arrives as a *shared library*, loaded beside `rbp` and hooked into it from the inside. That is where vocals, instrumentals and the key shifter come from, in a player that shipped with none of the three.
 
 The `KEY` and `STEMS` tabs are the same trick applied to the screen. Touch works because two native Beat FX zones were politely repurposed and handed back on the way out. The pads and the on-screen toggles blink in step because they both count from the same clock.
 
-If anything goes wrong within a few seconds after having applied the patch, the original bytes go back, the stock player starts again, and a log on your stick explains itself.
+If anything goes wrong in the seconds after the patch, the original bytes go back, the stock player starts again, and a log on your stick says what happened.
 
 Details for the curious: [how a mod runs without flashing anything](REFERENCES.md#2-how-a-mod-runs-without-flashing-anything).
 </details>
