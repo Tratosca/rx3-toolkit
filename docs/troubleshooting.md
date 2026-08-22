@@ -37,11 +37,11 @@ ignores. There is no error on the device.
 
 ## The drive disappears after the patch is applied
 
-Applying a module restarts the player, and the restarted process misses the
-hotplug event that announced the drive, so media that is still mounted is no
-longer listed. Since `0.5.1` the mod asks the kernel to re-emit that event as
-soon as the replacement player is alive, about a second after the relaunch; the
-log says `re-announced /dev/... to the hotplug handler`.
+Applying a module restarts the player. The restart misses the announcement the
+drive made when you inserted it, so the drive is still there but no longer
+listed. Since `0.5.1` the mod has that announcement repeated once the restarted
+player is up, about a second later. In the log it reads
+`re-announced /dev/... to the hotplug handler`.
 
 That is the runtime side of it. The drive can still take several seconds to
 come back, which is being looked into — see **Known issues** in the changelog.
