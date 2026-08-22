@@ -139,9 +139,9 @@ unpack it wherever you keep applications.
 <details>
 <summary><b>macOS says the app is damaged / Windows shows a warning</b></summary>
 
-The app is not code-signed yet, hich means your computer suspects it could be malicious.
+The app is not code-signed yet, which means your computer suspects it could be malicious.
 
-**macOS** — clear the quarantine flag your browser put on the download. Open the Terminal application, (in the Utilities folder), type `xattr rc` then drag the app into the window to fill in the path:
+**macOS** — clear the quarantine flag your browser put on the download. Open the Terminal application (in the Utilities folder), type `xattr -rc` followed by a space, then drag the app into the window to fill in the path:
 
 ```sh
 xattr -rc "/Applications/XDJ-RX3 Toolkit.app"
@@ -191,7 +191,7 @@ Skip this if you only want the longer beat jumps.
    works out at more than ten minutes it asks first, because it will occupy the
    machine — keep the computer plugged in and awake.
 
-Each track produces a `.rx3stem` file in a `RX3_STEMS` folder on the output folder you chose. If you didn't chose your Rekordbox USB stick as an output path, it's time to move that folder at the root of it
+Each track produces a `.rx3stem` file in an `RX3_STEMS` folder inside the output folder you chose. If that was not your Rekordbox USB stick, move `RX3_STEMS` to the root of the stick now.
 
 ```text
 Your USB stick
@@ -362,8 +362,8 @@ one has its own key. Tap the number in the middle to come straight back to `0`.
 
 Load a track with no stem and Slip Loop behaves exactly like stock. That is the
 intended fallback, not a failure — if a track you *did* prepare has no stem
-controls, then either you probably did something wron, or I did. See
-[Troubleshooting](docs/troubleshooting.md#a-prepared-track-has-no-stem-controls) and only after open an issue..
+controls, then either you did something wrong, or I did. See
+[Troubleshooting](docs/troubleshooting.md#a-prepared-track-has-no-stem-controls) first, and open an issue only after that.
 
 ---
 
@@ -458,7 +458,7 @@ to carry on being a DJ player.
 
 There is nothing installed. Pull the stick and the unit is stock. But after a
 firmware change, do not assume the toolkit still works — only use versions listed
-as supported. **If you do update, please to a clean boot cycle, without the mod USB, just in case**.  
+as supported. **If you do update, do one clean boot cycle without the mod stick first, just in case**.  
 </details>
 
 ---
