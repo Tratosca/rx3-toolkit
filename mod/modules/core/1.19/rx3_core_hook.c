@@ -1104,7 +1104,7 @@ static void draw_native_box_local(void *render, const void *model,
 
 /* Zero means "leave the cloned model's own colour alone", which is why these
    are still zero: the stock palette is known -- frame 0x632c, selected fill
-   0x7bef, black inactive, measured off assets/key-selected_180x50.png -- but
+   0x7bef, black inactive, measured off the stock tab strip -- but
    the encoding this field wants is not.
    NS_PALRender_DrawText decodes +0x44 three different ways depending on the
    window's pixel format, which it reads from DS_GR_GetWindowInfo, not from the

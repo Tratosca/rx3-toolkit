@@ -12,8 +12,8 @@ time, the same as the header donor. Nothing about the clone selects the face.
 So the labels become build-time artwork, the way Pioneer's own are, and reach
 the screen through the private image ids the tab strip already uses.
 
-Palette is measured, not chosen: sampled from assets/key-selected_180x50.png,
-which is the artwork the tab strip already ships.
+Palette is measured, not chosen: read off the stock tab strip on the device,
+beside which these labels sit.
 
 Geometry comes from the panel headers -- a KEY control box is 183x40 at
 x 19..201, y 521..560 -- so a label is drawn to fill one control exactly.
