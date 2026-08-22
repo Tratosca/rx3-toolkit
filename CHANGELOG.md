@@ -29,6 +29,8 @@
 
 - Tools address the files an operator keeps locally by the role they fill, not by a path asserting where they came from, resolved through a gitignored `artifacts.toml`. See `docs/artifacts.md`.
 
+- The resolver keeps the role naming and the error message, and loses the rest. A profile grouping several devices and firmwares, a third lookup layer under `local/artifacts/`, and an unused reader were sized for a scale this project does not have: two roles, one caller. A role nobody has configured now resolves to nothing and says so, instead of pointing at a directory that was never going to exist.
+
 - The emulator moved to its own repository. What remains here is the payload format it consumes.
 
 - The root filesystem documentation no longer sends everyone through `make_rootfs`. The published source package carries the built `initramfs.tar.gz` beside the sources, so reading the filesystem is archive handling on any of the three operating systems, and WSL2 is needed only by someone who wants to rebuild it. Reported in #23. The document still stops at an unpacked filesystem: it does not say what inside it the app is later pointed at, and it says plainly that a manufacturer-built archive stays on the machine that unpacked it.
