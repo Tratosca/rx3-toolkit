@@ -1,17 +1,23 @@
-# Direct Beat Jump
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+# ⏩ Immediate Beat Jump
 
-Replaces the branch to `startPlayQuantizeForJump()` with an ARM NOP on RX3
-firmware 1.19. Execution continues through the adjacent direct Beat Jump path.
-Global Quantize, Hot Cues, loops, and Beat FX are unchanged.
+Repeated Beat Jumps fire **straight away** instead of waiting for the grid to come round.
 
-`module.sh` registers the guarded word with the volatile runtime orchestrator.
-`tools/rx3_patcher/beatjump_no_quantize.py` applies the same word offline, to an
-extracted `rbp` on a workstation. `tests/test_module_consistency.py` compares
-the two, so neither is the reference: they must agree.
+Stock behaviour lines each jump up to the next half-bar, which is fine for one jump and infuriating for four in a row: you press, and the player politely waits. With this on, press four times quickly and you have moved four times.
 
-```sh
-python3 -m tools.rx3_patcher.beatjump_no_quantize rbp --check
-python3 -m tools.rx3_patcher.beatjump_no_quantize rbp -o rbp.direct
-python3 -m tools.rx3_patcher.beatjump_no_quantize rbp.direct \
-  --revert -o rbp.restored
-```
+On by default. It needs *No more wait between beatjumps*, which the app ticks for you.
+
+## What it does not touch
+
+Only the Beat Jump path changes. Everything else quantizes exactly as it did:
+
+- Global **Quantize** stays on if you had it on
+- **Hot Cues** still snap
+- **Loops** still snap
+- **Beat FX** are untouched
+
+So if you liked quantized cues, you keep them. This is not a "turn off quantize" switch.
+
+---
+
+What the change actually is, in one line of machine code: [Reference → A worked example](../../../../REFERENCES.md#a-worked-example-longer-beat-jumps).

@@ -1,54 +1,43 @@
-# Vocal and instrumental controls, firmware 1.19
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+# 🎤 Vocal and instrumental controls
 
-Splits a track into vocal and instrumental from a prepared sidecar. Volatile:
-the code is preloaded by the [performance core](../../core/1.19/README.md) and
-nothing is written to NAND.
+Drop the vocal, or keep only the vocal, on tracks you prepared beforehand.
 
-Slip Loop pads 7 and 8 are independent instrumental and vocal toggles, and the
-`STEMS` tab exposes the same two toggles per deck on screen. Both pads blink at
-one second on, one second off while a sidecar is being read, in step with the
-on-screen toggles, and hold their colour once the payload is resident. Without a
-matching sidecar, audio and pads follow the stock path.
+Open **Slip Loop** on a prepared track. Pads 7 and 8 stop being loop pads and become two independent switches:
 
-## How it works
+| Pad | Colour | What it does |
+| :--: | :--: | --- |
+| **7** | 🔴 Red | Instrumental on / off |
+| **8** | 🟢 Green | Vocal on / off |
 
-A basename-matched sidecar is associated in `PcmReader::load` and applied in
-`PcmReader::getStreamAt`. The instrumental is the full mix minus the vocal, so
-both signals must come from the same decode path to keep phase, delay and gain
-aligned.
+The **STEMS** tab on screen gives you the same two switches per deck, if you would rather tap the display.
 
-The mix stays in `getStreamAt` on purpose. That function is a random-access read
-of the ring buffer — shared with the BPM and waveform analysis scan, and mostly
-out of order — but the mix is addressed by absolute frame position, so re-reads
-and jumps cost it nothing. [Key shift](../../keyshift/1.19/README.md) carries a
-sequential cursor and therefore cannot sit there.
+On by default. Nothing is written to the player.
 
-Stems are copied into anonymous RAM before publication to the audio thread and
-then made read-only, so removing the drive after a completed load leaves no
-active file mapping, and an accidental write from the audio thread fails
-loudly instead of corrupting samples. `int16` and `float32` payloads are
-supported. `PcmReader` works at 44,100 frames per second regardless of the source
-file's rate, so the sidecar frame index stays in one time domain.
+## What you need on the stick
 
-## USB layout
+One `.rx3stem` file per track, in a `RX3_STEMS` folder at the root:
 
 ```text
-autoexec.bin
-RX3_STEMS/
-  Artist - Title.rx3stem
+Your USB stick
+├── Contents
+├── PIONEER
+└── RX3_STEMS
+    └── Artist - Title.rx3stem
 ```
 
-The sidecar basename must match the audio basename exactly.
+Make those in the app's **Stems preparation** tab — see the [Quick start](../../../../README.md#3-prepare-your-stems-optional). The stem file is matched to the track **by filename**, so it has to be named after the track it came from. The app does that for you.
 
-## Files
+## What to expect
 
-- `manifest.json`: declares the feature's only module dependency, `core`.
-- `module.sh`: exports `RX3_STEMS_DIR` so the core switches the feature on.
-- `rx3_stems_decl.h`: private sidecar format and per-deck state.
-- `rx3_stems_feature.h`, `rx3_stems_panel.h`: implementations of the core
-  lifecycle, hook-group and UI contracts.
-- `test_regressions.py`: guards for hardware-confirmed behaviour.
+Both pads blink while the stem loads — one second on, one second off — then settle on their colours. That is the file being read; on a big track it takes a moment.
 
-The core installs this feature's stream, pad and LED hook group only when the
-module is enabled. A guard failure removes that group without removing Key
-Shift or its DSP state.
+**A track with no stem file behaves exactly like stock.** Slip Loop stays Slip Loop, the pads stay dotted. That is the intended fallback, not a failure. If a track you *did* prepare has no controls, the filename probably does not match: see [Troubleshooting](../../../../docs/troubleshooting.md#a-prepared-track-has-no-stem-controls).
+
+Once a stem has finished loading it lives in memory, so pulling the drive after that will not interrupt playback. Do not make a habit of it anyway.
+
+The waveform display does not change. It is drawn from something else entirely and does not know the vocal went away.
+
+---
+
+How the audio is actually swapped, and why the instrumental is the mix minus the vocal: [Reference → Stems](../../../../REFERENCES.md#6-stems).

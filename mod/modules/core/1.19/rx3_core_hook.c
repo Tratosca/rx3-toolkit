@@ -54,10 +54,12 @@
    Player::update's BPM and waveform analysis scan, which walks the whole track
    out of order; a sequential DSP cannot sit there. TimeStretch+4 is the reader,
    which identifies the deck. */
-#define RENDER_CUR_POS ((unsigned long)0x001d46f0)
 #define GET_HMI_MANAGER ((unsigned long)0x001d09b4)
 #define REFRESH_GLYPH   ((unsigned long)0x001d07b0)
 #define SET_BEATFX_STORAGE ((unsigned long)0x001331fc)
+#if defined(RX3_EMULATOR_BUILD)
+#include "rx3_core_emulator_keys.h"
+#endif
 
 #define LOG_FILE  "/tmp/rx3-stems.log"
 #define READY_FILE "/tmp/rx3-performance.ready"
@@ -69,11 +71,9 @@
    floor((juce::Time::currentTimeMillis() - started_at) / period) is even, so
    the period the panel is given is the half-period: 500 ms is one second on,
    one second off. The on-screen toggles reuse the same origin and formula. */
-#define LED_OFF   0
 #define LED_ON    1
 #define LED_BLINK 2
 #define BLINK_PERIOD_MS 500u
-#define PERFORMANCE_VISIBLE_US 500000u
 #define RX3_DIAGNOSTIC_ONLY 0
 #define RX3_PITCH_DIAGNOSTIC 1
 #define BEATFX_LEFT_LAYER 0x1701u
@@ -177,7 +177,6 @@ typedef void (*touch_area_hold_fn)(void *, unsigned int, unsigned int);
 typedef void (*audio_start_fn)(void *, void *);
 typedef int (*audio_buffer_size_fn)(void *);
 typedef double (*audio_sample_rate_fn)(void *);
-typedef void (*render_cur_pos_fn)(int *, int *);
 typedef void (*set_beatfx_selected_fn)(int);
 typedef int (*get_beatfx_selected_fn)(void);
 
@@ -274,6 +273,9 @@ static volatile uint8_t performance_window;
 static volatile unsigned int performance_window_ready;
 static volatile unsigned int text_template_ready;
 static uint8_t text_template[0x54];
+/* 0 none, 1 a plausible label, 2 a label that also carries a fill. */
+static volatile unsigned int pad_text_template_ready;
+static uint8_t pad_text_template[0x54];
 
 struct touch_geometry {
     int x;
@@ -285,6 +287,9 @@ struct touch_geometry {
 static void *beatfx_touch_areas[6];
 static struct touch_geometry stock_touch_geometry[6];
 static volatile void *captured_native_touch;
+/* Which control is held, so the row can paint it pressed. -1 is nothing. */
+static volatile int pressed_deck = -1;
+static volatile int pressed_control = -1;
 static void *performance_left_glyph;
 static void *performance_right_glyph;
 static void *key_tab_glyph;
@@ -297,6 +302,27 @@ static volatile unsigned int beatfx_reselect_pending;
 static volatile unsigned int emulator_forced_panel;
 static volatile unsigned int emulator_panel_applied;
 static unsigned int emulator_touch_sequence;
+/* UiKey_KeyPush's own first eight bytes. Checked before the first call for the
+   same reason install_hook checks a prologue: a firmware whose entry point has
+   moved must be refused, not called. */
+static const uint8_t ui_key_push_guard[8] = {
+    0x30, 0x40, 0x2d, 0xe9, 0x00, 0x50, 0xa0, 0xe1
+};
+static const uint8_t browse_key_pump_guard[8] = {
+    0xf8, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe3
+};
+static const uint8_t set_flg_guard[8] = {
+    0x01, 0x00, 0x40, 0xe2, 0x1f, 0x00, 0x50, 0xe3
+};
+static const uint8_t gui_invalidate_guard[8] = {
+    0x01, 0x0a, 0x10, 0xe3, 0x10, 0x40, 0x2d, 0xe9
+};
+static const uint8_t player_innards_guard[8] = {
+    0x01, 0xc0, 0xa0, 0xe1, 0x03, 0x10, 0xa0, 0xe1
+};
+/* Indexed by channel - 1, so deck 1 is slot 0. */
+static void *volatile player_innards[2];
+static volatile int ui_key_push_usable = -1;
 #endif
 
 static const struct rx3_panel_feature *panel_for_id(unsigned int panel_id);
@@ -955,6 +981,10 @@ static void *install_hook(struct installed_hook *hook, unsigned long address,
     return trampoline;
 }
 
+#if defined(RX3_EMULATOR_BUILD)
+#include "rx3_core_emulator_breadcrumbs.h"
+#endif
+
 /* Variant for ldr r3,[pc,#imm12] followed by push. The trampoline loads a copy
    of the original literal value, replays push, and joins address+8. This
    preserves r3 without depending on the shared object's mapped address. */
@@ -1000,11 +1030,11 @@ static void *install_pc_ldr_hook(struct installed_hook *hook,
 }
 
 /* Native overlay. NS_PALRender_DrawText receives a fully attached 0x54-byte
-   NS_GlyphText. Clone the stock deck-2 KEY label, retain its window/parent,
-   and alter only the public text-box fields established by
-   NS_GlyphText_CreateFromProperty. */
+   NS_GlyphText. Clone a stock label from the pane the row stands in for, retain
+   its window/parent, and alter only the public text-box fields established by
+   NS_GlyphText_CreateFromProperty. Cloning is what carries the font: nothing
+   below sets one, so the controls wear whichever face the model was drawn in. */
 
-static const uint16_t text_patched[] = {'P','A','T','C','H','E','D',0};
 static const uint16_t text_empty[]    = {0};
 
 #include "../../keyshift/1.19/rx3_keyshift_panel.h"
@@ -1044,43 +1074,6 @@ static uint8_t text_length16(const uint16_t *text)
     return length;
 }
 
-static void draw_native_box(void *render, const void *model,
-                            uint8_t target_window,
-                            int x1, int y1, int x2, int y2,
-                            const uint16_t *text, uint8_t length,
-                            uint32_t foreground, uint32_t background)
-{
-    uint8_t box[0x54];
-    int parent_x = 0;
-    int parent_y = 0;
-    ((render_cur_pos_fn)RENDER_CUR_POS)(&parent_x, &parent_y);
-    memcpy(box, model, sizeof(box));
-    uint16_t window_layer;
-    memcpy(&window_layer, box + 0x10u, sizeof(window_layer));
-    window_layer = (uint16_t)((window_layer & 0xff00u) | target_window);
-    set_u16(box, 0x10, window_layer);
-    set_u16(box, 0x18, (uint16_t)(x1 - parent_x));
-    set_u16(box, 0x1a, (uint16_t)(y1 - parent_y));
-    set_u16(box, 0x1c, (uint16_t)(x2 - parent_x));
-    set_u16(box, 0x1e, (uint16_t)(y2 - parent_y));
-    set_u32(box, 0x28, foreground);
-    set_u32(box, 0x34, (uint32_t)(unsigned long)text);
-    box[0x38] = length;
-    box[0x3c] = 4; /* horizontally and vertically centred */
-    set_u32(box, 0x40, 1);
-    set_u32(box, 0x44, background);
-    set_u32(box, 0x50, 1);
-    original_draw_text(render, box);
-}
-
-static void draw_performance_overlay(void *render, const void *model)
-{
-    const uint32_t white = 0x00f4f4f4u;
-    const uint32_t green = 0x0020c878u;
-    draw_native_box(render, model, 1, 1140, 3, 1275, 47,
-                    text_patched, 7, white, green);
-}
-
 static void draw_native_box_local(void *render, const void *model,
                                   const void *window_model,
                                   uint8_t target_window,
@@ -1109,6 +1102,21 @@ static void draw_native_box_local(void *render, const void *model,
     original_draw_text(render, box);
 }
 
+/* Zero means "leave the cloned model's own colour alone", which is why these
+   are still zero: the stock palette is known -- frame 0x632c, selected fill
+   0x7bef, black inactive, measured off the stock tab strip -- but
+   the encoding this field wants is not.
+   NS_PALRender_DrawText decodes +0x44 three different ways depending on the
+   window's pixel format, which it reads from DS_GR_GetWindowInfo, not from the
+   glyph: format 2 takes the low byte alone, format 3 the whole word, format 9
+   unpacks 0x00BBGGRR into 5/6/5. Feeding it RGB888 painted magenta lettering on
+   green; feeding it RGB565 painted green; sweeping all 256 low-byte values
+   moved the green channel alone and never once lifted red or blue off zero.
+   So this window is not in a format where the field carries a colour we can
+   write. Settling it means identifying the format DS_GR_GetWindowInfo reports
+   for layers 0x17xx/0x18xx and using that branch's encoding -- until then,
+   inheriting is honest and the earlier "every literal guess looked foreign" is
+   explained rather than repeated. */
 static void pioneer_theme(uint16_t window_layer,
                           uint32_t *border, uint32_t *inactive,
                           uint32_t *active, uint32_t *light_text)
@@ -1170,10 +1178,19 @@ static void draw_custom_tabs(void *render, const void *image)
 #endif
 }
 
+/* The face the controls are cut from. A pad label carries the row's own font;
+   the header glyph is twice its size and is only a last resort, so a panel
+   opened before any stock label was drawn still shows something. */
+static const void *pad_button_face(void)
+{
+    return pad_text_template_ready ? pad_text_template : text_template;
+}
+
 static void draw_stock_button_local(void *render, const void *model,
                                     uint8_t window, int x1, int y1,
                                     int x2, int y2,
-                                    const uint16_t *label, int selected)
+                                    const uint16_t *label, int selected,
+                                    int pressed)
 {
     uint16_t window_layer;
     memcpy(&window_layer, (const uint8_t *)model + 0x10u,
@@ -1182,13 +1199,18 @@ static void draw_stock_button_local(void *render, const void *model,
     uint32_t border, inactive, active, light_text;
     pioneer_theme(window_layer, &border, &inactive, &active, &light_text);
     const uint32_t dark_text = 0x00000000u;
-    draw_native_box_local(render, text_template, model, window,
+    const void *face = pad_button_face();
+    /* Held moves the fill one step towards the frame, which reads as pressed
+       without resizing the button -- the stock idiom on this panel. */
+    uint32_t fill = selected ? active : inactive;
+    if (pressed)
+        fill = selected ? border : active;
+    draw_native_box_local(render, face, model, window,
                           x1, y1, x2, y2, text_empty,
                           light_text, border);
-    draw_native_box_local(render, text_template, model, window,
-                          x1 + 1, y1 + 1, x2 - 1, y2 - 1, label,
-                          selected ? dark_text : light_text,
-                          selected ? active : inactive);
+    draw_native_box_local(render, face, model, window,
+                          x1 + 2, y1 + 2, x2 - 2, y2 - 2, label,
+                          selected ? dark_text : light_text, fill);
 }
 
 static void draw_custom_pad_half(void *render, const void *model,
@@ -1203,14 +1225,98 @@ static void draw_custom_pad_half(void *render, const void *model,
     if (!panel)
         return;
     for (unsigned int control = 0; control < panel->control_count; control++) {
+        int pressed = (int)deck == pressed_deck &&
+                      (int)control == pressed_control;
         draw_stock_button_local(
             render, model, window,
             panel->lefts[control], 21, panel->rights[control], 59,
-            panel->label(deck, control), panel->selected(deck, control));
+            panel->label(deck, control), panel->selected(deck, control),
+            pressed);
     }
 }
 
 
+
+/* The row's own subtree. The low byte of a window-layer is the deck's window,
+   which decks 1 and 2 share with their info strips; the high byte names the
+   widget subtree, which is what "the pads" actually means. Keying on the low
+   byte swallowed AUTO CUE, QUANTIZE and the tempo badges along with the pads. */
+static int is_performance_pad_subtree(uint16_t window_layer)
+{
+    unsigned int subtree = (unsigned int)(window_layer >> 8);
+    return subtree == 0x17u || subtree == 0x18u;
+}
+
+static unsigned int deck_for_pad_subtree(uint16_t window_layer)
+{
+    return (unsigned int)(window_layer >> 8) == 0x17u ? 0u : 1u;
+}
+
+/* Clone a stock label from that subtree so the controls inherit the row's font,
+   padding and clipping. Take the first plausible label, then upgrade once to
+   one that also carries a fill, which is a real button rather than a caption.
+   Capturing before the interception below is what makes this work at all: the
+   draws worth cloning are exactly the ones a live panel replaces. */
+/* Which subtree to clone the control face from.
+   The pad subtree draws no text at all -- measured: twelve subtrees issue text
+   draws and 0x17/0x18 are not among them, because that row is images. So there
+   is no stock pad label to clone and the donor has to be chosen from elsewhere.
+   RX3_EMULATOR_FONT_DONOR names a subtree byte so candidates can be compared by
+   looking at them; 0 keeps the original behaviour of waiting for a pad label
+   that never comes. */
+static unsigned int font_donor_subtree(void)
+{
+    static int donor = -1;
+    if (donor < 0) {
+        const char *requested = getenv("RX3_EMULATOR_FONT_DONOR");
+        donor = 0;
+        if (requested)
+            for (const char *c = requested; *c >= '0' && *c <= '9'; c++)
+                donor = donor * 10 + (*c - '0');
+    }
+    return (unsigned int)donor;
+}
+
+static void capture_pad_text_template(const void *text, uint16_t window_layer)
+{
+    unsigned int donor = font_donor_subtree();
+    if (pad_text_template_ready >= 2u)
+        return;
+    if (donor ? ((unsigned int)(window_layer >> 8) != donor)
+              : !is_performance_pad_subtree(window_layer))
+        return;
+    if (((const uint8_t *)text)[0x38] == 0u)
+        return;
+    uint16_t y1, y2;
+    memcpy(&y1, (const uint8_t *)text + 0x1au, sizeof(y1));
+    memcpy(&y2, (const uint8_t *)text + 0x1eu, sizeof(y2));
+    int height = (int)y2 - (int)y1;
+    /* Selecting a donor by layer picked four faces that all render at 19 px,
+       because a layer draws text at more than one size. Selecting by measured
+       box height searches the actual range instead. */
+    static int ceiling = -1;
+    if (ceiling < 0) {
+        const char *requested = getenv("RX3_EMULATOR_FONT_MAXH");
+        ceiling = 0;
+        if (requested)
+            for (const char *c = requested; *c >= '0' && *c <= '9'; c++)
+                ceiling = ceiling * 10 + (*c - '0');
+        if (!ceiling)
+            ceiling = 64;
+    }
+    if (height < 8 || height > ceiling)
+        return;
+    uint32_t background;
+    memcpy(&background, (const uint8_t *)text + 0x44u, sizeof(background));
+    unsigned int level = background ? 2u : 1u;
+    if (level <= pad_text_template_ready)
+        return;
+    memcpy(pad_text_template, text, sizeof(pad_text_template));
+    pad_text_template_ready = level;
+    log_number("pad label template captured, level = ", level);
+    log_number("  donor layer = ", (unsigned long)window_layer);
+    log_number("  donor box height = ", (unsigned long)height);
+}
 
 static void hooked_draw_image(void *render, void *image)
 {
@@ -1276,26 +1382,17 @@ static void hooked_draw_image(void *render, void *image)
             log_number("native performance window = ", window);
         }
     }
-    if (overlay_panel && text_template_ready &&
-        window_layer == BEATFX_LEFT_LAYER) {
-        if (image_id == 0x14e9u)
+    /* The pane backdrop opens each pass over the row, so painting the controls
+       from it -- and only from it -- gives exactly one row per pass instead of
+       one per intercepted call. Everything else inside the subtree is the stock
+       pad furniture a live panel stands in for, and is dropped. */
+    if (overlay_panel && is_performance_pad_subtree(window_layer)) {
+        if (image_id == 0x14e9u || image_id == 0x14eau) {
             original_draw_image(render, image);
-        draw_custom_pad_half(render, image, window, 0u);
-        return;
-    }
-    if (overlay_panel && text_template_ready &&
-        window_layer == XPAD_RIGHT_LAYER) {
-        if (image_id == 0x14eau)
-            original_draw_image(render, image);
-        draw_custom_pad_half(render, image, window, 1u);
-        return;
-    }
-    if (overlay_panel && (window == 6u || window == 7u)) {
-        if (text_template_ready)
-            draw_custom_pad_half(render, image, window,
-                                 window == 7u ? 0u : 1u);
-        else
-            original_draw_image(render, image);
+            if (pad_text_template_ready || text_template_ready)
+                draw_custom_pad_half(render, image, window,
+                                     deck_for_pad_subtree(window_layer));
+        }
         return;
     }
 
@@ -1311,27 +1408,59 @@ static void hooked_draw_image(void *render, void *image)
     draw_custom_tabs(render, image);
 }
 
+#if defined(RX3_EMULATOR_BUILD)
+/* Which window layers actually issue a text draw.
+   The pad-label template has never been captured, and the reason matters: if
+   the pad subtree draws no text at all then the row is images and cloning a
+   label is the wrong approach entirely. Bounded to one line per distinct layer
+   and a hard ceiling -- an earlier unbounded version of this flooded the log
+   and took DirectFB down with it. */
+static void note_text_layer(uint16_t window_layer, const void *text)
+{
+    static uint16_t seen[48];
+    static unsigned int seen_count;
+    /* Read once. This sits in the render path, and calling getenv per draw
+       walks the environment thousands of times a second -- enough on its own
+       to stop DirectFB coming up, which is how the first version of this probe
+       announced itself. */
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char *requested = getenv("RX3_EMULATOR_TRACE_LAYERS");
+        enabled = requested && requested[0] == '1';
+    }
+    if (!enabled || seen_count >= 48u)
+        return;
+    for (unsigned int i = 0; i < seen_count; i++)
+        if (seen[i] == window_layer)
+            return;
+    seen[seen_count++] = window_layer;
+    {
+        uint16_t y1, y2;
+        memcpy(&y1, (const uint8_t *)text + 0x1au, sizeof(y1));
+        memcpy(&y2, (const uint8_t *)text + 0x1eu, sizeof(y2));
+        /* Layer and box height together: the header face is twice a stock pad
+           label, so height is what identifies a usable donor glyph. */
+        log_number("text layer ", (unsigned long)window_layer);
+        log_number("   box height = ", (unsigned long)(uint16_t)(y2 - y1));
+    }
+}
+#endif
+
 static void hooked_draw_text(void *render, void *text)
 {
     draw_calls++;
     uint16_t window_layer;
     memcpy(&window_layer, (const uint8_t *)text + 0x10u, sizeof(window_layer));
-    uint8_t window = (uint8_t)(window_layer & 0xffu);
-    if (!RX3_DIAGNOSTIC_ONLY && overlay_panel && text_template_ready &&
-        window_layer == XPAD_RIGHT_LAYER) {
-        draw_custom_pad_half(render, text, window, 1u);
-        return;
-    }
+#if defined(RX3_EMULATOR_BUILD)
+    note_text_layer(window_layer, text);
+#endif
+    if (!RX3_DIAGNOSTIC_ONLY)
+        capture_pad_text_template(text, window_layer);
+    /* The row is painted from the pane backdrop, so a stock label inside the
+       subtree is simply dropped once it has been cloned. */
     if (!RX3_DIAGNOSTIC_ONLY && overlay_panel &&
-        (window == 6u || window == 7u)) {
-        if (!text_template_ready) {
-            original_draw_text(render, text);
-            return;
-        }
-        draw_custom_pad_half(render, text, window,
-                             window == 7u ? 0u : 1u);
+        is_performance_pad_subtree(window_layer))
         return;
-    }
     original_draw_text(render, text);
     if (RX3_DIAGNOSTIC_ONLY)
         return;
@@ -1345,7 +1474,6 @@ static void hooked_draw_text(void *render, void *text)
     refresh_initial_performance_tabs_if_ready();
     main_window_draws++;
     overlay_drawn_us = monotonic_enough_us();
-    draw_performance_overlay(render, text);
 }
 
 static int performance_overlay_is_visible(void)
@@ -1424,6 +1552,8 @@ static void restore_status_after_pad_mode(void)
         return;
     overlay_panel = 0;
     captured_native_touch = 0;
+    pressed_deck = -1;
+    pressed_control = -1;
     configure_native_performance_touches(0);
     if (original_set_beatfx_selected)
         original_set_beatfx_selected(0);
@@ -1499,11 +1629,27 @@ static void activate_native_performance_touch(void *area)
     captured_native_touch = area;
     unsigned int deck = (unsigned int)index / panel->control_count;
     unsigned int control = (unsigned int)index % panel->control_count;
+    /* Held before the action, so the repaint the action asks for already
+       carries the pressed fill. */
+    pressed_deck = (int)deck;
+    pressed_control = (int)control;
     panel->activate(deck, control);
     log_number("native feature touch = ", (unsigned long)index);
 
     /* KEY/STEMS controls stay in their panel so successive adjustments remain
        visible. Only a hardware pad-mode selector restores STATUS. */
+    refresh_performance_ui();
+}
+
+/* The release edge. Without the repaint the button would stay lit until some
+   other invalidation happened along, which is why holding felt like nothing. */
+static void release_native_performance_touch(void)
+{
+    captured_native_touch = 0;
+    if (pressed_deck < 0)
+        return;
+    pressed_deck = -1;
+    pressed_control = -1;
     refresh_performance_ui();
 }
 
@@ -1528,7 +1674,7 @@ static void hooked_touch_button_off(void *area)
 {
     if (area == captured_native_touch ||
         (native_touch_index(area) >= 0 && overlay_panel)) {
-        captured_native_touch = 0;
+        release_native_performance_touch();
         return;
     }
     original_touch_button_off(area);
@@ -1547,7 +1693,7 @@ static void hooked_touch_toggle_off(void *area)
 {
     if (area == captured_native_touch ||
         (native_touch_index(area) >= 0 && overlay_panel)) {
-        captured_native_touch = 0;
+        release_native_performance_touch();
         return;
     }
     original_touch_toggle_off(area);
@@ -1566,7 +1712,7 @@ static void hooked_touch_xpad_off(void *area)
 {
     if (area == captured_native_touch ||
         (native_touch_index(area) >= 0 && overlay_panel)) {
-        captured_native_touch = 0;
+        release_native_performance_touch();
         return;
     }
     original_touch_xpad_off(area);
@@ -1663,127 +1809,25 @@ static void hooked_set_beatfx_selected(int selected)
 }
 
 #if defined(RX3_EMULATOR_BUILD)
-static int emulator_parse_coordinate(const char **cursor, int *value)
-{
-    const char *position = *cursor;
-    int parsed = 0;
-    int digits = 0;
-    while (*position == ' ' || *position == '\t')
-        position++;
-    while (*position >= '0' && *position <= '9') {
-        parsed = parsed * 10 + (*position - '0');
-        position++;
-        digits++;
-    }
-    *cursor = position;
-    *value = parsed;
-    return digits != 0;
-}
-
-static void emulator_apply_touch(int x, int y)
-{
-    const struct rx3_panel_feature *panel;
-    if (x < 0 || x >= 1280 || y < 0 || y >= 720)
-        return;
-
-    if (y >= 363 && y <= 413) {
-        const struct rx3_panel_feature *requested = 0;
-        if (x >= 1090 && x <= 1179)
-            requested = panel_for_slot(0u);
-        else if (x >= 1181 && x <= 1270)
-            requested = panel_for_slot(1u);
-        if (requested) {
-            emulator_forced_panel = requested->panel_id;
-            emulator_panel_applied = 1u;
-            select_custom_panel(requested->panel_id);
-            log_number("emulator touch selected panel = ", requested->panel_id);
-        }
-        return;
-    }
-
-    if (y >= 433 && y <= 483 && x >= 1090 && x <= 1270) {
-        emulator_forced_panel = 0u;
-        emulator_panel_applied = 0u;
-        overlay_panel = 0u;
-        captured_native_touch = 0;
-        configure_native_performance_touches(0u);
-        original_set_beatfx_selected(x >= 1181 ? 1 : 0);
-        refresh_performance_ui();
-        log_line(x >= 1181 ? "emulator touch selected BEAT FX"
-                           : "emulator touch selected STATUS");
-        return;
-    }
-
-    panel = panel_for_id(overlay_panel);
-    if (panel && y >= 521 && y <= 560) {
-        unsigned int deck = x >= 640 ? 1u : 0u;
-        int local_x = x - (int)(deck * 640u);
-        for (unsigned int control = 0; control < panel->control_count; control++) {
-            if (local_x >= panel->lefts[control] &&
-                local_x <= panel->rights[control]) {
-                panel->activate(deck, control);
-                refresh_performance_ui();
-                log_number("emulator touch deck = ", deck + 1u);
-                log_number("emulator touch control = ", control);
-                return;
-            }
-        }
-    }
-}
-
-static void emulator_poll_touch(void)
-{
-    char command[64];
-    ssize_t count;
-    const char *cursor;
-    int sequence, x, y;
-    int descriptor = open("/tmp/rx3emu-touch.fifo", O_RDONLY);
-    if (descriptor < 0)
-        return;
-    count = read(descriptor, command, sizeof(command) - 1u);
-    close(descriptor);
-    if (count <= 0)
-        return;
-    command[count] = '\0';
-    cursor = command;
-    if (emulator_parse_coordinate(&cursor, &sequence) &&
-        emulator_parse_coordinate(&cursor, &x) &&
-        emulator_parse_coordinate(&cursor, &y) &&
-        sequence > 0 && (unsigned int)sequence != emulator_touch_sequence) {
-        emulator_touch_sequence = (unsigned int)sequence;
-        emulator_apply_touch(x, y);
-    }
-}
-
-static void emulator_activate_initial_panel(void)
-{
-    if (!emulator_forced_panel || emulator_panel_applied ||
-        !tab_assets_ready || !text_template_ready ||
-        !stock_tab_backing_ready || !beatfx_touch_areas[0])
-        return;
-    emulator_panel_applied = 1u;
-    overlay_panel = emulator_forced_panel;
-    original_set_beatfx_selected(1);
-    configure_native_performance_touches(emulator_forced_panel);
-    refresh_performance_ui();
-    log_number("emulator activated feature panel = ",
-               emulator_forced_panel);
-}
-
-static void *emulator_touch_loop(void *unused)
-{
-    (void)unused;
-    log_line("emulator virtual touch channel ready");
-    while (state_thread_running)
-        emulator_poll_touch();
-    return 0;
-}
+#include "rx3_core_emulator_harness.h"
 #endif
 
 static void hooked_solve_touch(void *handler, const void *status,
                                const void *mode)
 {
     touch_calls++;
+#if defined(RX3_EMULATOR_BUILD)
+    /* The probe counters are dumped once per run, so they can never show
+       whether a touch injected later arrived. This says so the moment it does,
+       and only the first time, because this is rbp's hot touch path. */
+    {
+        static volatile unsigned int announced;
+        if (!announced) {
+            announced = 1u;
+            log_line("native solveCoordToKey reached");
+        }
+    }
+#endif
     if (RX3_DIAGNOSTIC_ONLY) {
         original_solve_touch(handler, status, mode);
         return;
@@ -2040,11 +2084,47 @@ static void remove_features(void)
 
 /* Lifecycle. */
 
+/* Both teardown paths take the same hooks out in the same order: the error exit
+   of the installer, and the destructor. They were two copies, so adding a hook
+   and updating only one of them left that hook installed on the path nobody
+   exercises until something has already gone wrong. */
+static void uninstall_performance_hooks(void)
+{
+    configure_native_performance_touches(0);
+    remove_features();
+    uninstall_hook(&touch_xpad_hold_hook);
+    uninstall_hook(&touch_xpad_off_hook);
+    uninstall_hook(&touch_xpad_on_hook);
+    uninstall_hook(&touch_toggle_off_hook);
+    uninstall_hook(&touch_toggle_on_hook);
+    uninstall_hook(&touch_button_off_hook);
+    uninstall_hook(&touch_button_hold_hook);
+    uninstall_hook(&touch_button_on_hook);
+    uninstall_hook(&beatfx_xpad_ctor_hook);
+    uninstall_hook(&beat_jump_hook);
+    uninstall_hook(&slip_loop_hook);
+    uninstall_hook(&beat_loop_hook);
+    uninstall_hook(&hot_cue_hook);
+    uninstall_hook(&set_beatfx_hook);
+    uninstall_hook(&touch_hook);
+    uninstall_hook(&draw_image_hook);
+    uninstall_hook(&draw_text_hook);
+    uninstall_hook(&load_hook);
+}
+
 __attribute__((constructor)) static void initialize(void)
 {
     /* Each feature is a module of its own and announces itself through the
        environment its module.sh exports. The core installs either way, so that
        key shift works without sidecars and stems works without key shift. */
+#if defined(RX3_EMULATOR_BUILD)
+    /* Before anything else, and before the feature gate below: init() runs
+       whether or not a feature is selected, so both of these have to be
+       installable independently of one -- and the latch has to be in place
+       before rbp constructs the deck objects it captures. */
+    install_player_innards_latch();
+    install_init_breadcrumbs();
+#endif
     stems_dir = getenv("RX3_STEMS_DIR");
     if (stems_dir && !stems_dir[0])
         stems_dir = 0;
@@ -2195,26 +2275,7 @@ __attribute__((constructor)) static void initialize(void)
     return;
 
 reject_performance_hooks:
-    configure_native_performance_touches(0);
-    remove_features();
-    uninstall_hook(&touch_xpad_hold_hook);
-    uninstall_hook(&touch_xpad_off_hook);
-    uninstall_hook(&touch_xpad_on_hook);
-    uninstall_hook(&touch_toggle_off_hook);
-    uninstall_hook(&touch_toggle_on_hook);
-    uninstall_hook(&touch_button_off_hook);
-    uninstall_hook(&touch_button_hold_hook);
-    uninstall_hook(&touch_button_on_hook);
-    uninstall_hook(&beatfx_xpad_ctor_hook);
-    uninstall_hook(&beat_jump_hook);
-    uninstall_hook(&slip_loop_hook);
-    uninstall_hook(&beat_loop_hook);
-    uninstall_hook(&hot_cue_hook);
-    uninstall_hook(&set_beatfx_hook);
-    uninstall_hook(&touch_hook);
-    uninstall_hook(&draw_image_hook);
-    uninstall_hook(&draw_text_hook);
-    uninstall_hook(&load_hook);
+    uninstall_performance_hooks();
     original_touch_xpad_hold = 0;
     original_touch_xpad_off = 0;
     original_touch_xpad_on = 0;
@@ -2238,26 +2299,7 @@ reject_performance_hooks:
 __attribute__((destructor)) static void finalize(void)
 {
     state_thread_running = 0;
-    configure_native_performance_touches(0);
-    remove_features();
-    uninstall_hook(&touch_xpad_hold_hook);
-    uninstall_hook(&touch_xpad_off_hook);
-    uninstall_hook(&touch_xpad_on_hook);
-    uninstall_hook(&touch_toggle_off_hook);
-    uninstall_hook(&touch_toggle_on_hook);
-    uninstall_hook(&touch_button_off_hook);
-    uninstall_hook(&touch_button_hold_hook);
-    uninstall_hook(&touch_button_on_hook);
-    uninstall_hook(&beatfx_xpad_ctor_hook);
-    uninstall_hook(&beat_jump_hook);
-    uninstall_hook(&slip_loop_hook);
-    uninstall_hook(&beat_loop_hook);
-    uninstall_hook(&hot_cue_hook);
-    uninstall_hook(&set_beatfx_hook);
-    uninstall_hook(&touch_hook);
-    uninstall_hook(&draw_image_hook);
-    uninstall_hook(&draw_text_hook);
-    uninstall_hook(&load_hook);
+    uninstall_performance_hooks();
     for (unsigned int i = 0; i < 2u; i++) {
         for (unsigned int feature = 0;
              feature < RUNTIME_FEATURE_COUNT; feature++)

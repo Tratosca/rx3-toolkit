@@ -28,14 +28,18 @@ class FirmwareImageTests(unittest.TestCase):
         self.assertNotEqual(encrypted, plain)
         self.assertEqual(firmware_image.crypt(encrypted, key, True), plain)
 
-    def test_container_crc_and_metadata(self):
-        body = bytes(1024)
-        blob = firmware_image.build(body, "1.19")
-        parsed, model, version, stored, actual = firmware_image.split(blob)
-        self.assertEqual(parsed, body)
-        self.assertEqual(model, b"XDJ-RX3")
-        self.assertEqual(version, "1.19")
-        self.assertEqual(stored, actual)
+    def test_no_update_container_codec_remains(self):
+        """The toolkit builds its own runtime image and nothing else.
+
+        Asserted rather than assumed: these names are the ones a future change
+        would most plausibly reintroduce by copying an older revision back in.
+        """
+        for name in ("build", "split", "cmd_encrypt", "cmd_decrypt", "cmd_verify",
+                     "MODEL", "TRAILER"):
+            self.assertFalse(
+                hasattr(firmware_image, name),
+                f"{name} is an update-container symbol and should be gone",
+            )
 
     def test_autoexec_iso_metadata(self):
         plain = bytearray(68 * firmware_image.SECTOR)

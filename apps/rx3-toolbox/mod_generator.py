@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import tempfile
 import threading
@@ -30,7 +31,9 @@ class ModGeneratorPane(ttk.Frame):
     def __init__(self, parent: tk.Misc) -> None:
         super().__init__(parent)
         self.root_resources = repository_root()
-        self.key_path = tk.StringVar()
+        # The key lives wherever its owner keeps it. RX3_KEY spares them the
+        # file dialog on every launch; it is read, never written.
+        self.key_path = tk.StringVar(value=os.environ.get("RX3_KEY", ""))
         self.output_path = tk.StringVar()
         self.status = tk.StringVar(value="Choose the patches, your RX3 key, and the USB drive.")
         self.firmware = tk.StringVar()
@@ -174,7 +177,11 @@ class ModGeneratorPane(ttk.Frame):
                 variable.set(patch.patch_id in needed)
 
     def _choose_key(self) -> None:
-        selected = filedialog.askopenfilename(title="Choose the RX3 encryption key")
+        current = pathlib.Path(self.key_path.get()).expanduser()
+        selected = filedialog.askopenfilename(
+            title="Choose the RX3 encryption key",
+            initialdir=str(current.parent) if current.name else None,
+        )
         if selected:
             self.key_path.set(selected)
 

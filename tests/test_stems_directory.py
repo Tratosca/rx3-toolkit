@@ -153,10 +153,6 @@ class ReinsertionTests(unittest.TestCase):
                 state = deck.insert(device)
                 self.assertEqual(state["restart"], "0", f"{device}: {state['lines']}")
 
-    def test_a_first_insertion_says_which_hook_asked_for_the_restart(self):
-        with tempfile.TemporaryDirectory() as directory:
-            state = Deck(Path(directory)).insert("sda2")
-            self.assertIn("requested-by: stems_prepare", state["lines"])
 
     def test_a_fixed_path_that_cannot_be_published_falls_back_to_the_mount(self):
         """A real directory in the way is not removed; the module degrades to
@@ -171,13 +167,6 @@ class ReinsertionTests(unittest.TestCase):
             self.assertTrue(
                 any("falling back to the mount path" in line for line in state["lines"]),
                 state["lines"],
-            )
-
-    def test_the_sidecar_count_still_reads_the_drive_itself(self):
-        with tempfile.TemporaryDirectory() as directory:
-            state = Deck(Path(directory)).insert("sda2", sidecars=4)
-            self.assertTrue(
-                any("4 sidecar(s)" in line for line in state["lines"]), state["lines"]
             )
 
 

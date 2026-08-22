@@ -1,4 +1,5 @@
-# Extracting `initramfs.tar.gz` from the XDJ-RX3 Source Package
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+# Getting a root filesystem from the published GPL sources
 
 The XDJ-RX3 source package is distributed as two ZIP files:
 
@@ -7,9 +8,7 @@ A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
 57CB205B-D45A-4143-BC09-22D8400074C2.zip
 ```
 
-Each ZIP contains one part of a split `tar.bz2` archive.
-
-The extraction process is:
+Each ZIP contains one part of a split `tar.bz2` archive. Reassemble the two parts, extract the tree, and the filesystem archive is already in it: for reading the filesystem, there is nothing to compile.
 
 ```text
 ZIP files
@@ -20,14 +19,12 @@ reassembled .tar.bz2
    ↓
 source tree
    ↓
-make_rootfs
+initramfs.tar.gz          already in the tree — section 5
    ↓
-initramfs.tar.gz
+root filesystem
 ```
 
-The archive extraction and `make_rootfs` steps can be performed on **macOS or Linux**.
-
-On Windows, the archive can be extracted natively, while the `make_rootfs` step is best performed through **WSL2**.
+Every step of that path is ordinary archive handling, so **macOS, Linux and Windows all do it natively**. `make_rootfs` produces the same archive from the sources instead; it is the one step that wants a Linux environment, it is section 6, and it is only for changing what goes into the filesystem.
 
 ---
 
@@ -187,10 +184,43 @@ Alternatively, use 7-Zip:
 
 At this point, the XDJ-RX3 source tree has been extracted.
 
+---
+
+## 5. Extract the filesystem
+
+Find it first:
+
+### macOS / Linux
+
+```bash
+find . -type f -name initramfs.tar.gz
+```
+
+### Windows
+
+```powershell
+Get-ChildItem -Recurse -Filter initramfs.tar.gz
+```
+
+If the archive is there, unpack it and you're done:
+
+```bash
+mkdir ../initramfs
+tar -xzf path/to/initramfs.tar.gz -C ../initramfs
+```
+
+The same `tar` command works in PowerShell. A root filesystem holds symlinks, device nodes and ownership that a desktop account cannot always recreate, so expect warnings on those entries; they are harmless here, because nothing in this path has to be bootable — it only has to be readable.
+
+If the archive is not in your copy of the sources, build it: section 6.
+
+> [!CAUTION]
+> That archive is the manufacturer's own build, sitting alongside the sources published for the components covered by the GPL and the LGPL. Unpacking it on your own machine, for a device you own, is not the same act as passing it on. It stays on your disk: not in an issue, not in a pull request, not in a release, not in a repository. See [the legal position](../LEGAL.md) and [SECURITY.md](../SECURITY.md).
 
 ---
 
-## 5. Run `make_rootfs`
+## 6. If step 5. didn't work: rebuilding the filesystem with `make_rootfs`
+
+You need this only if you intend to change what the filesystem contains, or if your copy of the sources does not carry the archive. It builds from the published sources, and it is the step that wants Linux.
 
 ### macOS / Linux
 
@@ -212,7 +242,7 @@ Run it:
 ./make_rootfs
 ```
 
-It then generates the `initrammfs.tar.gz`.
+It then generates `initramfs.tar.gz`, which is unpacked as in section 5.
 
 ### Windows
 
@@ -240,17 +270,18 @@ cd /path/to/directory/containing/make_rootfs
 chmod +x make_rootfs
 ./make_rootfs
 ```
+
 ---
 
 ## Platform support
 
 | Step | macOS | Linux | Windows |
 |---|---:|---:|---:|
-| Extract ZIP files | Yes | Yes | Yes |
-| Reassemble split archive | Yes | Yes | Yes |
-| Extract `tar.bz2` | Yes | Yes | Yes |
-| Run `make_rootfs` | Yes | Yes | Via WSL2 |
-| Obtain `initramfs.tar.gz` | Yes | Yes | Via WSL2 |
+| Extract the ZIP files | Yes | Yes | Yes |
+| Reassemble the split archive | Yes | Yes | Yes |
+| Extract the `tar.bz2` | Yes | Yes | Yes |
+| Unpack the `initramfs.tar.gz` in the tree | Yes | Yes | Yes |
+| Rebuild it with `make_rootfs`, if you need to | Yes | Yes | Via WSL2 |
 
 ---
 
@@ -273,9 +304,13 @@ pioneerdj_xdj_rx3.tar.bz2
         ▼
 XDJ-RX3 source tree
         │
-        │ make_rootfs
-        │
-        │ ./ltib --deploy
-        ▼
-initramfs.tar.gz
+        ├───────────────► initramfs.tar.gz, already in the tree
+        │                          │
+        │                          │
+        └─── make_rootfs ──────────┤ rebuilds the same archive
+             then ./ltib --deploy  │ from the sources
+                                   │
+                                   │ tar -xzf
+                                   ▼
+                            root filesystem
 ```
