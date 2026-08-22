@@ -19,4 +19,44 @@ Nothing is written to the player. Power off, pull the stick, and every trace of 
 
 ---
 
+
+---
+
+# For whoever builds this
+
+`rx3_core_hook.c` compiles into two different libraries from the same source. Which one you get depends on a single definition, `RX3_EMULATOR_BUILD`, and nothing else.
+
+```text
+mod/modules/core/1.19/rx3_core_hook.c   2994 lines
+        │
+        ├─ make hook           no -D                    → build/librx3_core.so
+        │                      2214 lines compiled         this is what goes on the stick
+        │
+        └─ make payload-hook   -DRX3_EMULATOR_BUILD=1   → build/librx3_core_payload.so
+                               2994 lines compiled         make payload ships it to the emulator,
+                                                           which lives in its own repository
+```
+
+So 780 lines — a quarter of the file — never reach a deck. They exist because a host running rbp under emulation has no front panel to press and no screen to look at. Everything in them either **injects** an input the hardware would have produced, or **reports** something you would otherwise have seen with your eyes.
+
+| Guarded branch | Lines | What it adds to the payload build | Why a deck does not need it |
+| --- | ---: | --- | --- |
+| Browse keys, touch samples | 550 | Marks rbp's own key records, then wakes `Ui_EventTask` the way `BrowseUiIf::InputKey` does; writes touch samples into the TSC2007 path | The deck has a front panel and a touch panel |
+| Init breadcrumbs, player latch | 155 | Records how far `init()` got, and captures the deck objects rbp constructs | On a deck, the session log answers the same question afterwards |
+| Text-layer trace, `RX3_EMULATOR_TRACE_LAYERS=1` | 36 | Lists which window layers issue a text draw, one line per distinct layer, with a hard ceiling | A diagnostic for one open question: whether the pad row draws text at all |
+| Forced panel, `RX3_EMULATOR_PANEL` set to 1 or 2 | 20 | Opens the KEY or STEMS panel at start-up, so the real rendering branches are reachable and clickable | On a deck, someone presses the button |
+| Render markers | 14 | Says once that the first custom tab, and the first custom pad, actually painted | On a deck you look at the screen |
+| Touch thread | 5 | Polls for injected touches for as long as the run lasts | Nothing is injected on a deck |
+| | **780** | | |
+
+Two rules hold across all of it.
+
+**The emulator branches observe and inject. They never change what the mod does.** The one exception is deliberate and visible at `hooked_set_beatfx_selected`: with a panel forced, the payload build short-circuits the native transition, because there is no front-panel microcontroller to request it.
+
+**An injected input is guarded like any other entry point.** `UiKey_KeyPush`, `BrowseKeyProcessing` and `set_flg` each have their first eight bytes checked before the first call, for the reason `install_hook` checks a prologue: a firmware whose entry point has moved must be refused, not called.
+
+`tests/test_hook_symbols.py` reads the `.dynsym` of **both** libraries, so a change that pulls a new import into either one fails the build.
+
+---
+
 How the on-screen additions are rendered, how the image table is extended, and the palette question that is still open: [Reference → The display](../../../../REFERENCES.md#4-the-display).
