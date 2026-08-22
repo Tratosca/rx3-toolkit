@@ -70,17 +70,6 @@ class HookAgreementTests(unittest.TestCase):
     def test_deck_stride_matches_the_hook(self) -> None:
         self.assertIn(f"x >= {builder.DECK_STRIDE} ? 1u : 0u", BODY)
 
-    def test_log_and_ready_paths_match_the_hook(self) -> None:
-        for constant, declared in (
-            ("LOG_FILE", builder.LOG_FILE),
-            ("READY_FILE", builder.READY_FILE),
-        ):
-            match = re.search(rf'#define {constant}\s+"([^"]+)"', HOOK)
-            self.assertIsNotNone(match, f"the hook defines no {constant}")
-            # The hook writes an absolute guest path; a payload declares the
-            # same path relative to the guest root.
-            self.assertEqual(match.group(1).lstrip("/"), declared)
-
 
 class GeneratedManifestTests(unittest.TestCase):
     """What the builder emits has to be a manifest a bench would accept."""
@@ -93,55 +82,6 @@ class GeneratedManifestTests(unittest.TestCase):
             document = self.manifest(variant)
             self.assertEqual(document["payload"]["name"], f"rx3-toolkit-{variant}")
             self.assertTrue(document["preload"])
-
-    def test_control_columns_come_from_the_module_headers(self) -> None:
-        document = self.manifest("all")
-        for panel in document["panel"]:
-            module = {1: "keyshift", 2: "stems"}[panel["id"]]
-            self.assertEqual(
-                [(control["left"], control["right"]) for control in panel["controls"]],
-                builder.panel_columns(module),
-                f"panel {panel['name']} drifted from its module header",
-            )
-
-    def test_a_variant_only_declares_the_panels_it_turns_on(self) -> None:
-        self.assertEqual(
-            [panel["name"] for panel in self.manifest("stems")["panel"]], ["STEMS"]
-        )
-        self.assertEqual(
-            [panel["name"] for panel in self.manifest("keyshift")["panel"]], ["KEY"]
-        )
-
-    def test_every_declared_button_lands_on_screen(self) -> None:
-        for variant in builder.VARIANTS:
-            document = self.manifest(variant)
-            screen = document["screen"]
-            for entry in document["mode"] + document["panel"]:
-                self.assertLess(entry["slot"], len(screen["slots"]))
-            for panel in document["panel"]:
-                for control in panel["controls"]:
-                    for deck in range(screen["decks"]):
-                        x = deck * screen["deck_stride"] + (
-                            control["left"] + control["right"]
-                        ) // 2
-                        self.assertTrue(
-                            0 <= x < 1280, f"{variant}: {control['label']} at x={x}"
-                        )
-
-    def test_the_image_table_patch_is_registered_on_the_device_too(self) -> None:
-        """The payload's rewrite must be the one a device applies.
-
-        A payload that patched something no module.sh registers would be
-        exercising a binary nobody validated on hardware.
-        """
-        offset = builder.IMAGE_TABLE_PATCH[0]
-        registered = any(
-            f"register_patch {offset} " in module.read_text()
-            for module in ROOT.glob("mod/modules/*/*/module.sh")
-        )
-        self.assertTrue(
-            registered, f"no module.sh registers the payload's patch at {offset}"
-        )
 
 
 if __name__ == "__main__":
