@@ -57,6 +57,8 @@ Build `autoexec.bin` from the terminal. Without `MODULES`, the manifest defaults
 make autoexec KEY=/absolute/path/to/aes256.key FIRMWARE=1.19
 ```
 
+Export `RX3_KEY` instead and `KEY=` becomes optional, on the command line and in the application, which opens with that path already filled in. The key stays where you keep it; nothing here writes its location down.
+
 ## Before submitting
 
 ```sh

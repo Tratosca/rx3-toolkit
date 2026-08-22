@@ -10,6 +10,9 @@ PYTHON ?= python3
 BUILD_DIR ?= build
 FIRMWARE ?= 1.19
 MODULES ?=
+# The key stays outside this repository. RX3_KEY saves retyping its path on
+# every build; KEY= on the command line still wins.
+KEY ?= $(RX3_KEY)
 VARIANT ?= all
 VERSION ?= 0.0.0-dev
 PAYLOAD_DIR ?= $(BUILD_DIR)/payload

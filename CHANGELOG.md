@@ -29,6 +29,8 @@
 
 - The scripts that model the player left this repository, for the unpublished one that holds the emulator: the pitch and UI harnesses, the shifter measurement, the image-table model, the Ghidra scripts, and the resolver that fed them. Nothing here imported any of it. What stays in `tools/rx3_firmware/` is `firmware_image.py`, which the build uses to author `autoexec.bin`.
 
+- `RX3_KEY` is read where the key is needed: `make autoexec` takes it when `KEY=` is absent, and the application opens with that path already filled in and its file dialog pointed at the right directory. Nothing writes the location down, and `KEY=` still wins.
+
 - The three largest emulator-only blocks of the hook move into their own headers, included at the point they used to sit and only when `RX3_EMULATOR_BUILD` is defined. `rx3_core_hook.c` drops from 2981 lines to 2310, and what a deck compiles is now most of what is left rather than three quarters of it. Both libraries hash the same before and after.
 
 - The two teardown paths of the hook are one function. The installer's error exit and the destructor each carried their own copy of the same twenty calls, in the same order, so adding a hook and updating one copy left that hook installed on the path that only runs once something has already gone wrong. **Not yet run on hardware:** the generated code changes, so the acceptance sequence in CONTRIBUTING.md applies before this ships.
