@@ -131,11 +131,9 @@
    floor((juce::Time::currentTimeMillis() - started_at) / period) is even, so
    the period the panel is given is the half-period: 500 ms is one second on,
    one second off. The on-screen toggles reuse the same origin and formula. */
-#define LED_OFF   0
 #define LED_ON    1
 #define LED_BLINK 2
 #define BLINK_PERIOD_MS 500u
-#define PERFORMANCE_VISIBLE_US 500000u
 #define RX3_DIAGNOSTIC_ONLY 0
 #define RX3_PITCH_DIAGNOSTIC 1
 #define BEATFX_LEFT_LAYER 0x1701u
@@ -198,7 +196,6 @@ extern int      gettimeofday(void *, void *);
 
 #define O_RDONLY 0
 #define O_WRONLY 1
-#define O_RDWR   2
 #define O_NONBLOCK 04000
 #define O_CREAT  0100
 #define O_TRUNC  01000
