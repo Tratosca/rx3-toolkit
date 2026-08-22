@@ -28,24 +28,27 @@ Nothing is written to the player. Power off, pull the stick, and every trace of 
 
 ```mermaid
 flowchart LR
-    SRC["rx3_core_hook.c<br>2994 lines"]
-    SRC -->|"make hook"| DEV["librx3_core.so<br>2214 lines compiled"]
-    SRC -->|"make payload-hook<br>-DRX3_EMULATOR_BUILD=1"| PAY["librx3_core_payload.so<br>2994 lines compiled"]
+    SRC["rx3_core_hook.c<br>2310 lines"]
+    HDR["rx3_core_emulator_*.h<br>692 lines, payload only"]
+    SRC -->|"make hook"| DEV["librx3_core.so<br>2201 lines compiled"]
+    SRC -->|"make payload-hook<br>-DRX3_EMULATOR_BUILD=1"| PAY["librx3_core_payload.so<br>3002 lines compiled"]
+    HDR -.->|included only<br>under the flag| PAY
     DEV --> STICK["the stick, then the deck"]
     PAY --> EMU["make payload, then the<br>emulator in its own repository"]
 ```
 
-The 780 lines the deck never compiles are there because a host running rbp under emulation has no front panel to press and no screen to look at. Each branch either injects an input the hardware would have produced, or reports something a person would have seen.
+The 801 lines a deck never compiles are there because a host running rbp under emulation has no front panel to press and no screen to look at. Each branch either injects an input the hardware would have produced, or reports something a person would have seen.
 
-| Guarded branch | Lines | What it adds to the payload build | Why a deck does not need it |
+Three of them are large enough to live in their own file, included at the point they used to sit and only under the flag. The rest are call sites inside production functions, and stay where they are.
+
+| Guarded code | Lines | What it adds to the payload build | Why a deck does not need it |
 | --- | ---: | --- | --- |
-| Browse keys, touch samples | 550 | Marks rbp's own key records, then wakes `Ui_EventTask` the way `BrowseUiIf::InputKey` does; writes touch samples into the TSC2007 path | The deck has a front panel and a touch panel |
-| Init breadcrumbs, player latch | 155 | Records how far `init()` got, and captures the deck objects rbp constructs | On a deck, the session log answers the same question afterwards |
+| `rx3_core_emulator_harness.h` | 470 | The commands a host sends in place of a front panel: browse keys marked in rbp's own table, touch samples written into the TSC2007 path | The deck has a front panel and a touch panel |
+| `rx3_core_emulator_breadcrumbs.h` | 155 | How far `init()` got, and the deck objects it built on the way | On a deck, the session log answers the same question afterwards |
+| `rx3_core_emulator_keys.h` | 67 | Where rbp keeps the browse keys, and how it finishes one | Same |
 | Text-layer trace, `RX3_EMULATOR_TRACE_LAYERS=1` | 36 | Lists which window layers issue a text draw, one line per distinct layer, with a hard ceiling | A diagnostic for one open question: whether the pad row draws text at all |
 | Forced panel, `RX3_EMULATOR_PANEL` set to 1 or 2 | 20 | Opens the KEY or STEMS panel at start-up, so the real rendering branches are reachable and clickable | On a deck, someone presses the button |
-| Render markers | 14 | Says once that the first custom tab, and the first custom pad, actually painted | On a deck you look at the screen |
-| Touch thread | 5 | Polls for injected touches for as long as the run lasts | Nothing is injected on a deck |
-| | **780** | | |
+| Render markers, touch thread, call sites | 53 | Says once that the first custom tab and the first custom pad painted; polls for injected touches | On a deck you look at the screen, and nothing is injected |
 
 Two rules hold across all of it.
 

@@ -1,7 +1,8 @@
 """The payload must aim where the hook actually listens.
 
-`emulator_apply_touch` in C and the payload builder in Python are two copies of
-one map, and nothing in the build makes them agree. A button that misses by a
+`emulator_apply_touch`, in the payload build's own header, and the payload
+builder in Python are two copies of one map, and nothing in the build makes
+them agree. A button that misses by a
 pixel does nothing at all, silently, so the agreement is asserted rather than
 assumed -- the same reason tests/test_module_consistency.py exists.
 
@@ -21,7 +22,7 @@ from tools.rx3_payload import cli as builder
 
 
 ROOT = pathlib.Path(__file__).parents[1]
-HOOK = (ROOT / "mod/modules/core/1.19/rx3_core_hook.c").read_text()
+HOOK = (ROOT / "mod/modules/core/1.19/rx3_core_emulator_harness.h").read_text()
 # Scope every match to the one function that reads window coordinates, so a
 # same-shaped comparison elsewhere in the hook cannot satisfy these guards.
 BODY = HOOK.split("static void emulator_apply_touch", 1)[1].split(
