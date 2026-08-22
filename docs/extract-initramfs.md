@@ -8,9 +8,7 @@ A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip
 57CB205B-D45A-4143-BC09-22D8400074C2.zip
 ```
 
-Each ZIP contains one part of a split `tar.bz2` archive. Reassemble the two
-parts, extract the tree, and the filesystem archive is already in it: for
-reading the filesystem, there is nothing to compile.
+Each ZIP contains one part of a split `tar.bz2` archive. Reassemble the two parts, extract the tree, and the filesystem archive is already in it: for reading the filesystem, there is nothing to compile.
 
 ```text
 ZIP files
@@ -26,10 +24,7 @@ initramfs.tar.gz          already in the tree — section 5
 root filesystem
 ```
 
-Every step of that path is ordinary archive handling, so **macOS, Linux and
-Windows all do it natively**. `make_rootfs` produces the same archive from the
-sources instead; it is the one step that wants a Linux environment, it is
-section 6, and it is only for changing what goes into the filesystem.
+Every step of that path is ordinary archive handling, so **macOS, Linux and Windows all do it natively**. `make_rootfs` produces the same archive from the sources instead; it is the one step that wants a Linux environment, it is section 6, and it is only for changing what goes into the filesystem.
 
 ---
 
@@ -214,29 +209,18 @@ mkdir ../initramfs
 tar -xzf path/to/initramfs.tar.gz -C ../initramfs
 ```
 
-The same `tar` command works in PowerShell. A root filesystem holds symlinks,
-device nodes and ownership that a desktop account cannot always recreate, so
-expect warnings on those entries; they are harmless here, because nothing in
-this path has to be bootable — it only has to be readable.
+The same `tar` command works in PowerShell. A root filesystem holds symlinks, device nodes and ownership that a desktop account cannot always recreate, so expect warnings on those entries; they are harmless here, because nothing in this path has to be bootable — it only has to be readable.
 
 If the archive is not in your copy of the sources, build it: section 6.
 
 > [!CAUTION]
-> That archive is the manufacturer's own build, sitting alongside the sources
-> published for the components covered by the GPL and the LGPL. Unpacking it on
-> your own machine, for a device you own, is not the same act as passing it on.
-> It stays on your disk: not in an issue, not in a pull request, not in a
-> release, not in a repository. See [the legal position](../LEGAL.md) and
-> [SECURITY.md](../SECURITY.md).
-
+> That archive is the manufacturer's own build, sitting alongside the sources published for the components covered by the GPL and the LGPL. Unpacking it on your own machine, for a device you own, is not the same act as passing it on. It stays on your disk: not in an issue, not in a pull request, not in a release, not in a repository. See [the legal position](../LEGAL.md) and [SECURITY.md](../SECURITY.md).
 
 ---
 
 ## 6. If step 5. didn't work: rebuilding the filesystem with `make_rootfs`
 
-You need this only if you intend to change what the filesystem contains, or if
-your copy of the sources does not carry the archive. It builds from the
-published sources, and it is the step that wants Linux.
+You need this only if you intend to change what the filesystem contains, or if your copy of the sources does not carry the archive. It builds from the published sources, and it is the step that wants Linux.
 
 ### macOS / Linux
 
@@ -264,8 +248,7 @@ It then generates `initramfs.tar.gz`, which is unpacked as in section 5.
 
 Use WSL2 for the `make_rootfs` step.
 
-From WSL2, it is preferable to copy the source tree into the Linux filesystem
-instead of building directly under `/mnt/c`.
+From WSL2, it is preferable to copy the source tree into the Linux filesystem instead of building directly under `/mnt/c`.
 
 For example:
 
