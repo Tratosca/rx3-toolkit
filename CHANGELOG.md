@@ -27,7 +27,7 @@
 
 - The update-container codec is gone from `tools/rx3_firmware/`, along with its description in the documentation. The toolkit authors `autoexec.bin` and nothing else, which is what the build engine has always used; a test asserts the removed symbols stay removed, and another fails the build if the container format is described in prose again.
 
-- The scripts that model the player moved to the rx3-emulator repository, under `tools/rx3_analysis/`: the pitch and UI harnesses, the shifter measurement, the image-table model, the Ghidra scripts, and the role resolver that fed them. Nothing here imported any of it. What stays in `tools/rx3_firmware/` is `firmware_image.py`, which the build uses to author `autoexec.bin`.
+- The scripts that model the player left this repository, for the unpublished one that holds the emulator: the pitch and UI harnesses, the shifter measurement, the image-table model, the Ghidra scripts, and the role resolver that fed them. Nothing here imported any of it. What stays in `tools/rx3_firmware/` is `firmware_image.py`, which the build uses to author `autoexec.bin`.
 
 - The test suite is cut to what it is for: 143 tests to 64, 3807 lines to 2424, and under six seconds to run. What stays fails when a deck would misbehave, when a stick or a track would be damaged, when the mod would load and silently do nothing, or when a commitment in LEGAL.md would break. What went was coverage: an estimator for a progress bar, a matrix of accelerator profiles restating a table the code reads, window theming, and a set of interface closures that replayed the dependency resolution already pinned elsewhere.
 
