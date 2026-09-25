@@ -409,6 +409,16 @@ Readers accept schema 1 and check the old drive-root location when the new manif
 
 The app data directory holds a 4 GiB default cache, configurable from zero (disabled) to 1024 GiB. Entries are keyed by source SHA-256 and processing signature and contain final encoded audio, not model output. Hits are copied to a local workspace while holding the cache lock; eviction therefore cannot interrupt a drive write. Directory modification time records last use for LRU eviction. Only verified entries are reused, first from this cache and then from mounted drives. Optional roles from an earlier preparation are removed before replacing vocals, so an interruption reduces available roles instead of combining different sources.
 
+### Manual imports
+
+Manual import accepts lossless WAV, AIFF and FLAC with one or two channels. The audio probe checks the codec as well as the suffix, so compressed audio in a WAV container is refused. Conversion duplicates mono to stereo and resamples to 44100 Hz. The mix is decoded with UNTRIMMED, and imports shorter than it or longer by more than one second are refused before correlation.
+
+Eight positions shared with the encoder-delay probes are examined where a complete window and a one-second search margin exist. At least four windows must be usable. A 64-frame amplitude envelope narrows the search; two passes over waveform samples refine it to individual frames. Every usable window must have correlation at least 0.55, and shifts must lie within one frame of their median. Silent or ambiguous material is refused rather than assigned an alignment. A constant offset up to one second can be corrected, with the milliseconds and removed head/end frames displayed. No surplus is trimmed unless its location agrees with that offset.
+
+Gain is a heuristic: the median least-squares coefficient across probes must be within five percent of unity. This can reject a valid correlated component or miss a processed one; it is not certification. The full set's residual-energy ratio is reported, not required to approach zero, because voices, drums and bass do not include every other instrument. The application never applies the estimated gain. It encodes the corrected timeline with write_stem, records peak, corrections and checks with origin `imported`, then uses verified publication. Listen to the reconstructed instrumental before relying on an imported set.
+
+Assignments persist per library and track in the app data directory. A file chooser is available on every supported webview; dropping a file also works where the backend supplies its native path. The shared job slot keeps import publication separate from other drive-writing jobs. Local synthetic measurements on a six-minute track, including decode, checks and final encoding: 1.03 s for one role and 4.61 s for three roles. These are measurements on the development machine, not estimates used by the interface.
+
 ### Which model actually runs
 
 The best models available are roformers, which are PyTorch checkpoints. The ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs. Neither runtime is accelerated everywhere, and the split differs per platform:

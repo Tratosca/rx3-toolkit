@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Manual lossless stems can be assigned per library track and imported after duration, multi-window alignment and heuristic gain checks. Constant offsets and trimming are reported, gain is never silently changed, and uncertain gain is not presented as certified. Imports preserve the existing PCM format and verified drive publication; assignments survive restarts.
+
 - Multi-role loading now counts earlier roles in the pending set against the shared 512 MiB ceiling, as well as the other deck. Native tests cover missing prerequisites, mismatched lengths, residual reconstruction and the exact 256-frame ramp. Preparation shows size per role and track, warns above 256 MiB, and includes drums whenever bass is requested. The README describes both library inputs and all four unchanged pads. Not yet run on hardware.
 
 - Prepared stems are reused only when the full source SHA-256, effective processing signature and verified final audio match. A version 2 manifest retains legacy entries without inventing provenance, and completed tracks are recorded individually. A bounded local LRU cache and mounted-drive lookup avoid repeated separation; the cache limit and clear action are available in the Stems screen.

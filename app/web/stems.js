@@ -12,6 +12,10 @@
   var library = null;
   var quality = null;
   var output = "";
+  var importTrack = "";
+  var importFiles = {};
+  var importReport = null;
+  var trackRequest = 0;
   var roles = {vocals: true, drums: false, bass: false};
 
   var ROLE_KEYS = [
@@ -129,6 +133,7 @@
     }
     if (selected) picker.value = selected;
     forecast();
+    drawTracks();
   }
 
   async function forecast() {
@@ -172,6 +177,7 @@
       : !library ? t("stems.needMusic")
       : !output ? t("stems.needOutput")
       : t("stems.longRun");
+    if (id("stem-import-run")) id("stem-import-run").disabled = libraryBlocked || !importTrack || !output || !importFiles.vocals;
     id("stems-start").disabled =
       libraryBlocked || !machine || !machine.ready || !library || !output;
   }
@@ -180,6 +186,7 @@
     output = path || "";
     id("stems-output").textContent = output || t("common.none");
     note();
+    window.dispatchEvent(new CustomEvent("rx3stemtrack", {detail:{track:importTrack, drive:output, files:importFiles}}));
   }
 
   // Doing ------------------------------------------------------------------------
@@ -225,7 +232,110 @@
     row.append(label, el("span", "dim", window.i18n.bytes(state.bytes)), clear);
   }
 
+  async function drawTracks() {
+    var request = ++trackRequest;
+    var tracks = library ? await window.rx3.ask("stems_tracks", id("playlist").value) : [];
+    if (request !== trackRequest) return;
+    var picker = id("stem-track");
+    picker.replaceChildren();
+    for (var track of tracks || []) {
+      var option = el("option", null, track.artist + " - " + track.title);
+      option.value = track.id; picker.append(option);
+    }
+    if (Array.from(picker.options).some(function (item) { return item.value === importTrack; })) picker.value = importTrack;
+    await selectTrack();
+  }
+
+  async function selectTrack() {
+    importTrack = id("stem-track").value;
+    importReport = null;
+    var selected = importTrack;
+    var files = selected ? await window.rx3.ask("stems_import_assign", selected, null) || {} : {};
+    if (selected !== importTrack) return;
+    importFiles = files;
+    drawImport(); note();
+    window.dispatchEvent(new CustomEvent("rx3stemtrack", {detail:{track:importTrack, drive:output, files:importFiles}}));
+  }
+
+  async function assignImport(role, path) {
+    if (!importTrack) return;
+    var values = Object.assign({}, importFiles);
+    if (path) values[role] = path; else delete values[role];
+    var selected = importTrack;
+    var result = await window.rx3.ask("stems_import_assign", selected, values);
+    if (selected !== importTrack) return;
+    if (result) { importFiles = result; importReport = null; drawImport(); note(); }
+    window.dispatchEvent(new CustomEvent("rx3stemtrack", {detail:{track:importTrack, drive:output, files:importFiles}}));
+  }
+
+  function drawImport() {
+    var slots = id("stem-import-slots");
+    slots.replaceChildren();
+    for (var item of ROLE_KEYS) {
+      (function (role, caption) {
+        var row = el("div", "row");
+        var choose = el("button", "btn small", caption);
+        choose.type = "button"; choose.disabled = !importTrack;
+        choose.addEventListener("click", async function () {
+          var selected = await window.rx3.ask("pick_files", "stem", "");
+          if (selected && selected.paths.length === 1) assignImport(role, selected.paths[0]);
+        });
+        // Some webview backends expose the native path on dropped files. On
+        // others the picker remains the supported path-preserving operation.
+        row.addEventListener("dragover", function (event) { event.preventDefault(); });
+        row.addEventListener("drop", function (event) {
+          event.preventDefault();
+          var files = event.dataTransfer.files;
+          if (files.length === 1 && (files[0].pywebviewFullPath || files[0].path))
+            assignImport(role, files[0].pywebviewFullPath || files[0].path);
+          else id("stem-import-report").textContent = t("stems.importUsePicker");
+        });
+        var clear = el("button", "btn small", t("samples.clear"));
+        clear.type = "button"; clear.disabled = !importFiles[role];
+        clear.addEventListener("click", function () { assignImport(role, ""); });
+        row.append(choose, el("span", "path", importFiles[role] || t("common.none")), clear);
+        slots.append(row);
+      })(item[0], t(item[1]));
+    }
+    var reports = [t("stems.importHeuristic")];
+    if (importReport) {
+      for (var role in importReport.roles) {
+        var check = importReport.roles[role];
+        reports.push(t("stems.importResult", {role:t(ROLE_KEYS.find(function (item) { return item[0] === role; })[1]),
+          ms:window.i18n.number(check.milliseconds, {maximumFractionDigits:3}),
+          head:check.trimStart, tail:check.trimEnd,
+          gain:window.i18n.number(check.gainEstimate, {maximumFractionDigits:4})}));
+      }
+      if (importReport.residualEnergyRatio !== null)
+        reports.push(t("stems.importResidual", {ratio:window.i18n.number(importReport.residualEnergyRatio, {maximumFractionDigits:4})}));
+    }
+    id("stem-import-report").textContent = reports.join("\n");
+  }
+
   function wire() {
+    var manual = el("section");
+    manual.append(el("h2", null, t("stems.importTitle")));
+    var picker = el("select"); picker.id = "stem-track";
+    picker.setAttribute("aria-label", t("stems.importTrackLabel"));
+    picker.addEventListener("change", selectTrack);
+    var slots = el("div"); slots.id = "stem-import-slots";
+    var run = el("button", "btn", t("stems.importRun"));
+    run.id = "stem-import-run"; run.type = "button";
+    run.addEventListener("click", async function () {
+      if (!(await checkLibrary())) return;
+      var selected = importTrack;
+      var answer = await window.rx3.ask("stems_import_start", selected, output);
+      if (answer) window.rx3.watchJob(function (job) {
+        if (selected === importTrack && job.result && job.result.imported) {
+          importReport = job.result.imported.checks; drawImport();
+          window.dispatchEvent(new CustomEvent("rx3stemtrack", {detail:{track:importTrack, drive:output, files:importFiles}}));
+        }
+      });
+    });
+    var report = el("p", "dim"); report.id = "stem-import-report";
+    report.style.whiteSpace = "pre-line";
+    manual.append(picker, slots, run, report);
+    id("stems-note").after(manual);
     var memory = el("div");
     memory.id = "stems-memory";
     id("forecast").after(memory);
@@ -248,7 +358,7 @@
       var picked = await window.rx3.ask("pick_file", "library", "");
       if (picked) openLibrary(picked.path);
     });
-    id("playlist").addEventListener("change", forecast);
+    id("playlist").addEventListener("change", function () { forecast(); drawTracks(); });
     id("stems-output-choose").addEventListener("click", async function () {
       var picked = await window.rx3.ask("pick_folder", output);
       if (picked && picked.path) setOutput(picked.path);
@@ -282,6 +392,7 @@
       if (!output) setOutput(event.detail.path);
     });
     window.addEventListener("rx3language", function () {
+      drawImport();
       drawCache();
       drawLibraryGuard();
       drawMachine();
@@ -300,6 +411,7 @@
     wire();
     await checkLibrary();
     await drawCache();
+    drawImport();
     drawMachine();
     drawQuality();
     drawRoles();

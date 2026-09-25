@@ -75,6 +75,7 @@ class StemResult:
     # False when that padding could not be measured and the stem was left on
     # the separator's own grid, which is only correct for a source without any.
     aligned: bool = True
+    peak: float | None = None
 
 
 def _decode(
@@ -238,9 +239,8 @@ def write_stem(
             arguments.extend(["-ac", str(CHANNELS)])
         else:
             arguments.extend(["-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS)])
-        if chain:
-            chain.append(MEASURE)
-            arguments.extend(["-af", ",".join(chain)])
+        chain.append(MEASURE)
+        arguments.extend(["-af", ",".join(chain)])
         arguments.extend(["-f", ffmpeg_format, str(raw)])
         measured = _decode(ffmpeg, arguments, report=bool(chain))
         # Only the samples where the vocal alone exceeds full scale are lost,
@@ -275,4 +275,5 @@ def write_stem(
         clipped=clipped,
         delay=delay,
         aligned=aligned,
+        peak=_peak_amplitude(measured),
     )

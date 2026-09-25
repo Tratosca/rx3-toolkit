@@ -43,6 +43,7 @@ from app.rx3_service import stems as stems_service
 # over a filter string of its own, because that string is platform syntax and
 # the screens hold no platform knowledge.
 FILE_KINDS = {
+    "stem": (("dialog.audio", "(*.wav;*.aiff;*.aif;*.flac)"),),
     "audio": (("dialog.audio", "(*.wav;*.aiff;*.aif;*.flac;*.mp3;*.m4a;*.aac;*.ogg;*.oga;*.opus;*.wma)"), ("dialog.all", "(*.*)")),
     "image": (("dialog.image", "(*.png;*.jpg;*.jpeg;*.webp)"), ("dialog.all", "(*.*)")),
     "key": (("dialog.all", "(*.*)"),),
@@ -595,6 +596,58 @@ class Bridge:
         )
 
     # Separation -------------------------------------------------------------
+
+    def _stem_track(self, track_id):
+        library = self._held()
+        matches = {track.location: track for playlist in library.collection.playlists
+                   for track in playlist.tracks if track.track_id == str(track_id)}
+        if len(matches) != 1:
+            raise LocalizedError("stems.importTrack")
+        track = next(iter(matches.values()))
+        from app.rx3_stems.rekordbox import export_stem
+        basename = export_stem(track.location.stem).casefold()
+        if any(other.location != track.location and export_stem(other.location.stem).casefold() == basename
+               for playlist in library.collection.playlists for other in playlist.tracks):
+            raise LocalizedError("stems.importCollision")
+        return track
+
+    @answered
+    def stems_tracks(self, playlist_id):
+        return [{"id": track.track_id, "title": track.title, "artist": track.artist}
+                for track in self._held().collection.playlist(playlist_id).tracks]
+
+    @answered
+    def stems_import_assign(self, track_id, values=None):
+        from app.rx3_stems import importing
+        self._stem_track(track_id)
+        return importing.assignments(self._held(), track_id, values)
+
+    @answered
+    def stems_import_start(self, track_id, output):
+        from app.rx3_stems import importing, safety, provisioning
+        safety.require_library_closed()
+        track = self._stem_track(track_id)
+        drive = pathlib.Path(output)
+        if not drive.is_dir():
+            raise LocalizedError("error.directory", path=output)
+        inputs = importing.assignments(self._held(), track_id)
+        ffmpeg = provisioning.detect().ffmpeg or "ffmpeg"
+        self._claim("stems", Message("stems.importChecking"))
+        cancelled = threading.Event()
+        self._watch(cancelled.set)
+        def checkpoint():
+            if cancelled.is_set():
+                raise Cancelled()
+        def run():
+            try:
+                entry = importing.publish(track, inputs, drive, ffmpeg, checkpoint)
+                self._settle("done", Message("job.done"), result={"imported": entry})
+            except Cancelled:
+                self._settle("cancelled", Message("job.cancelled"))
+            except Exception as error:
+                self._settle("failed", Message("job.failed"), error=error_message(error))
+        threading.Thread(target=run, daemon=True).start()
+        return {"started": True}
 
     @answered
     def stems_cache(self, maximum=None, clear=False) -> dict:
