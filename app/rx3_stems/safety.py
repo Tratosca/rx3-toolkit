@@ -38,9 +38,9 @@ def digest(path, progress=lambda done, total: None):
     return value.hexdigest()
 
 
-def source_stamp(path):
+def source_stamp(path, progress=lambda done, total: None):
     before = path.stat()
-    value = digest(path)
+    value = digest(path, progress)
     after = path.stat()
     if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
         raise LocalizedError("stems.sourceChanged", name=path.name)

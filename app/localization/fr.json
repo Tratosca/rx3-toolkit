@@ -303,5 +303,18 @@
   "stems.readback": "La verification apres ecriture a echoue pour {name}. Le fichier precedent est conserve. Verifiez la cle.",
   "stems.libraryBusy": "Fermez rekordbox avant de lire la bibliotheque ou de preparer les stems. Un export peut etre en cours.",
   "stems.processUnknown": "Impossible de verifier si le logiciel de bibliotheque est ouvert. Retablissez la detection des processus avant de continuer.",
-  "stems.recheck": "Verifier a nouveau"
+  "stems.recheck": "Verifier a nouveau",
+  "stems.hashing": "Calcul de l'empreinte source",
+  "stems.verified": "Stems existants verifies",
+  "stems.unverified": "{name} : stems existants conserves, mais leur source ne peut pas etre verifiee avec cet ancien manifeste.",
+  "stems.regenerating": "{name} : source, reglages ou audio stocke modifies ; remplacement des stems.",
+  "stems.reusing": "{name} : copie de stems verifies sans nouvelle separation.",
+  "stems.separating": "Separation des stems",
+  "stems.encoding": "Encodage : {role}",
+  "stems.alignmentUnknown": "{name} : delai encodeur non mesurable. Reexportez la source sans perte si la soustraction laisse des voix.",
+  "stems.clipped": "{name} : {count} echantillons ecretes en s16.",
+  "stems.cacheUnavailable": "Les stems sont enregistres, mais le cache local n'a pas pu etre mis a jour.",
+  "stems.cacheLimit": "Limite du cache local (Gio)",
+  "stems.cacheClear": "Vider le cache",
+  "stems.cacheLimitInvalid": "La limite du cache doit etre comprise entre 0 et 1024 Gio."
 }

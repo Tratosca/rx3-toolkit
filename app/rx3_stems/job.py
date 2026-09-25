@@ -15,13 +15,13 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Callable, Sequence
 
-from app.localization import error_message
-from app.rx3_stems import safety
+from app.localization import Message, error_message
+from app.rx3_stems import safety, cache
 from app.rx3_stems.estimate import Estimator
 from app.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from app.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
 from app.rx3_stems.separation import ROLE_STEMS, VOCAL_STEM, Settings, input_normalization
-from app.rx3_stems.stem import PARTIAL_SUFFIX, ROLE_ORDER, ROLE_SUFFIXES, write_stem
+from app.rx3_stems.stem import ROLE_ORDER, ROLE_SUFFIXES, write_stem
 
 
 MANIFEST_NAME = "rx3-stems-manifest.json"
@@ -65,6 +65,7 @@ class Stem:
     # Samples this stem alone pushed past full scale, which only the container
     # it was written into can report.
     clipped: int = 0
+    sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,9 @@ class TrackResult:
     # Encoder padding the stems were pushed back by to land on the deck's grid,
     # also measured from the source and so also shared.
     delay: int = 0
+    source_sha256: str | None = None
+    source_bytes: int | None = None
+    processing: dict | None = None
 
     @property
     def stem(self) -> str:
@@ -103,9 +107,11 @@ class TrackResult:
             "bytes": self.size, "status": self.status,
             "gainCorrection": round(self.gain, 6), "clippedSamples": self.clipped,
             "encoderDelayFrames": self.delay,
+            "source_sha256": self.source_sha256, "source_bytes": self.source_bytes,
+            "processing": self.processing,
             "stems": [
                 {"role": entry.role, "file": entry.name, "bytes": entry.size,
-                 "clippedSamples": entry.clipped}
+                 "clippedSamples": entry.clipped, "sha256": entry.sha256}
                 for entry in self.stems
             ],
         }
@@ -215,6 +221,8 @@ class StemJob:
         # Audio the current track carries, and audio every track after it does.
         self._current_audio = 0.0
         self._later_audio = 0.0
+        self._entries, self._has_manifest = cache.read_manifest(output_root)
+        self._signature = cache.signature(self.settings, architecture, self.roles)
 
     @property
     def state(self) -> JobState:
@@ -387,86 +395,96 @@ class StemJob:
         used_names[base.casefold()] = source
 
         targets = {role: output / f"{base}{ROLE_SUFFIXES[role]}" for role in self.roles}
-        for target in targets.values():
-            safety.check_target(target)
-        entries: dict[str, Stem] = {}
-        for role, path in targets.items():
-            if path.is_file() and path.stat().st_size > MINIMUM_STEM_BYTES:
-                entries[role] = Stem(role, path.name, path.stat().st_size)
-        missing = [role for role in self.roles if role not in entries]
-        gain, delay = 1.0, 0
-        if not missing:
-            self._update(stage="Already generated", track_progress=100)
-            status = "existing"
-        else:
-            status = "created"
-            safety.require_space(output, safety.estimated_bytes(
-                track, len(missing), self.runtime.ffmpeg or "ffmpeg"))
-            source_before = safety.source_stamp(source)
-            # The model reconstructs every role in one pass, so a run started
-            # for a single missing role still costs the whole separation.
-            partials: list[pathlib.Path] = []
+        for suffix in ROLE_SUFFIXES.values():
+            safety.check_target(output / (base + suffix))
+        self._update(stage=Message("stems.hashing"), track_progress=0)
+        before = safety.source_stamp(source, progress=lambda done, size: (
+            self._checkpoint(), self._update(track_progress=round(done * 100 / max(1, size)))))
+        previous = next((entry for entry in self._entries if entry.get("stem") == targets["vocals"].name), None)
+        known = previous is not None and previous.get("source_sha256") is not None
+        matching = known and previous.get("source_sha256") == before[2] and previous.get("processing") == self._signature
+        if matching and cache.verified_files(output, previous, self.roles):
+            safety.check_source(source, before)
+            self._update(stage=Message("stems.verified"), track_progress=100)
+            return self._result(track, targets, "existing", before, previous)
+        if not known and (not self._has_manifest or previous is not None) and all(
+                path.is_file() and path.stat().st_size > MINIMUM_STEM_BYTES for path in targets.values()):
+            self._notice(Message("stems.unverified", name=source.name))
+            # An old stem cannot acquire proof by merely hashing today's source.
+            return TrackResult(track.track_id, track.artist, track.title, source.name,
+                               tuple(Stem(role, path.name, path.stat().st_size) for role, path in targets.items()),
+                               "existing")
+        if previous is not None or any(path.exists() for path in targets.values()):
+            self._notice(Message("stems.regenerating", name=source.name))
+        safety.require_space(output, safety.estimated_bytes(track, len(self.roles), self.runtime.ffmpeg or "ffmpeg"))
+        with tempfile.TemporaryDirectory(prefix="rx3-stem-") as directory:
+            workspace = pathlib.Path(directory)
+            hit = cache.find(before[2], self._signature, self.roles, self.output_root, workspace)
+            metadata = {"gainCorrection": 1.0, "encoderDelayFrames": 0, "stems": []}
+            if hit:
+                prepared, metadata = hit
+                status = "reused"
+                self._notice(Message("stems.reusing", name=source.name))
+            else:
+                status = "created"
+                self._update(stage=Message("stems.separating"), track_progress=1)
+                separated = self._separate(source, workspace, index, total)
+                prepared = {}
+                for position, role in enumerate(self.roles):
+                    self._checkpoint()
+                    self._update(stage=Message("stems.encoding", role=role), track_progress=min(96 + position, 99))
+                    local = workspace / targets[role].name
+                    encoded = write_stem(separated[role], local,
+                                         ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16",
+                                         match_full=source, separator_normalization=input_normalization(self.settings, self.architecture))
+                    prepared[role] = local
+                    metadata["gainCorrection"], metadata["encoderDelayFrames"] = encoded.gain, encoded.delay
+                    metadata["stems"].append({"role": role, "clippedSamples": encoded.clipped})
+                    if not encoded.aligned:
+                        self._notice(Message("stems.alignmentUnknown", name=source.name))
+                    if encoded.clipped:
+                        self._notice(Message("stems.clipped", name=source.name, count=encoded.clipped))
+            safety.check_source(source, before)
+            safety.require_space(output, sum(path.stat().st_size for path in prepared.values()))
+            # Optional roles from the previous source must not survive a new
+            # vocal. An interrupted publication can then only reduce the set.
+            for role in reversed(ROLE_ORDER[1:]):
+                old = output / (base + ROLE_SUFFIXES[role])
+                safety.check_target(old)
+                old.unlink(missing_ok=True)
+            safety.sync_directory(output)
+            for role in self.roles:
+                self._checkpoint()
+                safety.check_source(source, before)
+                safety.publish(prepared[role], targets[role])
+            result = self._result(track, targets, status, before, metadata)
             try:
-                with tempfile.TemporaryDirectory(prefix="rx3-stem-") as directory:
-                    workspace = pathlib.Path(directory)
-                    stage = "Vocal separation" if self.roles == ("vocals",) else "Stem separation"
-                    self._update(stage=stage, track_progress=1)
-                    separated = self._separate(source, workspace, index, total)
-                    for position, role in enumerate(missing):
-                        destination = targets[role]
-                        self._update(
-                            stage=f"Encoding {role}",
-                            track_progress=min(96 + position, 99),
-                        )
-                        local = workspace / destination.name
-                        encoded = write_stem(
-                            separated[role], local,
-                            ffmpeg=self.runtime.ffmpeg or "ffmpeg",
-                            sample_format="s16",
-                            match_full=source,
-                            separator_normalization=input_normalization(
-                                self.settings, self.architecture
-                            ),
-                        )
-                        # Both are read off the source rather than off the stem,
-                        # so the last role to be encoded reports what all of them
-                        # were corrected by.
-                        gain, delay = encoded.gain, encoded.delay
-                        if not encoded.aligned:
-                            self._notice(
-                                f"{destination.name}: the encoder padding of "
-                                f"{source.name} could not be measured, so the stem "
-                                "stays on the separator's timeline. If the deck "
-                                "leaves vocal in the instrumental, convert the "
-                                "source to WAV or FLAC and generate it again."
-                            )
-                        if encoded.clipped:
-                            self._notice(
-                                f"{destination.name}: {encoded.clipped} sample(s) "
-                                "exceeded full scale and were clipped by the s16 "
-                                "stem."
-                            )
-                        if not output.is_dir():
-                            raise RuntimeError("The destination was unmounted during processing")
-                        safety.check_source(source, source_before)
-                        safety.require_space(output, local.stat().st_size)
-                        safety.publish(local, destination)
-                        entries[role] = Stem(
-                            role, destination.name, destination.stat().st_size,
-                            encoded.clipped,
-                        )
-            except BaseException:
-                # A role already renamed into place is left there: it is
-                # complete, and the deck reads each container on its own.
-                for partial in partials:
-                    partial.unlink(missing_ok=True)
-                raise
+                cache.remember(output, result.as_manifest_entry(), self.roles)
+            except OSError:
+                self._notice(Message("stems.cacheUnavailable"))
+            return result
+
+    def _result(self, track, targets, status, before, metadata):
         return TrackResult(
-            track_id=track.track_id, artist=track.artist, title=track.title,
-            source_file=source.name,
-            stems=tuple(entries[role] for role in self.roles),
-            status=status, gain=gain, delay=delay,
+            track.track_id, track.artist, track.title, track.location.name,
+            tuple(Stem(role, path.name, path.stat().st_size,
+                       next((item.get("clippedSamples", 0) for item in metadata.get("stems", []) if item.get("role") == role), 0),
+                       safety.digest(path)) for role, path in targets.items()),
+            status, metadata.get("gainCorrection", 1.0), metadata.get("encoderDelayFrames", 0),
+            before[2], before[0], self._signature,
         )
+
+    def _save_manifest(self, output, result):
+        self._entries = [entry for entry in self._entries if entry.get("stem") != result.stem]
+        self._entries.append(result.as_manifest_entry())
+        manifest = output / MANIFEST_NAME
+        contents = json.dumps({"format": 2, "createdAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                               "tracks": self._entries}, ensure_ascii=False, indent=2) + "\n"
+        with tempfile.TemporaryDirectory(prefix="rx3-manifest-") as directory:
+            local = pathlib.Path(directory) / MANIFEST_NAME
+            local.write_text(contents, encoding="utf-8")
+            safety.publish(local, manifest)
+        self._update(manifest=manifest)
 
     def run(self) -> JobState:
         """Process every track, recording per-track failures without stopping."""
@@ -514,6 +532,7 @@ class StemJob:
                 track_started = time.monotonic()
                 try:
                     result = self._process_track(track, index, len(tracks), output, used_names)
+                    self._save_manifest(output, result)
                     results.append(result)
                     # Only a separation that actually ran says anything about
                     # how fast this machine separates; a resumed stem is
@@ -537,21 +556,9 @@ class StemJob:
                     **self._timings(1.0),
                 )
 
-            manifest = output / MANIFEST_NAME
-            contents = json.dumps({
-                "format": 1,
-                "createdAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                "rekordboxXml": str(self.collection.xml),
-                "playlist": self.playlist.path,
-                "tracks": [item.as_manifest_entry() for item in results],
-            }, ensure_ascii=False, indent=2) + "\n"
-            with tempfile.TemporaryDirectory(prefix="rx3-manifest-") as directory:
-                local = pathlib.Path(directory) / MANIFEST_NAME
-                local.write_text(contents, encoding="utf-8")
-                safety.publish(local, manifest)
             self._update(
                 state="done", stage="Finished", current="", progress=100,
-                completed=len(tracks), position=len(tracks), manifest=manifest,
+                completed=len(tracks), position=len(tracks),
                 eta_seconds=0.0, elapsed_seconds=time.monotonic() - self._started,
             )
         except Cancelled:

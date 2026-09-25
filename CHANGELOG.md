@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Prepared stems are reused only when the full source SHA-256, effective processing signature and verified final audio match. A version 2 manifest retains legacy entries without inventing provenance, and completed tracks are recorded individually. A bounded local LRU cache and mounted-drive lookup avoid repeated separation; the cache limit and clear action are available in the Stems screen.
+
 - Stem preparation checks free space before separation, detects source changes, refuses symbolic-link destinations and verifies staged files by SHA-256 before replacing them. File and supported directory syncs precede completion, and metadata cleanup stays inside RX3_STEMS. The manifest now lives there too. Library reads and batches stop while the library application is open, with a persistent warning and an explicit recheck.
 
 - Cap sampler polyphony at four voices total across both decks and all playback modes. Reject a fifth start without interrupting active sounds; apply the same ceiling to desktop playback, including pending conversions. Not yet validated on hardware.

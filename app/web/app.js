@@ -209,6 +209,11 @@ async function readJob() {
     : job.state === "cancelled" ? t("job.cancelled") : t("job.failed");
   document.getElementById("job-detail").textContent =
     window.i18n.message(job.error) || (job.result ? describeResult(job) : running ? "" : window.i18n.message(job.message));
+  if (running && job.kind === "stems" && job.detail) {
+    document.getElementById("job-detail").textContent =
+      (job.detail.current || "") + " - " + window.i18n.message(job.detail.stage) +
+      " " + window.i18n.number(job.detail.trackProgress || 0) + "%";
+  }
   document.getElementById("job-cancel").hidden = !running;
   var bar = document.getElementById("job-bar");
   bar.dataset.indeterminate = String(running && job.progress === null);

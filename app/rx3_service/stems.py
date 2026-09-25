@@ -134,9 +134,12 @@ def job(
     detected = provisioning.detect()
     if not detected.ready:
         raise LocalizedError("stems.engineMissing")
+    current = settings or separation.Settings()
+    catalogue = _catalogue()
+    architecture = catalogue.architecture_of(current.model) if catalogue else None
     return StemJob(
         detected, library.collection, playlist, pathlib.Path(output),
-        settings=settings, roles=roles,
+        settings=current, roles=roles, architecture=architecture,
         observer=lambda state: observer(state.as_dict()),
     )
 

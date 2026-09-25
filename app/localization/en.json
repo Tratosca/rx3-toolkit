@@ -303,5 +303,18 @@
   "stems.readback": "Readback verification failed for {name}. The previous file was kept. Check the drive.",
   "stems.libraryBusy": "Close rekordbox before reading the library or preparing stems. An export may still be running.",
   "stems.processUnknown": "Cannot check whether the library application is running. Restore process detection before continuing.",
-  "stems.recheck": "Check again"
+  "stems.recheck": "Check again",
+  "stems.hashing": "Hashing source",
+  "stems.verified": "Verified existing stems",
+  "stems.unverified": "{name}: existing stems kept, but their source cannot be verified from the old manifest.",
+  "stems.regenerating": "{name}: source, settings or stored audio changed; replacing the prepared set.",
+  "stems.reusing": "{name}: copying verified prepared audio without separation.",
+  "stems.separating": "Separating stems",
+  "stems.encoding": "Encoding {role}",
+  "stems.alignmentUnknown": "{name}: encoder padding could not be measured. Re-export the source as lossless audio if subtraction leaves vocals.",
+  "stems.clipped": "{name}: {count} samples clipped to s16.",
+  "stems.cacheUnavailable": "Prepared stems were saved, but the local cache could not be updated.",
+  "stems.cacheLimit": "Local cache limit (GiB)",
+  "stems.cacheClear": "Clear cache",
+  "stems.cacheLimitInvalid": "The cache limit must be between 0 and 1024 GiB."
 }

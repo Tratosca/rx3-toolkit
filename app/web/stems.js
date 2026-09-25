@@ -187,7 +187,34 @@
     note();
   }
 
+  async function drawCache() {
+    var state = await window.rx3.ask("stems_cache");
+    if (!state) return;
+    var row = id("stems-cache");
+    row.replaceChildren();
+    var label = el("label", null, t("stems.cacheLimit"));
+    var size = el("input");
+    size.type = "number"; size.min = "0"; size.max = "1024"; size.step = "0.25";
+    size.value = String(state.limit / Math.pow(1024, 3));
+    label.append(size);
+    size.addEventListener("change", async function () {
+      var value = Number(size.value);
+      if (!Number.isFinite(value) || value < 0 || value > 1024) return;
+      await window.rx3.ask("stems_cache", Math.round(value * Math.pow(1024, 3)), false);
+      drawCache();
+    });
+    var clear = el("button", "btn small", t("stems.cacheClear"));
+    clear.type = "button";
+    clear.addEventListener("click", async function () {
+      await window.rx3.ask("stems_cache", null, true); drawCache();
+    });
+    row.append(label, el("span", "dim", window.i18n.bytes(state.bytes)), clear);
+  }
+
   function wire() {
+    var cacheRow = el("div", "row");
+    cacheRow.id = "stems-cache";
+    id("roles-row").after(cacheRow);
     var warning = el("div", "notice");
     warning.id = "library-warning";
     warning.setAttribute("role", "alert");
@@ -238,6 +265,7 @@
       if (!output) setOutput(event.detail.path);
     });
     window.addEventListener("rx3language", function () {
+      drawCache();
       drawLibraryGuard();
       drawMachine();
       drawQuality();
@@ -254,6 +282,7 @@
     machine = await window.rx3.ask("stems_runtime");
     wire();
     await checkLibrary();
+    await drawCache();
     drawMachine();
     drawQuality();
     drawRoles();

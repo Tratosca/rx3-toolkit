@@ -401,6 +401,14 @@ Each file is staged exclusively under a `.partial` suffix, stripped of extended 
 
 The manifest is published through the same path inside RX3_STEMS. The old root-level manifest is left untouched. Process detection blocks library reads and preparation while an export application is open; an unavailable process query fails closed. It cannot prevent an application being launched after the check.
 
+### Reuse and provenance
+
+Manifest schema 2 records `source_sha256`, `source_bytes`, `processing`, the applied gain and delay, and a SHA-256 for each final stem. The processing signature includes the model filename, catalogue architecture when available, preset, effective command arguments, requested roles, s16 format and stem/encoder versions. Changing any of these invalidates reuse. Source hashes stream in 1 MiB blocks and report progress. A source hash proves file identity, not ownership or separation quality.
+
+Readers accept schema 1 and check the old drive-root location when the new manifest is absent. Legacy entries retain null source identity until regenerated: hashing a current track cannot establish which source produced an older stem. Missing manifests keep the legacy existence-based behaviour with a visible warning. Known entries require matching source and processing, valid equal-length stem headers and matching audio hashes. A damaged known entry is regenerated. Each completed track is merged into the manifest so later failures do not erase earlier provenance.
+
+The app data directory holds a 4 GiB default cache, configurable from zero (disabled) to 1024 GiB. Entries are keyed by source SHA-256 and processing signature and contain final encoded audio, not model output. Hits are copied to a local workspace while holding the cache lock; eviction therefore cannot interrupt a drive write. Directory modification time records last use for LRU eviction. Only verified entries are reused, first from this cache and then from mounted drives. Optional roles from an earlier preparation are removed before replacing vocals, so an interruption reduces available roles instead of combining different sources.
+
 ### Which model actually runs
 
 The best models available are roformers, which are PyTorch checkpoints. The ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs. Neither runtime is accelerated everywhere, and the split differs per platform:

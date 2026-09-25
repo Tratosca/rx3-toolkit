@@ -597,6 +597,11 @@ class Bridge:
     # Separation -------------------------------------------------------------
 
     @answered
+    def stems_cache(self, maximum=None, clear=False) -> dict:
+        from app.rx3_stems import cache
+        return cache.configure(maximum, clear)
+
+    @answered
     def stems_library_status(self) -> dict:
         from app.rx3_stems import safety
         return {"busy": safety.library_busy()}
