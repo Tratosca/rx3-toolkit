@@ -332,7 +332,7 @@ Two details make this harder than it sounds. The library software truncates a fi
 
 Second, two different tracks can truncate to the same name. The load interface gives no reliable way to tell them apart, so the tool **refuses the collision** rather than picking one arbitrarily. Truncation is applied before that comparison, because two names that differ only past character 44 collide on the stick.
 
-Stems load asynchronously into anonymous memory. The deck stays on the stock audio path until loading finishes, after which the file on the stick is closed, so pulling the drive after a completed load cannot invalidate a live mapping. Allocation is refused if the payload would exceed 60% of the memory estimated to be available or reclaimable.
+Stems load asynchronously into anonymous memory. The deck stays on the stock audio path until loading finishes, after which the file on the stick is closed, so pulling the drive after a completed load cannot invalidate a live mapping. Allocation is refused if resident stem audio across both decks and the pending roles would exceed 512 MiB, or if the next allocation would leave less than 300 MiB of estimated available memory. Available memory is re-read after every allocation; it already reflects resident audio, so that part is not subtracted twice. Not yet run on hardware.
 
 ### Getting the audio right
 

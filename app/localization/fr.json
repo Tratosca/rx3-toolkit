@@ -316,5 +316,8 @@
   "stems.cacheUnavailable": "Les stems sont enregistres, mais le cache local n'a pas pu etre mis a jour.",
   "stems.cacheLimit": "Limite du cache local (Gio)",
   "stems.cacheClear": "Vider le cache",
-  "stems.cacheLimitInvalid": "La limite du cache doit etre comprise entre 0 et 1024 Gio."
+  "stems.cacheLimitInvalid": "La limite du cache doit etre comprise entre 0 et 1024 Gio.",
+  "stems.sizeUnknown": "Taille inconnue avant mesure de la duree",
+  "stems.trackSize": "{role} par role, {total} au total",
+  "stems.memoryWarning": "Au-dessus de {limit} : les deux platines partagent la RAM ; des roles supplementaires peuvent etre refuses."
 }

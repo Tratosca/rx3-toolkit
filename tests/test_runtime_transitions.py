@@ -94,6 +94,16 @@ int main(void) {
     for(unsigned i=0;i<300;i++) output[i]=(Float2){1,-1};
     stems_mix(c,0,output,300); assert(output[299].left==0.25f && output[299].right==-0.25f);
     c->selection=0xf0; stems_mix(c,0,output,300); assert(output[299].left==0);
+    for(unsigned count=1;count<=3;count++) {
+        c->payload_count=count; c->selection=1u; stems_reset_mix(c);
+        for(unsigned i=0;i<300;i++) output[i]=(Float2){1,-1};
+        stems_mix(c,0,output,255);
+        assert(c->transition_cursor==255 && c->gain[1]==1.0f/256.0f);
+        stems_mix(c,255,output+255,1);
+        float rest=1.0f-0.25f-(count>=2?0.125f:0)-(count==3?0.0625f:0);
+        assert(c->transition_cursor==256 && c->gain[1]==0);
+        assert(output[255].left==rest && output[255].right==-rest);
+    }
     c->selection=0xff; pthread_t a,b;
     assert(!pthread_create(&a,0,toggle_many,(void *)2));
     assert(!pthread_create(&b,0,toggle_many,(void *)4));
@@ -631,7 +641,7 @@ typedef struct { float left, right; } Float2;
 static unsigned long available=0x4b001;
 static unsigned long memory_available_kb(void) { return available; }
 static int read_exactly(int fd, void *p, size_t n) { return read(fd,p,n)==(ssize_t)n?0:-1; }
-''' + function(loader, "stems_load_payload") + r'''
+''' + function(MODULES / "core/rx3_core_hook.c", "release_payload") + function(loader, "stems_load_payload") + function(loader, "stems_load_set") + r'''
 static void write_fixture(FILE *f, const struct stem_header *h, unsigned bytes) {
     int16_t pcm[4]={1234,-1234,2345,-2345};
     rewind(f); assert(fwrite(h,1,sizeof(*h),f)==sizeof(*h));
@@ -653,7 +663,27 @@ int main(void) {
     h.frames=0; write_fixture(f,&h,8); assert(!stems_load_payload(fileno(f),&p,0)); h.frames=2;
     write_fixture(f,&h,4); assert(!stems_load_payload(fileno(f),&p,0));
     h.frames=1; write_fixture(f,&h,8); assert(!stems_load_payload(fileno(f),&p,0));
-    assert(!p.data); fclose(f); return 0;
+    assert(!p.data);
+    h.frames=2; write_fixture(f,&h,8);
+    FILE *shorter=tmpfile(); assert(shorter);
+    h.frames=1; write_fixture(shorter,&h,4);
+    struct stem_payload next[3]={0};
+    int fds[3]={-1,fileno(f),fileno(f)};
+    assert(!stems_load_set(fds,next,0));
+    fds[0]=fileno(f); fds[1]=-1;
+    assert(stems_load_set(fds,next,0)==1 && !next[1].data && !next[2].data);
+    release_payload(&next[0]);
+    fds[1]=fileno(shorter);
+    assert(stems_load_set(fds,next,0)==1 && !next[1].data && !next[2].data);
+    release_payload(&next[0]);
+    fds[1]=fileno(f);
+    assert(stems_load_set(fds,next,0)==3);
+    for(unsigned i=0;i<3;i++) release_payload(&next[i]);
+    /* Together with the other deck, only two eight-byte roles fit. */
+    assert(stems_load_set(fds,next,0x20000000u-16u)==2 && !next[2].data);
+    for(unsigned i=0;i<3;i++) release_payload(&next[i]);
+    assert(!stems_load_set(fds,next,0x20000001u));
+    fclose(shorter); fclose(f); return 0;
 }
 ''')
 

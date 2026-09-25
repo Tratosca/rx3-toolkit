@@ -37,8 +37,10 @@ Prepare stems of your tracks on your computer, load them on the RX3 the usual wa
 
 | Pad | Colour | What it does |
 | :--: | :--: | --- |
-| **7** | 🔴 Red | Instrumental on / off |
-| **8** | 🟢 Green | Vocal on / off |
+| **5** | Light blue | Drums on / off, with vocals and drums prepared. Not yet run on hardware |
+| **6** | Yellow | Bass on / off, with vocals, drums and bass prepared. Not yet run on hardware |
+| **7** | Red | Instrumental, or remaining instruments after subtracting prepared roles. Not yet run on hardware |
+| **8** | Green | Vocal on / off. Not yet run on hardware |
 
 ### 🎹 Key shift
 
@@ -144,9 +146,9 @@ xattr -rc "/Applications/XDJ-RX3 Toolkit.app"
 Skip this if you only want the longer beat jumps.
 
 1. In Rekordbox, make a playlist with the tracks you want stems for. Two or three, for a first run.
-2. Export your Rekordbox collection **as XML** (Preferences → *Advanced* or *View*, depending on your version). This is not the same as exporting to a stick. The app reads it to find where your audio files are.
+2. Export the playlist to your USB drive and close the library application. If the drive contains `PIONEER/rekordbox/export.pdb`, choose the drive directly: no XML export is needed. Alternatively, export the collection as XML to prepare audio stored on the computer. Not yet run on hardware.
 3. Open the app, go to the **Stems preparation** tab, and hit **Set up… → Install**. Separation needs a lot of software that is too big to ship in the download, so it gets installed once into its own private folder. You need an internet connection, ~1.5 GB free, and Python 3.10–3.13 ([python.org](https://www.python.org/downloads/) if you have none — take 3.13). If it stops halfway, press **Install** again; it picks up where it left off.
-4. Select your XML, your playlist, and your Rekordbox USB stick.
+4. Select the library drive or XML file, the playlist, and the destination USB drive. Vocals are required; drums and bass are optional, and bass also requires drums. Review the estimated size per role and track before starting. Not yet run on hardware.
 5. Pick a quality:
 
    | Preset | Use it when |
@@ -159,7 +161,7 @@ The top two are the same model at two settings, so switching between them downlo
 
 6. Start it. The app estimates how long the run will take, then corrects itself after the first track and remembers your machine's speed for next time. If it works out at more than ten minutes it asks first, because it will occupy the machine — keep the computer plugged in and awake.
 
-Each track produces a `.rx3stem` file in an `RX3_STEMS` folder inside the output folder you chose. If that was not your Rekordbox USB stick, move `RX3_STEMS` to the root of the stick now.
+Each track produces a vocal `.rx3stem`, plus `.rx3drums` and `.rx3bass` when selected, in `RX3_STEMS` at the output root. If preparing elsewhere, copy that directory to the USB drive root. Files are loaded into RAM; the size warning is guidance, and the player can reject additional roles when memory is insufficient. Not yet run on hardware.
 
 ```text
 Your USB stick
@@ -211,7 +213,7 @@ Here is what you are choosing from:
 
 | Module | What it does | On by default |
 | --- | --- | :--: |
-| **Stems control** | Slip Loop pads 7 and 8 become independent vocal and instrumental switches, on tracks that have a stem file | ✅ |
+| **Stems control** | Slip Loop pads 5/6/7/8 control drums, bass, remaining instruments and vocals when the corresponding files are prepared. Not yet run on hardware | Yes |
 | **Per-deck key shift** | A **KEY** tab on screen, twelve semitones either way, independently per deck | ✅ |
 | **Beat Jump ±32** | Beat Jump pads 7 and 8 become −32 and +32 instead of −8 and +8 | ✅ |
 | **Immediate Beat Jump** | Repeated jumps fire straight away instead of waiting for the grid. Quantize, Hot Cues, loops and Beat FX are untouched | ✅ |
@@ -287,7 +289,7 @@ Putting the stick back in later costs nothing: anything already running is recog
 
 Load one of your prepared tracks and open **Slip Loop**.
 
-Pads 7 and 8 blink while the stem loads, then settle on red and green. They are two independent switches — press pad 8 and the vocal drops out of the mix.
+Available stem pads blink while loading, then act as independent switches. Pad 5 toggles drums, 6 bass, 7 the remaining instruments and 8 vocals; without additional roles, pad 7 is the full instrumental. Turning off only pad 8 removes vocals. With no valid vocal file the player retains its native controls. Not yet run on hardware.
 
 Open **Beat Jump** on the same track: pads 7 and 8 now read `32`.
 

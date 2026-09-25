@@ -208,6 +208,8 @@ class StemJob:
         # and a run that produced drums alone would look complete while the
         # deck found nothing to load.
         wanted = {role for role in roles if role in ROLE_SUFFIXES} | {"vocals"}
+        if "bass" in wanted:
+            wanted.add("drums")
         self.roles = tuple(role for role in ROLE_ORDER if role in wanted)
         self.architecture = architecture
         self.acceleration = acceleration or resolve_acceleration(self.settings.accelerator)

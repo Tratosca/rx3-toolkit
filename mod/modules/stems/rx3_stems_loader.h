@@ -48,7 +48,7 @@ static int stems_load_payload(int fd, struct stem_payload *destination,
     for (unsigned int i = 0; i < sizeof(header.reserved); i++)
         if (header.reserved[i]) return 0;
     size_t bytes = (size_t)header.frames * 4u;
-    if (bytes > 0x20000000u - other_bytes) return 0;
+    if (other_bytes >= 0x20000000u || bytes > 0x20000000u - other_bytes) return 0;
     unsigned long available = memory_available_kb();
     if (available <= 0x4b000u || (bytes + 1023u) / 1024u > available - 0x4b000u) return 0;
     void *block = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -63,6 +63,27 @@ static int stems_load_payload(int fd, struct stem_payload *destination,
     destination->block = block;
     destination->block_size = bytes;
     return 1;
+}
+
+/* The worker is single-threaded. The other deck can release memory while
+   this set loads, but cannot allocate a second pending set concurrently. */
+static unsigned int stems_load_set(const int fds[3], struct stem_payload next[3],
+                                    unsigned int other_bytes)
+{
+    unsigned int count = 0u;
+    while (count < 3u && fds[count] >= 0) count++;
+    for (; count; count--) {
+        int valid = 1;
+        unsigned int resident = other_bytes;
+        for (unsigned int i = 0; i < count; i++) {
+            if (!stems_load_payload(fds[i], &next[i], resident) ||
+                (i && next[i].frames != next[0].frames)) { valid = 0; break; }
+            resident += next[i].block_size;
+        }
+        if (valid) break;
+        for (unsigned int i = 0; i < 3u; i++) release_payload(&next[i]);
+    }
+    return count;
 }
 
 static void *stems_loader_loop(void *unused)
@@ -84,21 +105,13 @@ static void *stems_loader_loop(void *unused)
         unsigned int count = 0u;
         while (count < 3u && request->fds[count] >= 0) count++;
         unsigned int wanted = count;
-        for (; count; count--) {
-            int valid = 1;
-            for (unsigned int i = 0; i < count; i++) {
-                unsigned int other_bytes = 0u;
-                stems_lock();
-                struct stems_deck_context *other = &stems_decks[context == &stems_decks[0] ? 1u : 0u];
-                for (unsigned int j = 0; j < other->payload_count; j++)
-                    other_bytes += other->payloads[j].block_size;
-                stems_unlock();
-                if (!stems_load_payload(request->fds[i], &next[i], other_bytes) ||
-                    (i && next[i].frames != next[0].frames)) { valid = 0; break; }
-            }
-            if (valid) break;
-            for (unsigned int i = 0; i < 3u; i++) release_payload(&next[i]);
-        }
+        stems_lock();
+        struct stems_deck_context *other = &stems_decks[context == &stems_decks[0] ? 1u : 0u];
+        unsigned int other_bytes = 0u;
+        for (unsigned int j = 0; j < other->payload_count; j++)
+            other_bytes += other->payloads[j].block_size;
+        stems_unlock();
+        count = stems_load_set(request->fds, next, other_bytes);
         stems_lock();
         if (stems_loader_running && context->generation == request->generation &&
             context->reader == request->reader) {

@@ -100,6 +100,9 @@
     box.disabled = role === "vocals";
     box.addEventListener("change", function () {
       roles[role] = box.checked;
+      if (role === "bass" && box.checked) roles.drums = true;
+      if (role === "drums" && !box.checked) roles.bass = false;
+      drawRoles(); forecast();
     });
     wrap.append(box, el("span", null, label));
     return wrap;
@@ -131,8 +134,19 @@
   async function forecast() {
     var picker = id("playlist");
     if (!library || !picker.value) return;
-    var answer = await window.rx3.ask("stems_forecast", picker.value);
+    var wanted = Object.keys(roles).filter(function (role) { return roles[role]; });
+    var answer = await window.rx3.ask("stems_forecast", picker.value, wanted);
     id("forecast").textContent = answer ? window.i18n.message(answer.summary) : "";
+    var table = id("stems-memory");
+    table.replaceChildren();
+    if (!answer) return;
+    for (var track of answer.memory || []) {
+      var size = track.total === null ? t("stems.sizeUnknown") :
+        t("stems.trackSize", {role: window.i18n.bytes(track.perRole), total: window.i18n.bytes(track.total)});
+      table.append(el("p", track.warning ? "notice" : "dim",
+        track.artist + " - " + track.title + ": " + size +
+        (track.warning ? " " + t("stems.memoryWarning", {limit:window.i18n.bytes(answer.memoryWarningBytes)}) : "")));
+    }
   }
 
   function drawLibraryGuard() {
@@ -212,6 +226,9 @@
   }
 
   function wire() {
+    var memory = el("div");
+    memory.id = "stems-memory";
+    id("forecast").after(memory);
     var cacheRow = el("div", "row");
     cacheRow.id = "stems-cache";
     id("roles-row").after(cacheRow);

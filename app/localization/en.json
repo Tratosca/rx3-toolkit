@@ -316,5 +316,8 @@
   "stems.cacheUnavailable": "Prepared stems were saved, but the local cache could not be updated.",
   "stems.cacheLimit": "Local cache limit (GiB)",
   "stems.cacheClear": "Clear cache",
-  "stems.cacheLimitInvalid": "The cache limit must be between 0 and 1024 GiB."
+  "stems.cacheLimitInvalid": "The cache limit must be between 0 and 1024 GiB.",
+  "stems.sizeUnknown": "Size unknown until duration is measured",
+  "stems.trackSize": "{role} per role, {total} total",
+  "stems.memoryWarning": "Above {limit}: both decks share limited RAM; additional roles may be rejected."
 }

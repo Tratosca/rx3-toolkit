@@ -91,7 +91,7 @@ def is_library(source: pathlib.Path) -> bool:
     return source.is_file() and source.suffix.lower() == ".xml"
 
 
-def forecast(library: Library, playlist_id: str, settings=None) -> dict:
+def forecast(library: Library, playlist_id: str, settings=None, roles=("vocals",)) -> dict:
     """What the run would cost, before anyone commits to it.
 
     Returns no estimate rather than a fabricated one when the durations are not
@@ -103,8 +103,22 @@ def forecast(library: Library, playlist_id: str, settings=None) -> dict:
     estimator = estimate.estimator_for(
         provisioning.data_directory() / "rates.json", None, accelerator.key)
     result = estimate.forecast(playlist.tracks, estimator)
+    selected = set(roles) | {"vocals"}
+    if "bass" in selected:
+        selected.add("drums")
+    selected &= {"vocals", "drums", "bass"}
+    # Half the 512 MiB shared resident cap leaves the other deck equal room.
+    warning_bytes = 256 * 1024 * 1024
+    memory = []
+    for track in playlist.tracks:
+        per_role = int(track.duration * 44100) * 4 + 64 if track.duration > 0 else None
+        total = per_role * len(selected) if per_role is not None else None
+        memory.append({"id": track.track_id, "title": track.title, "artist": track.artist,
+                       "perRole": per_role, "total": total,
+                       "warning": total is not None and total > warning_bytes})
     return {
         "tracks": result.tracks,
+        "memory": memory, "memoryWarningBytes": warning_bytes,
         "audioSeconds": result.audio_seconds,
         "seconds": result.seconds,
         "measured": result.measured,

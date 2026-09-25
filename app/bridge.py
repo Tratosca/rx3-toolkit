@@ -653,9 +653,9 @@ class Bridge:
         return stems_service.choose(mode or None, accelerator or None)
 
     @answered
-    def stems_forecast(self, playlist_id: str) -> dict:
+    def stems_forecast(self, playlist_id: str, roles=("vocals",)) -> dict:
         return stems_service.forecast(
-            self._held(), playlist_id, stems_service.settings())
+            self._held(), playlist_id, stems_service.settings(), roles)
 
     @answered
     def stems_install(self, accelerator: str = "auto") -> dict:

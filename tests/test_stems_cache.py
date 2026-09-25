@@ -114,6 +114,12 @@ class CacheTests(unittest.TestCase):
         cache.configure(clear=True)
         self.assertFalse(cache.directories())
 
+    def test_bass_preparation_includes_the_drums_prerequisite(self):
+        current = self.make_job("first")
+        with_bass = job.StemJob(self.runtime, current.collection, current.playlist,
+                               current.output_root, roles=("bass",))
+        self.assertEqual(with_bass.roles, ("vocals", "drums", "bass"))
+
     def test_manifest_paths_cannot_escape_the_stems_directory(self):
         state, _ = self.prepare()
         entry = state.results[0].as_manifest_entry()

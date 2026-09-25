@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Multi-role loading now counts earlier roles in the pending set against the shared 512 MiB ceiling, as well as the other deck. Native tests cover missing prerequisites, mismatched lengths, residual reconstruction and the exact 256-frame ramp. Preparation shows size per role and track, warns above 256 MiB, and includes drums whenever bass is requested. The README describes both library inputs and all four unchanged pads. Not yet run on hardware.
+
 - Prepared stems are reused only when the full source SHA-256, effective processing signature and verified final audio match. A version 2 manifest retains legacy entries without inventing provenance, and completed tracks are recorded individually. A bounded local LRU cache and mounted-drive lookup avoid repeated separation; the cache limit and clear action are available in the Stems screen.
 
 - Stem preparation checks free space before separation, detects source changes, refuses symbolic-link destinations and verifies staged files by SHA-256 before replacing them. File and supported directory syncs precede completion, and metadata cleanup stays inside RX3_STEMS. The manifest now lives there too. Library reads and batches stop while the library application is open, with a persistent warning and an explicit recheck.
