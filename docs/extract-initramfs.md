@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Getting a root filesystem from the published GPL sources
 
+The app does this for you when it needs the key: see step 4 of the README. This page is the same path by hand, for anyone who prefers to run it themselves or wants the whole filesystem rather than the key alone.
+
 The XDJ-RX3 source package is distributed as two ZIP files:
 
 ```text

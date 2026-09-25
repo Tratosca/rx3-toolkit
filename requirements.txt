@@ -4,3 +4,9 @@ pycdlib==1.14.0
 # was declared for the release alone while the logo screen had no way in; the
 # screen is the way in, so the tests that cover it need it too.
 pillow==12.3.0
+# The key is read from the manufacturer's GPL source package, whose archives
+# are Deflate64: `zipfile` lists that method but cannot read it.
+inflate64==1.0.4
+# A frozen interpreter does not reliably find the system's certificates, and
+# the package is fetched over HTTPS.
+certifi==2026.7.22

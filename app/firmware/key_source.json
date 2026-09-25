@@ -1,0 +1,27 @@
+{
+  "page": "https://www.pioneerdj.com/fr/support/open-source-code-distribution/gnu-open-source-license/",
+  "parts": [
+    {
+      "url": "https://files.microcms-assets.io/assets/3b9e29ce734e49babfedb3f8d1e728e3/f7f69f5f428841898c6d98f9976c23bb/A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip",
+      "name": "A9BEE4F7-6932-4E11-8D9F-5288F5F79EC2.zip",
+      "size": 209434594,
+      "sha256": "0cb9277161e57e35d3fd84823a926ea0ba6a342c07817cf871dc5d286b5b0169",
+      "member": "pioneerdj_xdj_rx3.tar.bz2.00"
+    },
+    {
+      "url": "https://files.microcms-assets.io/assets/3b9e29ce734e49babfedb3f8d1e728e3/5b39b9d79cc747c2b31ff39e22074bad/57CB205B-D45A-4143-BC09-22D8400074C2.zip",
+      "name": "57CB205B-D45A-4143-BC09-22D8400074C2.zip",
+      "size": 43368153,
+      "sha256": "6280e9e2c1c31a2d943608fde753de79c61b08f775aa063805ff84519537f484",
+      "member": "pioneerdj_xdj_rx3.tar.bz2.01"
+    }
+  ],
+  "filesystem": {
+    "member": "pioneerdj_xdj_rx3/initramfs.tar.gz",
+    "sha256": "2d854fa9692f3e44e736fa6ad05f62ffcb89f09ede19e4495979890f32279aef"
+  },
+  "key": {
+    "member": "initramfs/usr/local/pdj/aes256.key",
+    "sha256": "501771eba3ac9032e33ffe8c9132766f616b0bc9a01a3f8123914d29a2a27c70"
+  }
+}
