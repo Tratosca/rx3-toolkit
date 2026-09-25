@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Nettoyage, septembre 2026
 
-Ce que la passe de rangement a retiré de l'arbre, avec la preuve pour chaque fichier. Les fichiers suivis par git sont en `.attic/`, arborescence conservée, en attente du commit qui les supprimera. Les fichiers que git n'a jamais suivis sont dans `~/Desktop/rx3-toolbox-attic/`, hors du dépôt, et n'entreront jamais dans l'historique. Le tag `snapshot/before-cleanup` contient de toute façon l'arbre complet d'avant la passe.
+Ce que la passe de rangement a retiré de l'arbre, avec la preuve pour chaque fichier. Les fichiers suivis par git sont passés par `.attic/`, arborescence conservée, que le nettoyage du 25 septembre 2026 a supprimé ; les chemins `.attic/...` ci-dessous sont ceux d'alors, et le tag `snapshot/before-cleanup` contient l'arbre complet d'avant la passe. Les fichiers que git n'a jamais suivis ont été mis en quarantaine hors du dépôt, puis supprimés le même jour.
 
 Preuve de non-usage, appliquée à chaque entrée : aucune référence statique dans l'arbre (grep sur le nom et sur le chemin), absent du Makefile, de la CI et de `app/toolkit.spec`, hors d'atteinte des mécanismes dynamiques du dépôt (glob des `manifest.json` par `app/rx3_runtime/build.py` et par le spec, `*_feature.h` et `*_panel.h`, découverte `test_*.py` de `unittest`, wildcard `mod/modules/*/1.19/*.h` du Makefile), et aucune mention dans un `.md` autre que le CHANGELOG.
 
