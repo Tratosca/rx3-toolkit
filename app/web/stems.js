@@ -336,6 +336,7 @@
     report.style.whiteSpace = "pre-line";
     manual.append(picker, slots, run, report);
     id("stems-note").after(manual);
+    window.rx3listen.attach(manual);
     var memory = el("div");
     memory.id = "stems-memory";
     id("forecast").after(memory);

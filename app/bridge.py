@@ -623,6 +623,21 @@ class Bridge:
         return importing.assignments(self._held(), track_id, values)
 
     @answered
+    def stems_audition(self, drive, track_id, selection, start=0, seconds=30):
+        from app.rx3_stems import audition, provisioning
+        track = self._stem_track(track_id)
+        return audition.on_drive(track.location, pathlib.Path(drive), selection, start, seconds,
+                                 provisioning.detect().ffmpeg or "ffmpeg")
+
+    @answered
+    def stems_import_audition(self, drive, track_id, selection, start=0, seconds=30):
+        from app.rx3_stems import audition, importing, provisioning
+        track = self._stem_track(track_id)
+        inputs = importing.assignments(self._held(), track_id)
+        return audition.imported(track.location, inputs, selection, start, seconds,
+                                 provisioning.detect().ffmpeg or "ffmpeg")
+
+    @answered
     def stems_import_start(self, track_id, output):
         from app.rx3_stems import importing, safety, provisioning
         safety.require_library_closed()

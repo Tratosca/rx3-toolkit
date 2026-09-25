@@ -97,13 +97,23 @@ class ImportTests(unittest.TestCase):
             self.run_import(suffix=".mp3")
         self.assertEqual(caught.exception.message.key, "stems.importLossless")
 
+    def test_mono_duplication_does_not_attenuate_either_channel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source = root / "mono.wav"
+            wav(source, array.array("h", [1000] * 100), channels=1)
+            importing.decode(source, root / "pcm", "ffmpeg", duplicate_mono=True)
+            self.assertEqual(list(importing.samples(root / "pcm", 0, 1)), [1000 / 32768] * 2)
+
     def test_mono_is_duplicated_and_resampled(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             original = root / "mono.wav"
             pcm = signal(48000 * 12, 48000)[::2]
             wav(original, pcm, rate=48000, channels=1)
-            outputs, report = importing.prepare(original, {"vocals": original}, root)
+            mix = root / "stereo.wav"
+            wav(mix, array.array("h", (value for sample in pcm for value in (sample, sample))), rate=48000)
+            outputs, report = importing.prepare(mix, {"vocals": original}, root)
             audio = array.array("h", outputs["vocals"].read_bytes()[64:])
             self.assertEqual(audio[::2], audio[1::2])
             self.assertEqual(report["frames"], 44100 * 12)

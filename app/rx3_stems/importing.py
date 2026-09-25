@@ -47,9 +47,7 @@ def assignments(library, track_id, values=None):
         return data.get(key, {})
 
 
-def lossless(path, ffmpeg):
-    if path.suffix.lower() not in (".wav", ".aif", ".aiff", ".flac"):
-        raise LocalizedError("stems.importLossless", name=path.name)
+def audio_info(path, ffmpeg):
     probe = pathlib.Path(ffmpeg).with_name("ffprobe" + (".exe" if sys.platform == "win32" else ""))
     command = str(probe) if probe.is_file() else "ffprobe"
     result = subprocess.run([command, "-v", "error", "-select_streams", "a:0",
@@ -57,17 +55,30 @@ def lossless(path, ffmpeg):
                             capture_output=True, text=True)
     try:
         info = json.loads(result.stdout)["streams"][0]
-        codec = info["codec_name"]
-        valid = (codec == "flac" or codec.startswith("pcm_")) and info["channels"] in (1, 2)
+        if result.returncode:
+            raise ValueError()
+        return info
     except (ValueError, KeyError, IndexError, TypeError):
-        valid = False
-    if result.returncode or not valid:
+        raise LocalizedError("stems.importUnreadable", name=path.name) from None
+
+
+def lossless(path, ffmpeg):
+    if path.suffix.lower() not in (".wav", ".aif", ".aiff", ".flac"):
+        raise LocalizedError("stems.importLossless", name=path.name)
+    info = audio_info(path, ffmpeg)
+    codec = info.get("codec_name", "")
+    if not ((codec == "flac" or codec.startswith("pcm_")) and info.get("channels") in (1, 2)):
         raise LocalizedError("stems.importLossless", name=path.name)
 
 
-def decode(path, target, ffmpeg, *, untrimmed=False):
+def decode(path, target, ffmpeg, *, untrimmed=False, duplicate_mono=False):
+    # The default mono-to-stereo matrix attenuates each channel by sqrt(0.5).
+    # A manual mono stem must be duplicated at unity instead.
+    mono = duplicate_mono and audio_info(path, ffmpeg).get("channels") == 1
     stem._decode(ffmpeg, [*(stem.UNTRIMMED if untrimmed else ()), "-i", str(path),
-                          "-map", "0:a:0", "-vn", "-ar", "44100", "-ac", "2", "-f", "f32le", str(target)])
+                          "-map", "0:a:0", "-vn",
+                          *(["-af", "pan=stereo|c0=c0|c1=c0"] if mono else []),
+                          "-ar", "44100", "-ac", "2", "-f", "f32le", str(target)])
     size = target.stat().st_size
     if not size or size % 8:
         raise LocalizedError("stems.importUnreadable", name=path.name)
@@ -194,7 +205,7 @@ def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None)
     for role in roles:
         checkpoint()
         raw[role] = workspace / (role + ".f32")
-        lengths[role] = decode(pathlib.Path(inputs[role]), raw[role], ffmpeg)
+        lengths[role] = decode(pathlib.Path(inputs[role]), raw[role], ffmpeg, duplicate_mono=True)
     # All duration checks precede correlation or gain checks.
     if any(lengths[role] < frames for role in roles):
         raise LocalizedError("stems.importShort")

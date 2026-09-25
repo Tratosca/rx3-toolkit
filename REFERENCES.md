@@ -419,6 +419,12 @@ Gain is a heuristic: the median least-squares coefficient across probes must be 
 
 Assignments persist per library and track in the app data directory. A file chooser is available on every supported webview; dropping a file also works where the backend supplies its native path. The shared job slot keeps import publication separate from other drive-writing jobs. Local synthetic measurements on a six-minute track, including decode, checks and final encoding: 1.03 s for one role and 4.61 s for three roles. These are measurements on the development machine, not estimates used by the interface.
 
+### Host audition
+
+Audition reads the drive's final s16 stems and decodes the source on the UNTRIMMED 44100 Hz grid. Optional roles are admitted only as a contiguous prefix beginning with vocals and with identical frame counts, as in the loader. The original mix, remaining instruments and every available role combination use one Python reconstruction module. Native tests compare every float32 output bit with the C mixer across interrupted ramps, silence and selection changes. The native reference disables fused arithmetic because the configured ARMv7 NEON target uses separate multiply and add operations.
+
+The bridge returns at most 30 seconds of IEEE-float WAV, waveform peaks and the exact ramp state at each changed frame. Float output preserves peaks beyond unity until the playback device's own conversion. The browser requests a 44100 Hz audio context, retains position while preparing a changed selection, and carries the returned mixer state to the next request. Preparation may pause playback briefly; it is asynchronous and never blocks the interface thread. The excerpt cache holds at most four replies. The Imported view validates and encodes assigned files locally without publishing them; On the drive reads the existing files. Neither view emulates the player's time stretching, DAC or audio driver.
+
 ### Which model actually runs
 
 The best models available are roformers, which are PyTorch checkpoints. The ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs. Neither runtime is accelerated everywhere, and the split differs per platform:

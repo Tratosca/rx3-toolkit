@@ -55,6 +55,43 @@ int main(void) {
 }
 ''')
 
+    def test_host_reconstruction_matches_c_for_every_float_sample(self):
+        import array
+        import random
+        import struct
+        from app.rx3_stems import mixing
+        randomizer = random.Random(43)
+        pcm = [array.array("h", [randomizer.randint(-32768, 32767) for _ in range(1400)]) for _ in range(3)]
+        full = array.array("f", [randomizer.uniform(-1.2, 1.2) for _ in range(1400)])
+        for frame in range(0, 700, 17):
+            full[2 * frame] = full[2 * frame + 1] = 0
+        state = mixing.MixState()
+        expected = array.array("f")
+        segments = [(0, 128, 1), (128, 1, 3), (129, 300, 2), (429, 271, 15)]
+        for start, count, selection in segments:
+            expected.extend(mixing.reconstruct(full[start * 2:(start + count) * 2],
+                            [part[start * 2:(start + count) * 2] for part in pcm], selection, state))
+        def floats(values):
+            return ",".join(float(value).hex() + "f" for value in values)
+        vectors = "Float2 output[700]={" + ",".join("{" + floats(full[i:i + 2]) + "}" for i in range(0, 1400, 2)) + "};\n"
+        vectors += "Float2 expected[700]={" + ",".join("{" + floats(expected[i:i + 2]) + "}" for i in range(0, 1400, 2)) + "};\n"
+        for index, part in enumerate(pcm):
+            vectors += "Short2 role%d[700]={" % index + ",".join("{%d,%d}" % tuple(part[i:i + 2]) for i in range(0, 1400, 2)) + "};\n"
+        setup = "".join("c->payloads[%d].data=role%d;c->payloads[%d].frames=700;" % (i, i, i) for i in range(3))
+        calls = "".join("c->selection=%du;stems_mix(c,%d,output+%d,%d);" % (selection, start, start, count) for start, count, selection in segments)
+        self.run_c('''
+#pragma STDC FP_CONTRACT OFF
+typedef struct { float left, right; } Float2;
+typedef struct { int16_t left, right; } Short2;
+#include "stems/rx3_stems_decl.h"
+#include "stems/rx3_stems_audio.h"
+int main(void) {
+''' + vectors + "struct stems_deck_context *c=&stems_decks[0]; c->payload_count=3; stems_reset_mix(c);" + setup + calls + '''
+assert(!memcmp(output,expected,sizeof(output)));
+return 0;
+}
+''')
+
     def test_four_stem_mix_and_concurrent_selection(self):
         self.run_c(r'''
 typedef struct { float left, right; } Float2;
