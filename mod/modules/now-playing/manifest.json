@@ -1,0 +1,28 @@
+{
+  "id": "now-playing",
+  "name": "Now playing",
+  "description": "Sends what each deck is playing to a computer on the rear USB port: title, BPM, tempo and whether the channel is on air.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 101,
+  "runtime_directory": "now-playing",
+  "namespace": "now_playing",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_now_playing_decl.h",
+    "rx3_now_playing_feature.h"
+  ]
+}

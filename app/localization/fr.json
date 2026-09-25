@@ -249,6 +249,8 @@
   "module.logging.description": "Écrit les diagnostics sur USB ; la sortie continue du lecteur reste en RAM.",
   "module.search-latin.name": "Recherche sans accents",
   "module.search-latin.description": "Retrouve les morceaux sans saisir les accents.",
+  "module.now-playing.name": "Morceau en cours",
+  "module.now-playing.description": "Envoie à l’ordinateur branché sur le port USB arrière ce que joue chaque deck\u00a0: titre, BPM, tempo et état ON AIR de la voie. Pour un overlay de stream, un écran VJ ou la liste des morceaux joués, sans rekordbox ni PRO DJ LINK.",
   "module.telnet.name": "Accès Telnet",
   "module.telnet.description": "Active l’accès de développement via le réseau USB APIPA. Nécessite le mot de passe root.",
   "quality.quality.name": "Haute qualité",

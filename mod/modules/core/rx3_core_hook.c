@@ -166,6 +166,7 @@ typedef struct { int16_t left, right; } Short2;
 #include "../stemwave/rx3_stemwave_decl.h"
 #include "../theme-white/rx3_theme_decl.h"
 #include "../search-latin/rx3_search_decl.h"
+#include "../now-playing/rx3_now_playing_decl.h"
 #include "../samples/rx3_samples_decl.h"
 #include "../samples/rx3_samples_state.h"
 
@@ -360,8 +361,11 @@ static void search_latin_feature_remove(void);
 static int samples_feature_configured(void);
 static int samples_feature_install(void);
 static void samples_feature_remove(void);
+static int now_playing_feature_configured(void);
+static int now_playing_feature_install(void);
+static void now_playing_feature_remove(void);
 
-#define RUNTIME_FEATURE_COUNT 6u
+#define RUNTIME_FEATURE_COUNT 7u
 
 static struct rx3_runtime_feature runtime_features[RUNTIME_FEATURE_COUNT] = {
     {
@@ -402,6 +406,13 @@ static struct rx3_runtime_feature runtime_features[RUNTIME_FEATURE_COUNT] = {
         "samples", 0, &samples_row,
         samples_feature_configured, samples_feature_install,
         samples_feature_remove, 0, 0, 0, 0, 0
+    },
+    {
+        /* No panel and no per-deck callback: it hooks the player's own load,
+           which carries the title, rather than the core's PcmReader one. */
+        "now-playing", 0, 0,
+        now_playing_feature_configured, now_playing_feature_install,
+        now_playing_feature_remove, 0, 0, 0, 0, 0
     }
 };
 
@@ -1940,6 +1951,7 @@ static void hooked_audio_start(void *engine, void *device)
 #include "../theme-white/rx3_theme_feature.h"
 #include "../search-latin/rx3_search_feature.h"
 #include "../samples/rx3_samples_feature.h"
+#include "../now-playing/rx3_now_playing_feature.h"
 
 static int hooked_load(void *reader, const void *track_info)
 {

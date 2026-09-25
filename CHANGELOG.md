@@ -3,6 +3,7 @@
 
 ## Unreleased
 
+- Now playing: a new module sends what each deck is playing to the computer on the rear USB port, as one JSON datagram on UDP 50123 whenever a deck changes and every two seconds: title, track id, BPM, tempo, play mode and on-air state for both decks. `scripts/now_playing.py` prints it. It merges the event hooks from evanpurkhiser's USB telemetry prototype (#32) with the UDP transport from jacksight's Now Playing export (#20), runs inside the performance core and stops its worker when removed. Off by default. Not yet run on hardware.
 - Compute optional per-role Blue/RGB waveform columns from published stems on the exported analysis axis, including the reconstructed instrumental, with strict counts and verified publication. The player renderer is unchanged.
 
 - Stem audition reconstructs the instrumental and every available selection from final drive PCM using a single host mixer checked against native C output. Bounded float-audio excerpts carry the 256-frame ramp state across selection changes, with waveform seeking, Original and imported-versus-drive views. Preparation stays asynchronous and may briefly pause playback while a new selection is prepared.

@@ -247,6 +247,8 @@
   "module.logging.description": "Writes session and module diagnostics to USB, closing each line. Continuous player output stays in RAM.",
   "module.search-latin.name": "Accent-insensitive search",
   "module.search-latin.description": "Find a track without typing its accents, which the on-screen keyboard makes slow.",
+  "module.now-playing.name": "Now playing",
+  "module.now-playing.description": "Sends what each deck is playing to a computer on the rear USB port: title, BPM, tempo and whether the channel is on air. For stream overlays, VJ screens or a set list, with no rekordbox and no PRO DJ LINK.",
   "module.telnet.name": "Telnet access",
   "module.telnet.description": "Enables Telnet access to the device (through the USB to computer port on 169.254.X.Y network). Only use this if you know 1) what you are doing 2) the root password.",
   "quality.quality.name": "High quality",

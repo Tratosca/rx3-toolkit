@@ -39,6 +39,9 @@ ALLOWED = {
     "mmap", "mprotect", "munmap", "open",
     "pthread_create", "pthread_detach", "pthread_join",
     "read", "strlen", "sysconf", "usleep", "write",
+    # Now playing. rbp imports each of these from its libc for its own
+    # networking, checked in its dynamic symbol table for 1.19.
+    "poll", "recv", "send", "sendto", "setsockopt", "socket", "socketpair",
 }
 
 # Names that must never appear, with why, so a failure explains itself.
