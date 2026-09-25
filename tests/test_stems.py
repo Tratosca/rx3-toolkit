@@ -48,6 +48,11 @@ class RekordboxTests(unittest.TestCase):
 
 
 class JobTests(unittest.TestCase):
+    def setUp(self):
+        process = unittest.mock.patch("app.rx3_stems.safety.library_busy", return_value=False)
+        process.start()
+        self.addCleanup(process.stop)
+
     def runtime(self) -> provisioning.Runtime:
         return provisioning.detect()
 
@@ -66,7 +71,7 @@ class JobTests(unittest.TestCase):
             self.assertEqual(state.state, "done")
             self.assertEqual(state.results[0].status, "existing")
             self.assertEqual(state.errors, ())
-            self.assertTrue((output / "rx3-stems-manifest.json").is_file())
+            self.assertTrue((output / "RX3_STEMS/rx3-stems-manifest.json").is_file())
 
     def test_the_stem_carries_the_name_the_drive_export_gives_the_track(self):
         with tempfile.TemporaryDirectory() as directory:

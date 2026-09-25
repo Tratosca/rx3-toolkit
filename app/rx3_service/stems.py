@@ -19,7 +19,7 @@ from app.localization import Message, LocalizedError
 import dataclasses
 import pathlib
 
-from app.rx3_stems import estimate, provisioning, separation
+from app.rx3_stems import estimate, provisioning, separation, safety
 from app.rx3_stems.job import JobState, StemJob
 from app.rx3_stems.rekordbox import Collection, parse_collection, parse_drive
 from app.rx3_stems.rekordbox import has_export
@@ -129,6 +129,7 @@ def job(
     the observer receives. `cancel()` is safe at any point, because a stem
     already written is renamed into place and a partial one is removed.
     """
+    safety.require_library_closed()
     playlist = library.collection.playlist(playlist_id)
     detected = provisioning.detect()
     if not detected.ready:

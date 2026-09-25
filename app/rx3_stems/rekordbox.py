@@ -18,7 +18,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
-from app.rx3_stems import pdb
+from app.rx3_stems import pdb, safety
 
 
 DRIVE_LETTER = re.compile(r"^/[A-Za-z]:")
@@ -112,6 +112,7 @@ def export_stem(value: str) -> str:
 
 def parse_collection(xml_path: pathlib.Path) -> Collection:
     """Parse a Rekordbox XML export into playlists of resolved tracks."""
+    safety.require_library_closed()
     root = ET.parse(xml_path).getroot()
     if root.tag != "DJ_PLAYLISTS":
         raise ValueError("This file is not a Rekordbox XML export")
@@ -183,6 +184,7 @@ def parse_drive(drive: pathlib.Path) -> Collection:
     caller exactly as it is for XML, which is what keeps the stems named the
     way the deck will ask for them whichever reader found the track.
     """
+    safety.require_library_closed()
     drive = pathlib.Path(drive)
     export = pdb_path(drive)
     if not export.is_file():

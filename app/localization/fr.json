@@ -295,5 +295,13 @@
   "mock.samples": "SAMPLE",
   "mock.cues": "HOT CUE",
   "mock.time": "00:00.000",
-  "mock.product": "XDJ-RX3"
+  "mock.product": "XDJ-RX3",
+  "stems.sourceChanged": "La source a change pendant le traitement : {name}. Exportez-la a nouveau avant de preparer les stems.",
+  "stems.symlink": "Lien symbolique refuse : {path}. Choisissez un dossier stems reel.",
+  "stems.space": "Espace insuffisant : {required} octets requis, {available} octets disponibles. Le lot est arrete.",
+  "stems.durationUnknown": "Duree de {name} illisible. Verifiez la source et la sonde audio avant de recommencer.",
+  "stems.readback": "La verification apres ecriture a echoue pour {name}. Le fichier precedent est conserve. Verifiez la cle.",
+  "stems.libraryBusy": "Fermez rekordbox avant de lire la bibliotheque ou de preparer les stems. Un export peut etre en cours.",
+  "stems.processUnknown": "Impossible de verifier si le logiciel de bibliotheque est ouvert. Retablissez la detection des processus avant de continuer.",
+  "stems.recheck": "Verifier a nouveau"
 }

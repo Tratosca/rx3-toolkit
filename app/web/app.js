@@ -225,6 +225,12 @@ async function readJob() {
 }
 
 function describeResult(job) {
+  if (job.kind === "stems" && job.result) {
+    var errors = (job.result.errors || []).map(function (item) {
+      return item.track + ": " + window.i18n.message(item.error);
+    });
+    return errors.concat((job.result.notices || []).map(window.i18n.message)).join("\n");
+  }
   if (job.kind !== "mod" || !job.result) return "";
   return t("modules.built", {bytes: bytes(job.result.bytes), path: job.result.output});
 }

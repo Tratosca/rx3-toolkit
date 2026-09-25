@@ -295,5 +295,13 @@
   "mock.product": "XDJ-RX3",
   "stems.playlistOption": "{name} ({tracks})",
   "samples.hearKept": "Kept from the drive; replace it to hear it.",
-  "preview.framing": "Adjust artwork framing"
+  "preview.framing": "Adjust artwork framing",
+  "stems.sourceChanged": "Source changed during processing: {name}. Export it again before preparing stems.",
+  "stems.symlink": "Refusing a symbolic link: {path}. Choose a real stems directory.",
+  "stems.space": "Not enough free space: {required} bytes required, {available} bytes available. The batch has stopped.",
+  "stems.durationUnknown": "Cannot measure the duration of {name}. Check the source and the audio probe before trying again.",
+  "stems.readback": "Readback verification failed for {name}. The previous file was kept. Check the drive.",
+  "stems.libraryBusy": "Close rekordbox before reading the library or preparing stems. An export may still be running.",
+  "stems.processUnknown": "Cannot check whether the library application is running. Restore process detection before continuing.",
+  "stems.recheck": "Check again"
 }

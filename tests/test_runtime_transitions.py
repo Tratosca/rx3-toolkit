@@ -40,6 +40,21 @@ class RuntimeTransitionTests(unittest.TestCase):
                             "-I", str(MODULES), str(source), "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
 
+    def test_track_path_never_selects_appledouble_for_an_audio_file(self):
+        core = MODULES / "core/rx3_core_hook.c"
+        self.run_c(r'''
+static const char *stems_dir = "/usb/RX3_STEMS";
+static size_t str_length(const char *s) { return strlen(s); }
+''' + function(core, "path_in_stems") + function(core, "stem_path_for_track") + r'''
+int main(void) {
+    char path[1024];
+    assert(!stem_path_for_track("/usb/Contents/track.wav",path,sizeof(path)));
+    assert(!strcmp(path,"/usb/RX3_STEMS/track.rx3stem"));
+    assert(strcmp(path,"/usb/RX3_STEMS/._track.rx3stem"));
+    return 0;
+}
+''')
+
     def test_four_stem_mix_and_concurrent_selection(self):
         self.run_c(r'''
 typedef struct { float left, right; } Float2;

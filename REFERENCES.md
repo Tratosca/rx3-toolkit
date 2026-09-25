@@ -393,6 +393,14 @@ FFmpeg found on `PATH` is preferred over the bundled copy, but only once it is s
 
 The data directory keeps the name the earlier standalone application used, so a runtime installed by that version is still found rather than downloaded again. That name is load-bearing and should not be tidied up.
 
+### Safe publication
+
+Preparation reserves the estimated s16 payload (duration times 44100 times four bytes per role, plus 64 bytes per header) and a fixed 16 MiB margin before separation. The margin covers integer-second library duration rounding, encoder padding, filesystem allocation and the manifest; it does not assume old files can be removed to make room. Unknown durations require an audio probe. A space refusal stops the batch.
+
+Each file is staged exclusively under a `.partial` suffix, stripped of extended attributes, synced and read back for SHA-256 comparison with the local file before replacement. The directory is synced where supported. Matching AppleDouble metadata files are removed only inside RX3_STEMS; unrelated files are preserved. Symlink output directories and targets are refused. Source size, nanosecond mtime and a streamed full-file SHA-256 must still match before publication. These checks detect software-visible failures, not a USB controller that acknowledges writes it has not durably stored.
+
+The manifest is published through the same path inside RX3_STEMS. The old root-level manifest is left untouched. Process detection blocks library reads and preparation while an export application is open; an unavailable process query fails closed. It cannot prevent an application being launched after the check.
+
 ### Which model actually runs
 
 The best models available are roformers, which are PyTorch checkpoints. The ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs. Neither runtime is accelerated everywhere, and the split differs per platform:

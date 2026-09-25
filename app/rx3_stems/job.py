@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import pathlib
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -16,6 +15,8 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Callable, Sequence
 
+from app.localization import error_message
+from app.rx3_stems import safety
 from app.rx3_stems.estimate import Estimator
 from app.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from app.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
@@ -164,7 +165,7 @@ class JobState:
             "fatal": self.fatal,
             "results": [item.as_manifest_entry() for item in self.results],
             "errors": [
-                {"track": item.track.label, "error": item.error}
+                {"track": item.track, "error": item.error}
                 for item in self.errors
             ],
             "notices": list(self.notices),
@@ -370,6 +371,7 @@ class StemJob:
         output: pathlib.Path,
         used_names: dict[str, pathlib.Path],
     ) -> TrackResult:
+        safety.require_library_closed()
         source = track.location
         if not source.is_file():
             raise FileNotFoundError("Source file not found")
@@ -385,6 +387,8 @@ class StemJob:
         used_names[base.casefold()] = source
 
         targets = {role: output / f"{base}{ROLE_SUFFIXES[role]}" for role in self.roles}
+        for target in targets.values():
+            safety.check_target(target)
         entries: dict[str, Stem] = {}
         for role, path in targets.items():
             if path.is_file() and path.stat().st_size > MINIMUM_STEM_BYTES:
@@ -396,6 +400,9 @@ class StemJob:
             status = "existing"
         else:
             status = "created"
+            safety.require_space(output, safety.estimated_bytes(
+                track, len(missing), self.runtime.ffmpeg or "ffmpeg"))
+            source_before = safety.source_stamp(source)
             # The model reconstructs every role in one pass, so a run started
             # for a single missing role still costs the whole separation.
             partials: list[pathlib.Path] = []
@@ -441,10 +448,9 @@ class StemJob:
                             )
                         if not output.is_dir():
                             raise RuntimeError("The destination was unmounted during processing")
-                        partial = destination.with_name(destination.name + PARTIAL_SUFFIX)
-                        partials.append(partial)
-                        shutil.copyfile(local, partial)
-                        partial.replace(destination)
+                        safety.check_source(source, source_before)
+                        safety.require_space(output, local.stat().st_size)
+                        safety.publish(local, destination)
                         entries[role] = Stem(
                             role, destination.name, destination.stat().st_size,
                             encoded.clipped,
@@ -465,10 +471,12 @@ class StemJob:
     def run(self) -> JobState:
         """Process every track, recording per-track failures without stopping."""
         try:
+            safety.require_library_closed()
             tracks = self.playlist.tracks
             if not tracks:
                 raise ValueError("The playlist is empty")
             output = self.output_root / OUTPUT_NAME
+            safety.check_target(output / MANIFEST_NAME)
             try:
                 output.mkdir(parents=True, exist_ok=True)
             except OSError as error:
@@ -476,6 +484,7 @@ class StemJob:
                     f"{output} could not be created: {error.strerror or error}. "
                     "Choose a writable output folder or mounted USB drive."
                 ) from error
+            safety.clean_metadata(output)
             self._started = time.monotonic()
             durations = [float(max(0, track.duration or 0)) for track in tracks]
             self._current_audio = 0.0
@@ -517,8 +526,10 @@ class StemJob:
                 except Cancelled:
                     raise
                 except Exception as error:
-                    errors.append(TrackError(track=track.label, error=str(error)))
+                    errors.append(TrackError(track=track.label, error=error_message(error)))
                     self._update(errors=tuple(errors))
+                    if isinstance(error, safety.SpaceError):
+                        raise
                 self._current_audio = 0.0
                 self._update(
                     completed=index + 1, track_progress=100,
@@ -526,14 +537,18 @@ class StemJob:
                     **self._timings(1.0),
                 )
 
-            manifest = self.output_root / MANIFEST_NAME
-            manifest.write_text(json.dumps({
+            manifest = output / MANIFEST_NAME
+            contents = json.dumps({
                 "format": 1,
                 "createdAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                 "rekordboxXml": str(self.collection.xml),
                 "playlist": self.playlist.path,
                 "tracks": [item.as_manifest_entry() for item in results],
-            }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            }, ensure_ascii=False, indent=2) + "\n"
+            with tempfile.TemporaryDirectory(prefix="rx3-manifest-") as directory:
+                local = pathlib.Path(directory) / MANIFEST_NAME
+                local.write_text(contents, encoding="utf-8")
+                safety.publish(local, manifest)
             self._update(
                 state="done", stage="Finished", current="", progress=100,
                 completed=len(tracks), position=len(tracks), manifest=manifest,
@@ -544,6 +559,6 @@ class StemJob:
         except Exception as error:
             self._update(
                 state="failed", stage="Error", current="",
-                fatal=f"{type(error).__name__}: {error}",
+                fatal=error_message(error),
             )
         return self.state

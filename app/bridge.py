@@ -597,6 +597,11 @@ class Bridge:
     # Separation -------------------------------------------------------------
 
     @answered
+    def stems_library_status(self) -> dict:
+        from app.rx3_stems import safety
+        return {"busy": safety.library_busy()}
+
+    @answered
     def stems_runtime(self) -> dict:
         runtime = stems_service.runtime()
         return {
@@ -693,7 +698,7 @@ class Bridge:
             self._settle("cancelled", Message("job.cancelled"), result=state)
         elif state["state"] == "failed":
             self._settle("failed", Message("job.failed"), result=state,
-                         error=Message("error.detail", detail=state.get("fatal") or translate("job.failed")))
+                         error=state.get("fatal") or Message("job.failed"))
         else:
             self._settle("done", Message("job.done"), result=state)
 

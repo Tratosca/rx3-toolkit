@@ -7,6 +7,7 @@
 (function () {
   var t = window.i18n.t;
 
+  var libraryBlocked = true;
   var machine = null;
   var library = null;
   var quality = null;
@@ -134,6 +135,23 @@
     id("forecast").textContent = answer ? window.i18n.message(answer.summary) : "";
   }
 
+  function drawLibraryGuard() {
+    var warning = id("library-warning");
+    warning.hidden = !libraryBlocked;
+    warning.firstElementChild.textContent = t("stems.libraryBusy");
+    warning.lastElementChild.textContent = t("stems.recheck");
+    id("library-drive").disabled = libraryBlocked;
+    id("library-file").disabled = libraryBlocked;
+  }
+
+  async function checkLibrary() {
+    var status = await window.rx3.ask("stems_library_status");
+    libraryBlocked = !status || status.busy;
+    drawLibraryGuard();
+    note();
+    return !libraryBlocked;
+  }
+
   function note() {
     id("stems-note").textContent =
       !machine || !machine.ready ? t("stems.needRuntime")
@@ -141,7 +159,7 @@
       : !output ? t("stems.needOutput")
       : t("stems.longRun");
     id("stems-start").disabled =
-      !machine || !machine.ready || !library || !output;
+      libraryBlocked || !machine || !machine.ready || !library || !output;
   }
 
   function setOutput(path) {
@@ -153,9 +171,9 @@
   // Doing ------------------------------------------------------------------------
 
   async function openLibrary(path) {
-    if (!path) return;
+    if (!path || !(await checkLibrary())) return;
     var answer = await window.rx3.ask("stems_library", path);
-    if (!answer) return;
+    if (!answer) { await checkLibrary(); return; }
     library = answer;
     id("library-path").textContent =
       answer.source + "  " + t("drive.trackCount", {count: answer.tracks});
@@ -170,6 +188,14 @@
   }
 
   function wire() {
+    var warning = el("div", "notice");
+    warning.id = "library-warning";
+    warning.setAttribute("role", "alert");
+    var again = el("button", "btn small");
+    again.type = "button";
+    again.addEventListener("click", checkLibrary);
+    warning.append(el("p"), again);
+    id("stems-note").before(warning);
     id("library-drive").addEventListener("click", async function () {
       var picked = await window.rx3.ask("pick_folder", "");
       if (picked) openLibrary(picked.path);
@@ -195,11 +221,13 @@
       if (started) window.rx3.watchJob(refreshMachine);
     });
     id("stems-start").addEventListener("click", async function () {
+      if (!(await checkLibrary())) return;
       var wanted = [];
       for (var role in roles) if (roles[role]) wanted.push(role);
       var started = await window.rx3.ask(
         "stems_start", id("playlist").value, output, wanted);
       if (started) window.rx3.watchJob(null);
+      else await checkLibrary();
     });
 
     // A drive that carries an export is the ordinary source, so offer it.
@@ -210,6 +238,7 @@
       if (!output) setOutput(event.detail.path);
     });
     window.addEventListener("rx3language", function () {
+      drawLibraryGuard();
       drawMachine();
       drawQuality();
       drawRoles();
@@ -224,6 +253,7 @@
     quality = await window.rx3.ask("stems_qualities");
     machine = await window.rx3.ask("stems_runtime");
     wire();
+    await checkLibrary();
     drawMachine();
     drawQuality();
     drawRoles();

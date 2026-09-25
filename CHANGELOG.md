@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Stem preparation checks free space before separation, detects source changes, refuses symbolic-link destinations and verifies staged files by SHA-256 before replacing them. File and supported directory syncs precede completion, and metadata cleanup stays inside RX3_STEMS. The manifest now lives there too. Library reads and batches stop while the library application is open, with a persistent warning and an explicit recheck.
+
 - Cap sampler polyphony at four voices total across both decks and all playback modes. Reject a fifth start without interrupting active sounds; apply the same ceiling to desktop playback, including pending conversions. Not yet validated on hardware.
 
 - Correct sampler input ownership across decks, ignore hold-repeat events, stop sustained voices when leaving the sample page, and honor SHIFT-only silence. Add a 32-frame loop edge ramp. Match that ramp and the squared bank-volume curve in desktop preview, using buffer playback for continuous loops. ARM build, host behavior tests and firmware 1.19 byte guards pass; these changes have not yet been validated on hardware.
