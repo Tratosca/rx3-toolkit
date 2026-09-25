@@ -248,6 +248,8 @@ def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None)
 
 
 def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
+    from app.rx3_stems import waveform
+
     safety.require_library_closed()
     output = drive / "RX3_STEMS"
     safety.check_target(output / safety.MANIFEST_NAME)
@@ -264,6 +266,7 @@ def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
         for path, before in stamps.items():
             safety.check_source(path, before)
         safety.require_space(output, sum(path.stat().st_size for path in outputs.values()))
+        waveform.invalidate(track, drive)
         for role in reversed(stem.ROLE_ORDER[1:]):
             old = output / (base + stem.ROLE_SUFFIXES[role])
             safety.check_target(old)
@@ -278,6 +281,7 @@ def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
             safety.publish(local, target)
             entries.append({"role": role, "file": target.name, "bytes": target.stat().st_size,
                             "sha256": safety.digest(target), "clippedSamples": report["roles"][role]["clippedSamples"]})
+        report["waveform"] = waveform.prepare(track, drive, stamps[track.location][2], ffmpeg, checkpoint)
         manifest, _ = cache.read_manifest(drive)
         name = base + stem.ROLE_SUFFIXES["vocals"]
         entry = {"trackId": track.track_id, "artist": track.artist, "title": track.title,

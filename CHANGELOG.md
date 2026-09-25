@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Compute optional per-role Blue/RGB waveform columns from published stems on the exported analysis axis, including the reconstructed instrumental, with strict counts and verified publication. The player renderer is unchanged.
+
 - Stem audition reconstructs the instrumental and every available selection from final drive PCM using a single host mixer checked against native C output. Bounded float-audio excerpts carry the 256-frame ramp state across selection changes, with waveform seeking, Original and imported-versus-drive views. Preparation stays asynchronous and may briefly pause playback while a new selection is prepared.
 
 - Manual lossless stems can be assigned per library track and imported after duration, multi-window alignment and heuristic gain checks. Constant offsets and trimming are reported, gain is never silently changed, and uncertain gain is not presented as certified. Imports preserve the existing PCM format and verified drive publication; assignments survive restarts.

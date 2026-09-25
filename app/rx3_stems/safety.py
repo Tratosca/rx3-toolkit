@@ -101,7 +101,7 @@ def clean_metadata(output):
         if not path.name.startswith("._"):
             continue
         name = path.name[2:]
-        if name == MANIFEST_NAME or any(name.endswith(suffix) for suffix in ROLE_SUFFIXES.values()):
+        if name == MANIFEST_NAME or any(name.endswith(suffix) for suffix in (*ROLE_SUFFIXES.values(), ".rx3wave")):
             if path.is_file() or path.is_symlink():
                 path.unlink()
 

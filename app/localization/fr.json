@@ -358,5 +358,7 @@
   "stems.listenDrums": "DRUMS",
   "stems.listenBass": "BASS",
   "stems.listenVocal": "VOCAL",
-  "stems.listenInstrumental": "INSTRUMENTAL"
+  "stems.listenInstrumental": "INSTRUMENTAL",
+  "stems.waveUnavailable": "{name} : les formes d'onde des stems ne sont pas disponibles ; les stems audio restent utilisables.",
+  "stems.wavePreparing": "Calcul des formes d'onde des stems"
 }

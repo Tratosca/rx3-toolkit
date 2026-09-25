@@ -306,6 +306,8 @@
           head:check.trimStart, tail:check.trimEnd,
           gain:window.i18n.number(check.gainEstimate, {maximumFractionDigits:4})}));
       }
+      if (importReport.waveform === false)
+        reports.push(t("stems.waveUnavailable", {name:importTrack}));
       if (importReport.residualEnergyRatio !== null)
         reports.push(t("stems.importResidual", {ratio:window.i18n.number(importReport.residualEnergyRatio, {maximumFractionDigits:4})}));
     }

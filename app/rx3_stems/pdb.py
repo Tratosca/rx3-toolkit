@@ -43,8 +43,9 @@ TRACK_ARTIST_ID = 68
 TRACK_ID = 72
 TRACK_DURATION = 84
 # The fixed part is followed by this many offsets, one per string the row can
-# carry. Only two of them are read here.
+# carry. The audio and analysis paths refer to the same exported track.
 TRACK_STRING_COUNT = 21
+STRING_ANALYSIS_PATH = 14
 STRING_TITLE = 17
 STRING_FILE_PATH = 20
 
@@ -190,6 +191,7 @@ class TrackRow:
     duration: int
     title: str
     file_path: str
+    analysis_path: str = ""
 
 
 def parse_artist(row: Row) -> tuple[int, str]:
@@ -215,12 +217,18 @@ def parse_track(row: Row) -> TrackRow:
         offset = _u16(row.page, row.position + TRACK_FIXED_SIZE + index * 2)
         return read_string(row.page, row.position + offset).strip()
 
+    try:
+        analysis_path = string_at(STRING_ANALYSIS_PATH)
+    except (ValueError, UnicodeError):
+        analysis_path = ""
+
     return TrackRow(
         track_id=_u32(row.page, row.position + TRACK_ID),
         artist_id=_u32(row.page, row.position + TRACK_ARTIST_ID),
         duration=_u16(row.page, row.position + TRACK_DURATION),
         title=string_at(STRING_TITLE),
         file_path=string_at(STRING_FILE_PATH),
+        analysis_path=analysis_path,
     )
 
 

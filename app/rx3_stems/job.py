@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Sequence
 
 from app.localization import Message, error_message
-from app.rx3_stems import safety, cache
+from app.rx3_stems import safety, cache, waveform
 from app.rx3_stems.estimate import Estimator
 from app.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from app.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
@@ -448,6 +448,7 @@ class StemJob:
                         self._notice(Message("stems.clipped", name=source.name, count=encoded.clipped))
             safety.check_source(source, before)
             safety.require_space(output, sum(path.stat().st_size for path in prepared.values()))
+            waveform.invalidate(track, output.parent)
             # Optional roles from the previous source must not survive a new
             # vocal. An interrupted publication can then only reduce the set.
             for role in reversed(ROLE_ORDER[1:]):
@@ -543,6 +544,10 @@ class StemJob:
                         self.estimator.observe(
                             durations[index], time.monotonic() - track_started
                         )
+                    self._update(stage=Message("stems.wavePreparing"), eta_seconds=None)
+                    if not waveform.prepare(track, output.parent, result.source_sha256,
+                                            self.runtime.ffmpeg or "ffmpeg", self._checkpoint):
+                        self._notice(Message("stems.waveUnavailable", name=track.location.name))
                     self._update(results=tuple(results))
                 except Cancelled:
                     raise

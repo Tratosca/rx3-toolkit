@@ -425,6 +425,53 @@ Audition reads the drive's final s16 stems and decodes the source on the UNTRIMM
 
 The bridge returns at most 30 seconds of IEEE-float WAV, waveform peaks and the exact ramp state at each changed frame. Float output preserves peaks beyond unity until the playback device's own conversion. The browser requests a 44100 Hz audio context, retains position while preparing a changed selection, and carries the returned mixer state to the next request. Preparation may pause playback briefly; it is asynchronous and never blocks the interface thread. The excerpt cache holds at most four replies. The Imported view validates and encodes assigned files locally without publishing them; On the drive reads the existing files. Neither view emulates the player's time stretching, DAC or audio driver.
 
+### Host stem waveforms
+
+Preparation reads the analysis path from string 14 of the output drive's track row, matches the exported audio by basename and SHA-256, and opens its DAT and EXT files read-only. It does not rely on track IDs being shared between libraries. Paths escaping the drive, files above 32 MiB, truncated or duplicate tags, malformed beat grids, unsupported detailed strides/cadences and conflicting column counts disable waveform preparation for that track. PQTZ beats are decoded as bar position, tempo times 100 and time in milliseconds; they are not used to infer a sample-accurate encoder offset. XML-only destinations without a matching exported analysis keep their audio stems without a waveform file.
+
+The detailed axis is fixed by the template: PWV3 has one byte per column, PWV5 has two bytes per column, both at 150 columns per second. The richer format is selected when both are present. At 44100 Hz each column covers 294 audio frames, starting at frame zero of the UNTRIMMED grid. The stem frame count must give exactly the template count when rounded up to a complete terminal cell. Only that terminal cell may receive zeros, never an extra column or a shifted origin. A differing count is refused. This convention does not certify the original analyser's encoder-delay policy.
+
+Columns are computed from the final s16 files, after publication, with an instrumental produced by the host mixer's settled mix-minus-vocal selection. They do not reuse or filter the mix's stored colours. Blue uses a quantized mono average, per-cell peaks, a 150 Hz low-pass peak ratio for colour and a squared, globally normalized height. RGB uses an amplitude-aware mono projection, second-order filters (low: 100 Hz low-pass; middle: 700 Hz high-pass followed by 3000 Hz low-pass; high: 1500 Hz high-pass), millisecond peak envelopes, 12 ms/1 ms symmetric maximum windows for low/middle, then 150 Hz cells and nonlinear colour mapping. Filter Q is 1/sqrt(2). Filtering uses double precision in the existing audio subprocess; envelope reduction and packing use the standard library. Heights are normalized per role, so comparing their displayed heights is not a loudness measurement. This is an independently implemented host analysis, not a claim of bit-identical output from the original analyser. PWV7 and preview replacement are not emitted.
+
+The optional file is `RX3_STEMS/<exported-basename>.rx3wave`. All container integers are little-endian. Header size is 128 bytes; a 64-byte entry for each role immediately follows it. Payloads follow the role table contiguously, in table order, without padding. The current player has no reader for this file, so its presence or absence cannot change rendering. Not yet run on hardware.
+
+| Offset | Bytes | Header field |
+| --- | --- | --- |
+| `0x00` | 8 | magic `RX3WAV1\0` |
+| `0x08` | 4 | version, 1 |
+| `0x0c` | 4 | header size, 128 |
+| `0x10` | 4 | audio rate, 44100 |
+| `0x14` | 4 | columns per second, 150 |
+| `0x18` | 4 | columns per role, 1 through 540000 |
+| `0x1c` | 4 | column encoding: 1 = PWV3, 2 = PWV5 |
+| `0x20` | 4 | role count, 2 through 4 |
+| `0x24` | 4 | role-entry size, 64 |
+| `0x28` | 32 | SHA-256 of the complete source audio file |
+| `0x48` | 32 | SHA-256 of DAT length as u64 LE, DAT bytes, then EXT bytes |
+| `0x68` | 8 | exact audio frame count, before terminal-cell padding |
+| `0x70` | 16 | reserved, zero |
+
+| Entry offset | Bytes | Role field |
+| --- | --- | --- |
+| `0x00` | 4 | role: 1 vocals, 2 instrumental, 3 drums, 4 bass |
+| `0x04` | 4 | bytes per column, equal to header encoding |
+| `0x08` | 8 | absolute payload offset |
+| `0x10` | 8 | payload bytes, exactly count times stride |
+| `0x18` | 32 | SHA-256 of the exact stereo float32 LE PCM submitted for this role |
+| `0x38` | 8 | reserved, zero |
+
+PWV3 payload bytes contain colour in bits 7..5 and height in bits 4..0. PWV5 preserves the template's big-endian 16-bit column encoding inside the little-endian container: red in bits 15..13, green in 12..10, blue in 9..7 and height in 6..2; bits 1..0 are zero. Keeping payload order explicit avoids confusing the file header with the analysis format. Vocals and instrumental are mandatory; drums precede bass. Unknown versions, sizes, role order, counts, trailing bytes and nonzero reserved fields are refused by the host reader.
+
+An old waveform is removed before replacing audio roles, and whenever optional regeneration is unavailable. The source, final stems and analysis files are checked again after computation. Publication uses the same verified partial-file path as audio stems. Only matching metadata names inside RX3_STEMS are cleaned. Waveform work runs in the preparation worker; it is excluded from separation-speed observations. Temporary disk reservation is 96 bytes per padded audio frame plus the ordinary margin, covering decoded mix, role PCM and six double-precision filter streams. There is no waveform disk cache yet. A local six-minute synthetic track with four RGB roles took 75.37 seconds including decoding, reconstruction, filtering and hashing; its waveform file was 432384 bytes. This measured cost is separate from manual-import validation and is not used as an interface time estimate.
+
+### Waveform renderer integration review
+
+No runtime rendering change is part of host waveform preparation. The current renderer consumes 16-byte resident columns (three amplitude bytes, one reserved byte, three 32-bit colour fields), not compact analysis bytes. Flat is the simplest future target for an amplitude plus role colour. The Bands path needs the original compact-to-resident conversion and mode mapping. Blue also needs its palette-pointer semantics and separate 2736-byte overview conversion. Existing stock-renewal callbacks do not by themselves establish safe ownership of replacement buffers. Before integration, verify column origin, count pointers, zoom/seek behaviour, regeneration completion, buffer lifetime and track-change synchronization against the player binary and then on hardware.
+
+For N columns and R stored roles, the compact payload costs N*R bytes for Blue or 2*N*R for RGB. Six minutes at 150 columns/s gives N=54000: four RGB roles occupy 432000 payload bytes plus 384 bytes of header/table. Expanding all four into 16-byte resident columns adds 3456000 bytes per deck; keeping only the selected role expanded costs 864000 bytes, with another buffer of that size if publication requires double buffering. At the current 540000-column cap, four expanded roles cost 34560000 bytes per deck. Include this memory in the existing resident-role budget and account for both decks.
+
+Absent, incompatible, stale or allocation-failed files must retain the current display filter; returning to full mix must restore stock columns. Combined selections without a prepared waveform also retain the filter: peak envelopes and colours cannot in general be added, because the underlying audio can cancel. The second phase still requires explicit approval and hardware acceptance. Not yet run on hardware.
+
 ### Which model actually runs
 
 The best models available are roformers, which are PyTorch checkpoints. The ones that reach a GPU without PyTorch are MDX-Net, which are ONNX graphs. Neither runtime is accelerated everywhere, and the split differs per platform:
