@@ -76,12 +76,12 @@ One build flag is load-bearing and worth knowing about before it bites you. At `
 
 ### Modules
 
-Each feature is a directory under a firmware version, described by a `manifest.json`. The desktop application, the command line and the release packager all read the same manifests rather than keeping their own lists.
+Each feature is one directory under `mod/modules/`, described by a `manifest.json` that lists the firmware versions it is built against. The desktop application, the command line and the release packager all read the same manifests rather than keeping their own lists.
 
 | Field | Meaning |
 | --- | --- |
 | `id` | stable identifier |
-| `firmware` | the exact firmware revision this targets; must match the directory name |
+| `firmwares` | the firmware versions this module is built against, as a list |
 | `runtime_directory` | one directory name written into the image |
 | `namespace` | shell prefix for every lifecycle callback, so modules cannot collide |
 | `default` | selected unless the user says otherwise |
@@ -221,24 +221,78 @@ The approximation is fitted, not eyeballed. Fourteen captions in the shipped art
 
 An earlier fit chose Light at 24. It had been scored on whole-word bounding boxes, which is a weak signal: weight and size trade off against each other and still match a box. Per-glyph pixel error does not have that failure mode.
 
-### Reusing the host's typeface at run time
+### Reusing the host's typeface at run time, and why it does not work
 
-Nothing in the drawing code sets a font. A control wears whichever face the model it was cloned from was drawn in, which means picking the right model *is* the typography, and there are two of them:
+Nothing in the drawing code sets a font. A control wears whichever face the model it was cloned from was drawn in, so the theory was that picking the right model *is* the typography, and there were two candidates:
 
-- **A pad label**, captured on its way into the text renderer before a live panel replaces that same draw. The capture takes the first plausible label, then upgrades once to one that also carries a fill, since that is a real button rather than a caption. This is the face the added controls use.
-- **A header glyph**, twice the size, kept only as a fallback so that a panel forced open before the row has ever drawn shows something rather than nothing.
+- **A pad label**, captured on its way into the text renderer before a live panel replaces that same draw, upgraded once to one carrying a fill since that is a real button rather than a caption.
+- **A header glyph**, twice the size, as a fallback.
+
+The first of those does not exist. The pad subtree issues no text draw at all: twelve subtrees draw text and `0x17`/`0x18` are not among them, because those stock labels are images. So the capture never fires, the fallback is what every control was lettered in, and it is twice the size the row wants. Two measurements settled it, the second being that four different donor glyphs all rendered at 19 pixels: nothing about a clone selects a face.
+
+The row is therefore lettered from artwork of our own, one image per character, composed at draw time -- see the pad row's own section below. A cloned text model is still what a filled rectangle is cut from, because it carries the renderer and window attachment; it just no longer pretends to carry a typeface.
 
 The row itself is painted from the pane backdrop, which opens once per pass over the row rather than once per intercepted call. Draws elsewhere in that subtree are the stock furniture the panel stands in for and are dropped; draws *outside* it belong to the vendor and reach the renderer untouched. Keying that test on the deck's window instead of the widget subtree is what used to swallow unrelated labels elsewhere on screen.
 
-### The palette question, still open
+### The palette question, and the way round it
 
-Worth writing down because the honest state of it is "we know what, not how".
-
-The stock colours are known, measured off the shipped artwork: a two-pixel frame, a selected fill with black glyphs, an inactive state with grey glyphs. What is *not* known is the encoding the glyph's colour field wants.
+The stock colours are known, measured off the shipped artwork: a two-pixel frame, a selected fill with black glyphs, an inactive state with grey glyphs. What was never established is the encoding the *glyph's* colour field wants.
 
 The text renderer decodes that field three different ways, choosing by the pixel format of the window it is drawing into, which it reads from the window rather than from the glyph. One branch takes the low byte alone, one the whole word, one unpacks a packed 24-bit value into 5/6/5. Measured against the real layers: one interpretation painted magenta lettering on green, another painted green, and sweeping all 256 low-byte values moved the green channel alone without ever lifting red or blue off zero.
 
-So the code returns zero, which means "leave the cloned model's colour alone". Settling this means identifying the format the window actually reports for those layers and using that branch's encoding. Until then, the pressed state the touch layer already tracks has nothing to paint itself with. An earlier note in the source that every literal colour "looked foreign" is thereby explained rather than repeated.
+The question is now avoided rather than answered, and that is the better outcome. Lettering is artwork, so the ink colour is a property of the image and no field has to be encoded to set it. What the row still writes is a *fill*, and the background field of a text draw does land: `0xff9000` was written into it and rendered for as long as the stems strip existed. So a control is a filled rectangle in a known colour with artwork drawn over it, and the colour comes out of the artwork file rather than out of a constant, so the fill and the ink it sits behind are one measurement.
+
+The pressed state the touch layer tracks now has something to paint itself with, which it did not before: the artwork carries a set of glyphs per ground, and a press selects one.
+
+### The pad row
+
+The strip where KEY and STEMS draw their controls is one region, y 521..560 on screen and y 21..59 in the pad window's own coordinates, spanning x 19..613 within each deck's half. Deck one is widget subtree `0x17` and deck two `0x18`, and each is its own 640 wide window: a box is placed in the coordinates of the window it is drawn into, while a touch arrives in screen coordinates. Getting those two confused is the standing trap here.
+
+A feature does not draw the row. It declares what its controls are -- a button, a toggle, a stepper, a slider -- with a weight each, and the core solves the row into rectangles, paints them and hit-tests them from that one set. The solver is `rx3_pad_layout.h`, deliberately free of player types, globals and libc so that it compiles on a computer and can be run against the preview's copy of it. Everything else about a control is a callback: what it says, whether it is lit, what it does.
+
+There are two ways a touch can reach the row and only one is used. The player's six Beat FX touch objects report press and release for a rectangle each, which is convenient and caps the row at three controls per deck, because there are six of them and two decks. The other is the coordinate solver, which reports every event of a gesture once a press has been claimed. The row uses the second, so it can carry as many controls as it likes, track a drag, and tell a release inside a control from one that slid off it first. The six objects are parked off screen while a custom panel is up and handed back untouched on the way out, which is what keeps a native action from firing in the gaps between controls -- the one place the row declines a touch and lets it through.
+
+Repainting is a request, not a paint. Anything may set `performance_refresh_pending`; the renderer's own thread drains it and holds a one second window at 100 ms intervals, because a single repaint loses a race the player starts on its own. Painting from the input path instead is a stall, and the row does not do it.
+
+Lettering is artwork. `build_labels.py` renders one image per character on each ground, and the deck composes a string from that atlas at draw time. Whole captions were tried and cannot spell what the row says: the KEY centre carries a key and a move, `*3A +2`, which is twenty-four tonalities times twenty-five transpositions. The cells are colour-keyed on the pixels the ink never touched, so an anti-aliased edge -- a blend of ink and the ground it was drawn on -- survives, and a letter whose ink overflows its advance is not erased by the letter after it.
+
+### On-screen messages
+
+`EMERGENCY LOOP` is not special. It is one entry in a table of on-screen notices the player raises for itself, alongside `PC FULL`, `OVERCURRENT`, `DATABASE UNFOUND`, `QUANTIZE LIMITED` and dozens more. The mechanism is `ui::CautionManager`, and the binary is not stripped, so all of it is readable.
+
+The entry point takes the text, which is what makes it usable from here:
+
+    ui::Caution::set(bool show, uif::UiObject::Channel deck, unsigned short const *text) const
+
+The player builds 72 `ui::Caution` objects in one static initialiser, each 32 bytes, and keeps a pointer to each in a table. A caution carries a service code as its first field, encoded as the code reads: `A008` is `0xa008`, `B051` is `0xb051`. Its placement is fixed at construction, in four shapes -- `CautionOnTop`, `CautionOnInfo`, `CautionOnBrowse`, and the plain base -- and the info-bar ones carry a life in milliseconds, 500 to 3000.
+
+**Twenty of the seventy-two are constructed and then never referenced anywhere else in the binary**, so the player never raises them. Counting the literal pools alone is not enough to establish that: four more are reached through `movw`/`movt` pairs, and `B046` and `B059` look unused until those are counted too. The mod borrows `B051`, an info-bar notice with a three second life and no other reader.
+
+Borrowing rather than building is deliberate. Constructing a caution means modelling a C++ object with bitfields and multiple inheritance, and a wrong field is a frozen player. That is not hypothetical here: a build predating this repository had caution workers of its own, and the only record of them is the line that disabled them, in what is now `.attic/tools/rx3_runtime/patch_r38_ui.py` -- "invoking that path froze rbp". The cause was never written down.
+
+### The player's language
+
+One byte, `gUtilityLanguageNo`, and it counts from one. The Utility row that renders the setting reads it and subtracts one before indexing, which is the off-by-one to respect: a table that counts from zero and a byte that counts from one differ by exactly one language.
+
+Eighteen, in this order:
+
+| 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|
+| ENGLISH | FRANCAIS | DEUTSCH | ITALIANO | NEDERLANDS | ESPANOL |
+
+| 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---|---|---|---|---|
+| Russian | Korean | Chinese simplified | Chinese traditional | Japanese | PORTUGUES |
+
+| 13 | 14 | 15 | 16 | 17 | 18 |
+|---|---|---|---|---|---|
+| SVENSKA | CESTINA | MAGYAR | DANSK | Greek | TURKCE |
+
+The names are the player's own, read from the choices array the Utility row points at. Two arrays in the binary begin with a pointer to `ENGLISH`; the second is a coincidence in unrelated data, and the strings after it are noise. The one to read is the array the row itself uses.
+
+Note what the shipped font covers. The main face is Latin, Greek and Cyrillic; Korean, Japanese and both Chinese sets come from a separate font. The player renders its own notices in all eighteen, so this path should reach both faces, but a message in a CJK language has not been seen on a deck.
+
+The mod's own notices live in `mod/modules/core/rx3_messages.h`, one line per language in this order, written as UTF-16 literals so they stay readable. A language left out falls back to English, which is what the selection does with a short table.
 
 ### Two sizes of one face
 
@@ -262,7 +316,7 @@ The complete code table lives in [Appendix A](#appendix-a-front-panel-codes).
 
 ## 6. Stems
 
-The largest feature: replacing or removing the vocal from a track in real time, from a sidecar file prepared on a computer.
+The largest feature: replacing or removing the vocal from a track in real time, from a stem file prepared on a computer.
 
 ### Hooking the audio path
 
@@ -270,15 +324,15 @@ Four sites are hooked with guarded trampolines: the function that hands decoded 
 
 Each site has an eight-byte prologue guard. Three of them can have their stolen instructions copied straight into the trampoline. The fourth begins with a PC-relative load, whose meaning depends on where it sits, so that trampoline loads a copy of the original constant before replaying the instruction after it. This is the standard hazard of prologue-stealing hooks and the reason each site is inspected individually rather than handled by one generic routine.
 
-### Finding the right sidecar
+### Finding the right stem
 
-The hook derives a track's base name and looks for a matching sidecar in a fixed directory on the stick.
+The hook derives a track's base name and looks for a matching stem in a fixed directory on the stick.
 
-Two details make this harder than it sounds. The library software truncates a filename to the first 44 characters when it exports a track, leaving the original untouched. So the name on the stick is not the name in the library, and the preparation tool applies the same truncation when it names a sidecar. Trailing spaces survive that cut on both sides and are not trimmed.
+Two details make this harder than it sounds. The library software truncates a filename to the first 44 characters when it exports a track, leaving the original untouched. So the name on the stick is not the name in the library, and the preparation tool applies the same truncation when it names a stem. Trailing spaces survive that cut on both sides and are not trimmed.
 
 Second, two different tracks can truncate to the same name. The load interface gives no reliable way to tell them apart, so the tool **refuses the collision** rather than picking one arbitrarily. Truncation is applied before that comparison, because two names that differ only past character 44 collide on the stick.
 
-Sidecars load asynchronously into anonymous memory. The deck stays on the stock audio path until loading finishes, after which the file on the stick is closed, so pulling the drive after a completed load cannot invalidate a live mapping. Allocation is refused if the payload would exceed 60% of the memory estimated to be available or reclaimable.
+Stems load asynchronously into anonymous memory. The deck stays on the stock audio path until loading finishes, after which the file on the stick is closed, so pulling the drive after a completed load cannot invalidate a live mapping. Allocation is refused if the payload would exceed 60% of the memory estimated to be available or reclaimable.
 
 ### Getting the audio right
 
@@ -323,7 +377,7 @@ The default is 16-bit to halve resident memory. The frame count is aligned to th
 
 The player's audio path runs at 44,100 frames per second, corroborated by the constructor constants, the buffer sizes and the sample-rate converter it instantiates. Sources at other rates are converted before they reach the hooked buffer.
 
-### Preparing sidecars on the host
+### Preparing stems on the host
 
 Separation itself is not ours. The pipeline drives [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) and FFmpeg as subprocesses, so nothing separation-related is linked into the release archive. Those dependencies together are two orders of magnitude larger than the application.
 
@@ -383,11 +437,11 @@ Nothing here should ever grow a hardcoded duration. The seed rates are keyed on 
 
 ### Pads and indicators
 
-Stem controls are active only when the right pad mode is selected, no modifier is held, the deck has a valid sidecar, and the event targets one of two specific pads. Anything else is passed to the stock handler untouched.
+Stem controls are active only when the right pad mode is selected, no modifier is held, the deck has a valid stem, and the event targets one of two specific pads. Anything else is passed to the stock handler untouched.
 
 The indicator list holds entries for both decks, so filtering by indicator identity alone would disturb the other deck. The hook also checks the channel stored in each entry.
 
-While a sidecar loads, both pads blink, then hold colour once the audio is resident. The blink uses the firmware's own timed state rather than a toggle driven from the hook, so its cadence does not depend on how often the refresh happens to call back. Note that the configured period is a *half*-period: the indicator is lit while the elapsed count is even, so 500 ms means one second on, one second off.
+While a stem loads, both pads blink, then hold colour once the audio is resident. The blink uses the firmware's own timed state rather than a toggle driven from the hook, so its cadence does not depend on how often the refresh happens to call back. Note that the configured period is a *half*-period: the indicator is lit while the elapsed count is even, so 500 ms means one second on, one second off.
 
 The waveform display is not modified. Its internal three-band representation is not the audio buffer we process.
 
@@ -442,8 +496,8 @@ Two artefacts remain, both inherent to time-domain shifting: roughly 2 dB of lev
 Off the device, with both harnesses printing the same columns so the two can be read side by side. The first runs the firmware's real ARM code under emulation; the second compiles our shifter for the host. Neither is in this repository. Both are kept with the emulator, which is not published, along with the rest of the scripts that model the player rather than build for it.
 
 ```sh
-python3 tools/rx3_analysis/emulate_pitch.py <application> --quality
-python3 tools/rx3_analysis/measure_shifter.py
+emulate_pitch.py <application> --quality
+measure_shifter.py
 ```
 
 ---
@@ -466,33 +520,43 @@ Nothing here is installable through a package manager. There is no packaging met
 | --- | --- |
 | `make help` | print the target list (the default) |
 | `make hook` | cross-compile the ARM hook and assert the resulting binary |
-| `make payload-hook` | compile the hook variant a payload ships |
 | `make autoexec KEY=<path>` | build the runtime image; `KEY` is required and must exist |
-| `make payload` | assemble the mods into a runnable payload |
 | `make app` | run the desktop application from source |
-| `make test` | run the regression guards, then the unit tests |
+| `make new-module ID=<id> NAME=<name> [CORE=1]` | write the manifest, the shell contract and the README a module is made of |
+| `make test` | run the unit tests |
 | `make preflight` | inspect every publishable file |
 | `make clean` | remove the build directory and nothing else |
 
-`PYTHON` defaults to `python3`, `BUILD_DIR` to `build`, `FIRMWARE` to `1.19`, `CC` to `clang` unless the environment sets it. `MODULES` empty means "the manifest defaults".
+`PYTHON` defaults to `python3`, `BUILD_DIR` to `build`, `FIRMWARE` to `1.19`, `CC` to `clang` unless the environment sets it. `FIRMWARE` is the version an operator reads in the deck's menu, and it selects which modules go on the drive: each module's manifest lists the versions it is built against. `MODULES` empty means "the manifest defaults".
 
 ### The desktop application
 
-One Tkinter window with a tab for each half of preparing a drive. It replaces two earlier separate applications that shipped as two downloads for one workflow.
+One window, drawn with the webview the desktop already has rather than a second toolkit carried around. It has five screens: the drive, the modules and the build, the sample pads, the logo, and stem separation.
 
 | File | Contents |
 | --- | --- |
-| `main.py` | the window, the two tabs, and the `--self-test` entry point CI smoke-tests |
-| `mod_generator.py` | the **USB Runtime** tab: picks modules and writes the image |
-| `stem_studio.py` | the **Vocal Stems** tab, plus the Advanced options dialog |
-| `theme.py` | appearance detection, the shared styles, the path-row widget |
+| `shell.py` | the window, and the `--self-test` entry point CI runs |
+| `bridge.py` | the only surface the interface may call, one method per operation |
+| `web/index.html` | the five screens, as markup with nothing computed in it |
+| `web/app.css` | the two palettes, the shapes, and the spacing |
+| `web/app.js` | the shell: navigation, the drive, the modules, the build, the job strip |
+| `web/samples.js` | the pad editor |
+| `web/logo.js` | the logo framer, including the framing arithmetic a test pins to Python's |
+| `web/stems.js` | separation |
+| `web/strings.js`, `web/i18n.js` | every visible string in English and French, and the four hooks that place them |
 
-**Neither tab holds engine logic.** They drive `tools/rx3_runtime/` and `tools/rx3_stems/` respectively, which is why the command line and the packager can produce identical results without duplicating anything.
+**No screen holds engine logic.** They call `bridge.Bridge`, which calls `app/rx3_service/`, which drives `app/rx3_runtime/` and `app/rx3_stems/`. That is why the command line and the packager produce identical results without duplicating anything, and why a test can hold the whole surface with no window.
 
-One rule in `theme.py` is easy to break, and the result is invisible to whoever broke it. Light or dark is decided from the colour Tk is actually painting, not from an operating-system query, and **nothing may hard-code a foreground colour.** A fixed grey is unreadable in whichever appearance it was not chosen for. Only classic Tk widgets, which the theme engine does not reach, are recoloured by hand, and the log pane is the single case.
+Two rules are easy to break and the result is invisible to whoever broke it.
+
+**Arguments cross the bridge positionally.** The window packs what JavaScript passed into a list and calls the method with it, so a method taking `**kwargs` can never be reached with any of them set: it silently runs at its defaults. Anything richer than a scalar is one dict parameter, reduced to the keys it knows before a service sees it.
+
+**Nothing hard-codes a colour.** Both palettes are alpha steps of one ink value per theme, and the contrast of each text step is measured and written down in `app.css`. A fixed grey is unreadable in whichever appearance it was not chosen for, which is what the interface this replaced did.
+
+Progress is polled through `job_status()`, not pushed. There is one job slot for every long task, because a build and a separation both write the same drive.
 
 ```sh
-make app                          # or: python3 apps/rx3-toolbox/main.py
+make app                          # or: python3 app/shell.py
 ```
 
 ### Command-line tools
@@ -500,7 +564,7 @@ make app                          # or: python3 apps/rx3-toolbox/main.py
 Build a runtime with specific modules:
 
 ```sh
-python3 tools/rx3_runtime/cli.py build --firmware 1.19 \
+python3 -m app.rx3_runtime.cli build --firmware 1.19 \
   --patch beatjump-32bars --patch stems \
   --key /path/to/keyfile --output build
 ```
@@ -510,35 +574,26 @@ python3 tools/rx3_runtime/cli.py build --firmware 1.19 \
 Build and inspect a runtime image:
 
 ```sh
-python3 tools/rx3_firmware/firmware_image.py autoexec \
+python3 app/rx3_firmware/firmware_image.py autoexec \
   build/runtime build/autoexec.bin --key /path/to/keyfile
-python3 tools/rx3_firmware/firmware_image.py verify-autoexec \
+python3 app/rx3_firmware/firmware_image.py verify-autoexec \
   build/autoexec.bin --key /path/to/keyfile
 ```
 
-Encode a sidecar:
-
-```sh
-python3 tools/rx3_stems/make_sidecar.py vocals.wav "Artist - Title.rx3stem" \
-  --match-full "Artist - Title.mp3" --separator-normalization 1.0
-```
-
-Patch a host copy of the application offline. Apply in this order when both are needed; each refuses unexpected content, and applying then reverting in reverse order restores the input byte for byte:
-
-```sh
-python3 -m tools.rx3_patcher.beatjump_32bars rbp -o rbp.32bars
-python3 -m tools.rx3_patcher.beatjump_no_quantize rbp.32bars -o rbp.patched
-```
+The stems preparation tab is the only front end to the stem encoder; a script reaches the same code through `write_stem` in `app/rx3_stems/stem.py`.
 
 ### Environment variables
 
 | Variable | Read by | Effect |
 | --- | --- | --- |
-| `RX3_SEPARATOR` | Stem Studio | path to a separator binary, instead of searching |
-| `RX3_FFMPEG` | Stem Studio | path to FFmpeg; used as given, a missing filter is reported rather than worked around |
-| `RX3_STEM_STUDIO_HOME` | Stem Studio | overrides the managed runtime and model cache location |
+| `RX3_SEPARATOR` | Stems preparation | path to a separator binary, instead of searching |
+| `RX3_FFMPEG` | Stems preparation | path to FFmpeg; used as given, a missing filter is reported rather than worked around |
+| `RX3_STEM_STUDIO_HOME` | Stems preparation | overrides the managed runtime and model cache location |
 | `RX3_PREBUILT_HOOK` | packaging | path to the compiled hook; required when packaging, with no fallback |
-| `RX3_STEMS_DIR` | on-device stems module | overrides the sidecar directory |
+| `RX3_KEY` | `make autoexec` and the application | path of the key file, outside the repository; `KEY=` on the make command line wins |
+| `RX3_KEYSHIFT`, `RX3_STEMWAVE`, `RX3_THEME`, `RX3_LOGO`, `RX3_SEARCH_LATIN`, `RX3_SAMPLES_DIR`, `RX3_SAMPLES_CONFIG`, `RX3_LOG_FILE` | the hook, exported by each module's `module.sh` | switches that feature on, or names its directory or file; the names are typed by hand on both sides, so a rename touches both |
+| `RX3_TAB_DELAY_MS`, `RX3_RENDER_PROBE` | the hook, when set by hand | diagnostics: delays the tab draw, or logs what the renderer is asked to paint |
+| `RX3_STEMS_DIR` | on-device stems module | overrides the stem directory |
 | `DECODER_SLEEP_NS` | on-device decoder module | overrides the polling interval |
 | `CC` | build | compiler for the ARM hook |
 
@@ -564,7 +619,7 @@ Cross-compilation flags:
 
 ### Supported binaries
 
-Four application checksums are accepted, all corresponding to firmware 1.19, which has no sub-revisions. An unlisted checksum aborts before anything is modified. This is the same refuse-rather-than-guess rule as every patch site.
+Five application checksums are accepted. Two are established here: firmware 1.19 stock and firmware 1.20 stock, each hashed from the player binary in that update. The other three were registered before this record was kept and their builds are not identified. An unlisted checksum aborts before anything is modified. This is the same refuse-rather-than-guess rule as every patch site.
 
 ### On the root password
 

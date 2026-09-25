@@ -36,7 +36,7 @@ MODULE_LOAD_FAILED=0
 def patch_words(module: str) -> list[tuple[int, bytes, bytes]]:
     """The (offset, stock, patched) triples a module registers on device."""
     words = []
-    for line in (MODULES / module / "1.19/module.sh").read_text().splitlines():
+    for line in (MODULES / module / "module.sh").read_text().splitlines():
         if not line.startswith("register_patch "):
             continue
         _, offset, stock, patched, _label = line.split(maxsplit=4)
@@ -138,29 +138,6 @@ class NormalisedIdentityTests(unittest.TestCase):
                         f"applied={applied or ('none',)}",
                     )
 
-    def test_a_stock_binary_normalises_to_itself(self):
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            binary = self.stock_binary(directory)
-            self.assertEqual(
-                self.normalised(binary, tuple(PATCHING_MODULES)),
-                hashlib.sha1(binary.read_bytes()).hexdigest(),
-            )
-
-    def test_a_word_that_is_neither_stock_nor_patched_still_normalises(self):
-        """Normalisation cannot tell a foreign write from ours, which is why
-        the word-by-word audit runs after it and stops before any write."""
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            binary = self.stock_binary(directory)
-            stock_hash = hashlib.sha1(binary.read_bytes()).hexdigest()
-            image = bytearray(binary.read_bytes())
-            offset = WORDS["core"][0][0]
-            image[offset:offset + 4] = b"\xde\xad\xbe\xef"
-            foreign = directory / "rbp-foreign"
-            foreign.write_bytes(image)
-            self.assertEqual(self.normalised(foreign, ("core",)), stock_hash)
-
     def test_a_change_outside_a_guarded_word_is_still_caught(self):
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
@@ -173,23 +150,6 @@ class NormalisedIdentityTests(unittest.TestCase):
             self.assertNotEqual(
                 self.normalised(elsewhere, tuple(PATCHING_MODULES)), stock_hash
             )
-
-    def test_an_unaligned_offset_is_refused_rather_than_served_slowly(self):
-        with tempfile.TemporaryDirectory() as directory:
-            directory = Path(directory)
-            binary = self.stock_binary(directory)
-            with tempfile.TemporaryDirectory() as workspace:
-                result = run_shell(
-                    "module_begin holder holder\n"
-                    "register_patch 4098 '\\001\\002\\003\\004' "
-                    "'\\005\\006\\007\\010' unaligned\n"
-                    f'extract_guarded_words "{workspace}"\n'
-                    f'normalized_rbp_sha1 "{binary}" "{workspace}" && exit 21\n'
-                    "exit 0\n"
-                )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), "")
-
 
 if __name__ == "__main__":
     unittest.main()

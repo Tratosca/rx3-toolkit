@@ -11,7 +11,7 @@
 <p align="center">
   <a href="../../releases"><img alt="Release" src="https://img.shields.io/github/v/release/Tratosca/rx3-toolkit?style=flat-square&color=ff5c00"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square"></a>
-  <img alt="Firmware" src="https://img.shields.io/badge/XDJ--RX3%20firmware-1.19-black?style=flat-square">
+  <img alt="Firmware" src="https://img.shields.io/badge/XDJ--RX3%20firmware-1.19%20%7C%201.20-black?style=flat-square">
   <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square">
 </p>
 
@@ -67,7 +67,7 @@ Everything runs from the stick and disappears when the power goes off. Any RX3 y
 
 | | |
 | --- | --- |
-| 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` only at the moment |
+| 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` or `1.20` |
 | 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
 | 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
 | 🧱 **A root filesystem** | Built on your machine from the manufacturer's published GPL sources — [see below](#4-getting-a-root-filesystem) |
@@ -103,13 +103,22 @@ Remove every USB stick, power the RX3 on, hold **MENU (UTILITY)** for a second, 
 VERSION No. 1.19
 ```
 
-Anything else and you should stop here — the toolkit is built against this exact version and simply will not apply itself to another one. AlphaTheta documents updating [in its support article](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
+`1.19` and `1.20` both work, and the toolkit builds the same drive either way: the two differ by three bytes of the player, none of them anywhere the mod touches. Anything else and you should stop here, because the toolkit checks the player it is looking at and refuses rather than guessing. AlphaTheta documents updating [in its support article](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
 
 Power the RX3 back off.
 
 ### 2. Download the app
 
 Grab the build for your computer from the [**Releases page**](../../releases) and unpack it wherever you keep applications.
+
+The app draws its window with the one your desktop already has, rather than carrying a second one around. macOS and Windows always have it, and need nothing else.
+
+On **Linux** most desktops have it too, but not all of them. If the window never appears, install it:
+
+```sh
+sudo apt install gir1.2-webkit2-4.1    # Debian, Ubuntu, Mint
+sudo dnf install webkit2gtk4.1         # Fedora
+```
 
 <details>
 <summary><b>macOS says the app is damaged / Windows shows a warning</b></summary>
@@ -196,7 +205,7 @@ The XDJ-RX3 runs Linux, so under the GPL/LGPL Pioneer publishes the correspondin
 
 ### 5. Build the file for your stick
 
-Now that the hard part is done, in the **Modules installation** tab: pick firmware `1.19`, choose the modules you want, pick what step 4 produced, pick the **root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
+Now that the hard part is done, in the **Modules installation** tab: pick the firmware your deck reported in step 1, choose the modules you want, pick what step 4 produced, pick the **root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
 
 Here is what you are choosing from:
 
@@ -207,13 +216,18 @@ Here is what you are choosing from:
 | **Beat Jump ±32** | Beat Jump pads 7 and 8 become −32 and +32 instead of −8 and +8 | ✅ |
 | **Immediate Beat Jump** | Repeated jumps fire straight away instead of waiting for the grid. Quantize, Hot Cues, loops and Beat FX are untouched | ✅ |
 | **No more wait between beatjumps** | Makes the player access audio files faster when beatjumping, so big jumps can be repeated sooner. Nothing to see, it just helps the two above | ✅ |
+| **Sample pads** | Fire your own sounds from the performance pads, each with its own colour and its own way of playing: once, only while you hold it, looping until you press it again, or right through with the same pad to stop it early. SLIP LOOP reaches them as the page after its own, so your hot cues stay where they are. SHIFT can stop them all. Prepared on the computer. Not yet run on hardware | ❌ |
+| **Stem waveform** | Colour the waveform by the stem you have soloed, so the display agrees with the pads. Not yet run on hardware | ❌ |
+| **Light display mode** | A light interface for a lit room, with the waveform kept dark so it stays readable. Not yet run on hardware | ❌ |
+| **Accent-insensitive search** | Find a track without typing its accents, which the on-screen keyboard makes slow. Not yet run on hardware | ❌ |
+| **Logo** | Replace the wordmark in the middle of the performance screen with your own artwork. Not yet run on hardware | ❌ |
 | **Session logging** | Writes what happened to `RX3_RUNTIME/session.txt` on the stick. Tick it when something went wrong and you want to know why | ❌ |
 | **Diagnostic Telnet access** | Opens a shell for inspection. You do not need this | ❌ |
 
 Some boxes tick and untick themselves, and that is on purpose: a few modules genuinely need another one to work.
 
 > [!WARNING]
-> **Session logging** is off by default for a reason that will cost you a stick if you ignore it. While it is on, the player holds that log file open for as long as it plays. **Eject the drive from the RX3 — never just pull it out.** On a FAT stick, yanking it mid-write is how you lose a folder.
+> **Session logging** closes USB diagnostics after each line and keeps continuous player output in RAM. **Verbose USB logging** is a separate opt-in for debugging; it keeps the drive open, so stop the player before removing it.
 
 > [!WARNING]
 > **Diagnostic Telnet** is off by default and should stay that way unless you know why you want it. The traffic is unencrypted, and it is reachable through the rear computer USB port. The root password won't be provided here.
@@ -341,13 +355,13 @@ No. Prepared and unprepared tracks live happily on the same stick.
 <details>
 <summary><b>Are my original files modified?</b></summary><br>
 
-No. The stem is a separate sidecar file sitting next to the track.
+No. The stem is a separate file sitting next to the track.
 </details>
 
 <details>
-<summary><b>Why only firmware 1.19?</b></summary><br>
+<summary><b>Why only these firmware versions?</b></summary><br>
 
-The mod patches the player software at very specific places, and a firmware update moves that code around. So the toolkit checks it is looking at the player it expects, and refuses if it is not. Support for other versions has to be added and tested deliberately.
+The mod patches the player software at very specific places, and a firmware update can move that code around. So the toolkit checks it is looking at a player it recognises, by its checksum, and refuses if it is not. Support for another version is added deliberately: the addresses are checked one by one against that version's own player binary before anything is claimed. That is how `1.20` was added, and it turned out to be `1.19` with three bytes changed, none of them at an address the mod reads or writes.
 </details>
 
 <details>
@@ -371,7 +385,7 @@ What is being worked on next. No dates, no promises but this is the direction.
 | | What it would give you | Status |
 | --- | --- | :--: |
 | **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang | 💡 Planned |
-| **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 💡 Planned |
+| **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 🚧 In progress |
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
 | **Polished interface** | Icons and lettering on every button the mod adds, close enough to the player's own that you stop noticing which is which | 🚧 In progress |
 | **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |

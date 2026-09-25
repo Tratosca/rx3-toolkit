@@ -10,8 +10,10 @@ The Mozilla Public License 2.0 applies only to original source code identified a
 | cryptography | `50.0.0` | Apache-2.0 OR BSD-3-Clause |
 | pycdlib | `1.14.0` | LGPL-2.1-only |
 | PyInstaller | `6.21.0` | GPL-2.0-or-later with the PyInstaller bootloader exception |
+| pywebview | `6.2.1` | BSD-3-Clause |
+| Pillow | `12.3.0` | MIT-CMU |
 
-PyInstaller is a release build tool. Its exception permits applications built with it to be distributed under the application's own license, subject to the licenses of the bundled dependencies.
+PyInstaller is a release build tool. Its exception permits applications built with it to be distributed under the application's own license, subject to the licenses of the bundled dependencies. pywebview draws the coming window with the webview the operating system already has. Pillow resizes logo artwork and draws the label artwork beside the core module.
 
 ## Separation runtime
 

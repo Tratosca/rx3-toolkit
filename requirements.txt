@@ -1,2 +1,6 @@
 cryptography==50.0.0
 pycdlib==1.14.0
+# The logo screen resizes artwork and the label generator draws lettering. It
+# was declared for the release alone while the logo screen had no way in; the
+# screen is the way in, so the tests that cover it need it too.
+pillow==12.3.0

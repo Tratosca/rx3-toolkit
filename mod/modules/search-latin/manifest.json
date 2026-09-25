@@ -1,0 +1,28 @@
+{
+  "id": "search-latin",
+  "name": "Accent-insensitive search",
+  "description": "Find a track without typing its accents, which the on-screen keyboard makes slow.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 55,
+  "runtime_directory": "search-latin",
+  "namespace": "search_latin",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_search_decl.h",
+    "rx3_search_feature.h"
+  ]
+}

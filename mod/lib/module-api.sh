@@ -228,6 +228,59 @@ rbp_environment_value()
     tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n "s/^$1=//p" | head -1
 }
 
+# Export one setting for the core, and ask for a restart when the running player
+# does not already carry it.
+#
+# rbp reads its environment once, at load. A module that only exports leaves a
+# player started without the variable running exactly as before, which is
+# indistinguishable from a module that did nothing: the file changed, the deck
+# did not. Every module that configures the core needs this comparison, so it
+# lives here instead of being written out five times.
+#
+# Returns 0 when a restart was asked for, 1 when the running player is already
+# carrying the value. Modules that have a second reason to restart, such as
+# artwork that changed on the drive, test the result.
+module_export()
+{
+    _rx3_setting=$1
+    _rx3_wanted=$2
+    _rx3_owner=$3
+    export "$_rx3_setting=$_rx3_wanted"
+    _rx3_running=$(rbp_environment_value "$_rx3_setting")
+    [ "$_rx3_running" = "$_rx3_wanted" ] && return 1
+    say "$_rx3_owner needs a restart: running rbp carries $_rx3_setting=[${_rx3_running:-none}]"
+    request_rbp_restart
+    return 0
+}
+
+# Where a module's kill switch lives. One shape for every module, so an operator
+# who has learned one has learned them all.
+module_switch_path() { printf '/tmp/rx3-%s.off' "$1"; }
+
+# Whether the operator has turned this module off from the deck itself.
+#
+# Creating the file takes a shell on the player and no computer at all, and the
+# switch is gone at the next power cycle. During a set that is the difference
+# between a feature misbehaving for one track and a feature misbehaving until
+# there is time to rebuild the drive.
+#
+# The path is built here from the module id, which module_begin has already
+# constrained to lower case, digits and dashes, so no module can name a switch
+# outside /tmp or diverge from the shape.
+#
+# The caller must step aside with `return 0`, never `return 1`. A prepare hook
+# that returns non-zero stops the session and no guarded word is written at
+# all, so a switch meant to take out one module would take out every one of
+# them. That is the opposite of what it is for, and it is not hypothetical: it
+# shipped that way once and cost a session on hardware.
+module_disabled_by_switch()
+{
+    _rx3_switch=$(module_switch_path "$1")
+    [ -e "$_rx3_switch" ] || return 1
+    say "$1 disabled: $_rx3_switch exists"
+    return 0
+}
+
 preload_contains()
 {
     case ":$PREVIOUS_PRELOAD:" in

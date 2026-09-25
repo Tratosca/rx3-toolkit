@@ -1,2 +1,5 @@
 -r requirements.txt
 pyinstaller==6.21.0
+# The window. It uses the system webview rather than shipping one, so on Linux
+# libwebkit2gtk has to be present on the machine that runs the release.
+pywebview==6.2.1

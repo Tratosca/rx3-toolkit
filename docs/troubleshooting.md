@@ -21,7 +21,7 @@ Check three things, in this order:
 
 1. the file is named exactly `autoexec.bin`, lower case, no second extension;
 2. it sits at the root of the drive, not in a folder;
-3. it was built for firmware `1.19`, and the RX3 is running `1.19`.
+3. it was built for a firmware the RX3 is actually running, which is `1.19` or `1.20`.
 
 If the RX3 does not see the drive at all, it is formatted as something other than FAT32 or exFAT, or it was unplugged without ejecting. It is always one of those two.
 
@@ -49,7 +49,7 @@ Tick **Session logging** in the builder to get `RX3_RUNTIME/session.txt` and the
 
 Delete `autoexec.bin` from the drive before using the RX3 again.
 
-`STOP:` means a precondition failed and nothing was modified. The most common one is `STOP: unsupported rbp SHA-1`, which means the player binary is not one the runtime recognises. That is firmware other than `1.19`, or a `1.19` build this project has not seen.
+`STOP:` means a precondition failed and nothing was modified. The most common one is `STOP: unsupported rbp SHA-1`, which means the player binary is not one the runtime recognises. That is a firmware other than `1.19` or `1.20`, or a build of one of them this project has not seen.
 
 A drive that was removed and pushed back in without a power cycle used to report that same `STOP`, because the player binary carried the writes of the first run and no longer matched the state it started from. It no longer does: the guarded words are put back to their stock values before the comparison, so an already-patched session is recognised and the log says `accepted rbp SHA-1: … (already patched; normalises to …)`.
 
@@ -63,9 +63,9 @@ No valid `.rx3stem` matched the loaded track. This is the intended fallback, not
 
 ## A prepared track has no stem controls
 
-The sidecar and the audio file must share exactly the same name before the extension. `Artist - Title.mp3` needs `Artist - Title.rx3stem`. A trailing space, a different dash character, or a renamed audio file all break the match.
+The stem and the audio file must share exactly the same name before the extension. `Artist - Title.mp3` needs `Artist - Title.rx3stem`. A trailing space, a different dash character, or a renamed audio file all break the match.
 
-Compare the names on the drive, not the names in your library. Rekordbox cuts a filename to 44 characters when it exports the track, so a long title reaches the drive shortened while the library keeps it whole. The app applies the same cut. A sidecar generated before it did needs the same treatment: keep the first 44 characters of the name and the `.rx3stem` extension.
+Compare the names on the drive, not the names in your library. Rekordbox cuts a filename to 44 characters when it exports the track, so a long title reaches the drive shortened while the library keeps it whole. The app applies the same cut. A stem generated before it did needs the same treatment: keep the first 44 characters of the name and the `.rx3stem` extension.
 
 Check also that `RX3_STEMS` sits at the root of the drive and not inside another folder.
 
@@ -73,7 +73,7 @@ Check also that `RX3_STEMS` sits at the root of the drive and not inside another
 
 The vocal pad works, the instrumental pad does not, and the vocal is as loud as ever rather than merely leaking. The stem and the audio the deck plays are on different timelines.
 
-You used an older version: please generate the track again with a current version. An MP3 or AAC file declares samples its encoder prepended, which FFmpeg drops but the deck plays; a sidecar built without accounting for them sits about 25 ms early, which is far more than subtraction tolerates. Releases before this handling shipped are affected only for lossy sources that declare padding, which is why some of your tracks work.
+You used an older version: please generate the track again with a current version. An MP3 or AAC file declares samples its encoder prepended, which FFmpeg drops but the deck plays; a stem built without accounting for them sits about 25 ms early, which is far more than subtraction tolerates. Releases before this handling shipped are affected only for lossy sources that declare padding, which is why some of your tracks work.
 
 If the run reports that the padding could not be measured, the source is one the pipeline could not line up. Convert it to WAV or FLAC and generate it again.
 

@@ -1,0 +1,32 @@
+{
+  "id": "samples",
+  "name": "Sample pads",
+  "description": "Fire your own one-shots from the performance pads, prepared on the computer.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 42,
+  "runtime_directory": "samples",
+  "namespace": "samples",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_samples_decl.h",
+    "rx3_samples_feature.h",
+    "rx3_samples_config.h",
+    "rx3_samples_audio.h",
+    "rx3_samples_panel.h",
+    "rx3_samples_state.h"
+  ]
+}

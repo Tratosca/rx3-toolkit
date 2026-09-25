@@ -1,0 +1,30 @@
+{
+  "id": "theme-white",
+  "name": "Light display mode",
+  "description": "A light interface for a lit room, with the waveform kept dark so it stays readable.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 50,
+  "runtime_directory": "theme-white",
+  "namespace": "theme_white",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_theme_decl.h",
+    "rx3_theme_feature.h",
+    "rx3_theme_pixels.h",
+    "rx3_theme_utility.h"
+  ]
+}

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 
-MODULE_PATH = Path(__file__).parents[1] / "tools/rx3_firmware/firmware_image.py"
+MODULE_PATH = Path(__file__).parents[1] / "app/rx3_firmware/firmware_image.py"
 SPEC = importlib.util.spec_from_file_location("firmware_image", MODULE_PATH)
 firmware_image = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(firmware_image)

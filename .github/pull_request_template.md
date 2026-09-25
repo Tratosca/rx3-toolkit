@@ -15,7 +15,7 @@ Ordered by what they affect. Keep the technical names.
 
 - [ ] `make test`
 - [ ] `make preflight`
-- [ ] run on hardware, firmware 1.19
+- [ ] run on hardware, firmware ___
 
 Say what was not verified. A stated gap is cheap; an unstated one is found by a reviewer or by a DJ.
 

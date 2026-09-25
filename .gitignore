@@ -21,8 +21,10 @@
 *.gpr
 *.rep
 *.gzf
+*.asar
 
 # Secrets and local configuration
+CLAUDE.local.md
 *.key
 *.pem
 *.p12
@@ -47,6 +49,7 @@
 
 # Dependencies, caches and coverage
 /.venv*/
+/venv*/
 **/node_modules/
 **/.models/
 **/__pycache__/

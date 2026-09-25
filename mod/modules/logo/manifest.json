@@ -1,0 +1,28 @@
+{
+  "id": "logo",
+  "name": "Logo",
+  "description": "Replace the wordmark in the middle of the performance screen with your own artwork. The player centres whatever size you give it.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 60,
+  "runtime_directory": "logo",
+  "namespace": "logo",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_logo_decl.h",
+    "rx3_logo_feature.h"
+  ]
+}

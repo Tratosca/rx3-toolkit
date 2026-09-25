@@ -1,0 +1,24 @@
+{
+  "id": "logging-verbose",
+  "name": "Verbose USB logging",
+  "description": "Captures continuous player output on USB for debugging. Keeps the drive open; stop the player before removing it.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 96,
+  "runtime_directory": "logging-verbose",
+  "namespace": "logging_verbose",
+  "requires": [
+    "logging"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ]
+}

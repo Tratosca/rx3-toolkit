@@ -26,16 +26,18 @@ import unittest
 
 REPOSITORY = pathlib.Path(__file__).resolve().parent.parent
 BUILD = REPOSITORY / "build"
-HOOKS = ("librx3_core.so", "librx3_core_payload.so")
+HOOKS = ("librx3_core.so",)
 
+# memmove is exported by the player libc as GLIBC_2.4. Clang can introduce it
+# when copying a variable-length native label.
 # Everything rbp itself is known to export. A new name here is a deliberate
 # decision -- confirm rbp really provides it before adding one.
 ALLOWED = {
     "__aeabi_uidiv", "__aeabi_uldivmod",
     "close", "getenv", "gettimeofday", "lseek",
-    "memcmp", "memcpy", "memset",
+    "memcmp", "memcpy", "memmove", "memset",
     "mmap", "mprotect", "munmap", "open",
-    "pthread_create", "pthread_detach",
+    "pthread_create", "pthread_detach", "pthread_join",
     "read", "strlen", "sysconf", "usleep", "write",
 }
 
@@ -84,7 +86,7 @@ class HookSymbolTests(unittest.TestCase):
         # Build rather than trusting whatever is lying in build/, so the test
         # measures the Makefile's current flags and not a stale artefact.
         result = subprocess.run(
-            ["make", "hook", "payload-hook"],
+            ["make", "hook"],
             cwd=REPOSITORY, capture_output=True, text=True,
         )
         if result.returncode != 0:

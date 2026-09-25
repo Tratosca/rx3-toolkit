@@ -1,0 +1,27 @@
+{
+  "id": "decoder-sleep",
+  "name": "Infinite beatjumping",
+  "description": "Drastically reduces wait time between beatjumps, allowing for almost indefinitely instant beatjumping.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": true,
+  "order": 8,
+  "runtime_directory": "decoder-sleep",
+  "namespace": "decoder_sleep",
+  "requires": [],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    },
+    {
+      "source": "apply.sh",
+      "target": "apply.sh",
+      "executable": true
+    }
+  ]
+}

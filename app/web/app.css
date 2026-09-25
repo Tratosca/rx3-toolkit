@@ -1,0 +1,475 @@
+/* SPDX-License-Identifier: MPL-2.0
+ *
+ * One ink colour per theme, spent as alpha steps. Surfaces, borders and
+ * secondary text are all steps of the same value, so a theme swap is a change
+ * of two tokens rather than of every rule, and nothing drifts out of the set.
+ *
+ * The text steps are measured against the surface they sit on, not assumed:
+ * --text is 17.1:1 light and 19.6:1 dark, --muted is 6.1:1 and 9.2:1, --dim is
+ * 5.0:1 and 7.7:1. All are above the 4.5:1 WCAG AA asks for body text. The
+ * interface this replaces reached about 1.6:1 on a dark desktop with a fixed
+ * mid grey, which is unreadable, so the steps below are the point rather than
+ * a detail.
+ */
+:root {
+  color-scheme: light dark;
+  --ink: 17 20 32;
+  --body: #eef0f5;
+  --canvas: #f6f7fa;
+  --text: #111420;
+  --accent: #2f62d8;
+  --accent-soft: #2f62d81f;
+  --accent-edge: #2f62d84d;
+  --warning: #8f3800;
+  --warning-soft: #8f38001a;
+  --danger: #a11b1b;
+  --danger-soft: #a11b1b1a;
+  --good: #17693f;
+  --good-soft: #17693f1a;
+  --shadow: 0 1px 2px rgb(17 20 32 / 0.06), 0 10px 30px rgb(17 20 32 / 0.07);
+  --lift: inset 0 1px 0 rgb(255 255 255 / 0.7);
+
+  --r-chip: 9px;
+  --r-control: 13px;
+  --r-tile: 20px;
+  --r-card: 22px;
+  --r-pill: 100px;
+
+  --pad: 24px;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.011em;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: 255 255 255;
+    --body: #08080b;
+    --canvas: #0b0b10;
+    --text: #ffffff;
+    --accent: #8fb8ff;
+    --accent-soft: #8fb8ff21;
+    --accent-edge: #8fb8ff52;
+    --warning: #ffab6b;
+    --warning-soft: #ffab6b1f;
+    --danger: #ff9f9f;
+    --danger-soft: #ff9f9f1f;
+    --good: #8ce8b6;
+    --good-soft: #8ce8b61f;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 40px rgb(0 0 0 / 0.45);
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--body);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { font-size: 22px; letter-spacing: -0.025em; }
+h2 { font-size: 18px; letter-spacing: -0.02em; }
+h3 { font-size: 14.5px; }
+p { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: rgb(var(--ink) / 0.68); }
+.dim { color: rgb(var(--ink) / 0.62); font-size: 12.5px; }
+.lede { color: rgb(var(--ink) / 0.68); max-width: 64ch; margin-top: 6px; }
+.warning { color: var(--warning); }
+.danger { color: var(--danger); }
+.good { color: var(--good); }
+
+/* The rail ---------------------------------------------------------------- */
+
+#rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 14px;
+  border-right: 1px solid rgb(var(--ink) / 0.09);
+  min-height: 0;
+}
+#rail header { padding: 6px 8px 0; }
+#rail header p { margin-top: 2px; }
+
+nav { display: flex; flex-direction: column; gap: 2px; }
+nav button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  color: rgb(var(--ink) / 0.68);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  cursor: pointer;
+}
+nav button:hover { background: rgb(var(--ink) / 0.05); color: var(--text); }
+nav button[aria-selected="true"] {
+  background: rgb(var(--ink) / 0.09);
+  border-color: rgb(var(--ink) / 0.12);
+  color: var(--text);
+  box-shadow: var(--lift);
+}
+nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+nav .glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgb(var(--ink) / 0.07);
+  font-size: 14px;
+}
+nav button[aria-selected="true"] .glyph {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+}
+nav .tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgb(var(--ink) / 0.08);
+  color: rgb(var(--ink) / 0.62);
+}
+nav .tag[data-state="on"] { background: var(--good-soft); color: var(--good); }
+
+#rail .spacer { flex: 1; }
+
+/* Cards and controls ------------------------------------------------------ */
+
+.card {
+  background: var(--canvas);
+  border: 1px solid rgb(var(--ink) / 0.09);
+  border-radius: var(--r-card);
+  padding: var(--pad);
+  box-shadow: var(--shadow), var(--lift);
+}
+.card + .card { margin-top: 16px; }
+.card > h2 + .lede { margin-bottom: 18px; }
+.inner {
+  background: rgb(var(--ink) / 0.045);
+  border: 1px solid rgb(var(--ink) / 0.08);
+  border-radius: var(--r-tile);
+  padding: 16px;
+}
+
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.row.tight { gap: 6px; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stack { display: grid; gap: 14px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: rgb(var(--ink) / 0.07);
+  border: 1px solid rgb(var(--ink) / 0.11);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background 0.18s, filter 0.18s, transform 0.05s;
+}
+.btn:hover:not(:disabled) { background: rgb(var(--ink) / 0.11); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--body);
+}
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.btn.quiet { background: none; border-color: transparent; font-weight: 500; color: rgb(var(--ink) / 0.68); }
+.btn.quiet:hover:not(:disabled) { background: rgb(var(--ink) / 0.06); color: var(--text); }
+.btn.harm { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+
+input[type="text"], input[type="search"], select {
+  font: inherit;
+  color: var(--text);
+  background: rgb(var(--ink) / 0.05);
+  border: 1px solid rgb(var(--ink) / 0.11);
+  border-radius: var(--r-control);
+  padding: 9px 12px;
+  min-width: 0;
+}
+input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+input[type="range"] { accent-color: var(--accent); width: 100%; }
+label { font-weight: 500; }
+
+.path {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgb(var(--ink) / 0.07);
+  color: rgb(var(--ink) / 0.68);
+}
+.pill.on { background: var(--good-soft); color: var(--good); }
+.pill.off { background: var(--warning-soft); color: var(--warning); }
+.pill.bad { background: var(--danger-soft); color: var(--danger); }
+
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
+dt { color: rgb(var(--ink) / 0.68); }
+dd { margin: 0; }
+
+/* Screens ----------------------------------------------------------------- */
+
+main { overflow: auto; padding: 28px 32px 40px; min-width: 0; }
+main > header { margin-bottom: 22px; }
+.screen[hidden] { display: none; }
+
+/* Anything wide scrolls inside itself. The page never scrolls sideways. */
+.wide { overflow-x: auto; }
+
+/* The job strip ----------------------------------------------------------- */
+
+#job {
+  position: sticky;
+  bottom: 0;
+  margin-top: 20px;
+  padding: 14px 18px;
+  background: var(--canvas);
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--r-tile);
+  box-shadow: var(--shadow);
+}
+#job-bar {
+  margin-top: 10px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgb(var(--ink) / 0.1);
+  overflow: hidden;
+}
+#job-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+#job-bar[data-indeterminate="true"] span {
+  width: 40% !important;
+  animation: sweep 1.4s ease-in-out infinite;
+}
+@keyframes sweep {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+#failure {
+  position: fixed;
+  inset: auto 32px 24px auto;
+  max-width: 52ch;
+  padding: 13px 16px;
+  background: var(--canvas);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-tile);
+  color: var(--danger);
+  box-shadow: var(--shadow);
+}
+#failure button { margin-left: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* The pads ----------------------------------------------------------------- */
+
+.pad-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); gap: 16px; }
+.pad-layout > .card + .card { margin-top: 0; }
+@media (max-width: 1080px) { .pad-layout { grid-template-columns: 1fr; } }
+
+.pad-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+
+/* One pad. The border is the colour the deck will light the button, so the
+ * tile is a preview of the hardware rather than a decoration of its own. */
+.pad {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 108px;
+  padding: 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: rgb(var(--ink) / 0.04);
+  border: 1px solid var(--pad-colour, rgb(var(--ink) / 0.12));
+  border-radius: var(--r-tile);
+  cursor: pointer;
+}
+.pad:hover { background: rgb(var(--ink) / 0.07); }
+.pad:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pad[aria-selected="true"] {
+  padding: 11px;
+  border-width: 2px;
+  background: rgb(var(--ink) / 0.09);
+}
+.pad.empty { border-style: dashed; color: rgb(var(--ink) / 0.62); }
+.pad .index {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-chip);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pad-colour, currentColor);
+  background: rgb(var(--ink) / 0.08);
+}
+.pad .label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pad .meter { height: 4px; border-radius: var(--r-pill); background: rgb(var(--ink) / 0.12); }
+.pad .meter span { display: block; height: 100%; border-radius: var(--r-pill); background: var(--pad-colour, var(--accent)); }
+.pad .badge {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  background: rgb(var(--ink) / 0.08);
+  color: rgb(var(--ink) / 0.68);
+}
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.swatch[aria-pressed="true"] { border-color: rgb(var(--ink) / 0.8); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="color"] {
+  width: 40px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: 1px solid rgb(var(--ink) / 0.2);
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+/* Three ways a pad can play, as one control. */
+.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.modes button {
+  padding: 9px 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--ink) / 0.68);
+  background: rgb(var(--ink) / 0.05);
+  border: 1px solid rgb(var(--ink) / 0.1);
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.modes button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+}
+.modes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The logo ----------------------------------------------------------------- */
+
+.logo-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 16px; }
+.logo-layout > .card + .card { margin-top: 0; }
+@media (max-width: 1080px) { .logo-layout { grid-template-columns: 1fr; } }
+
+/* The pane as the deck paints it: dark by default, and the artwork sits in an
+ * ink area inset from every edge, which is the margin the player samples. */
+.frame {
+  position: relative;
+  margin-top: 16px;
+  border-radius: var(--r-tile);
+  border: 1px solid rgb(var(--ink) / 0.12);
+  background: #101014;
+  overflow: hidden;
+  touch-action: none;
+}
+.frame[data-theme="light"] { background: #e8e8ea; }
+.frame canvas { display: block; width: 100%; height: auto; cursor: grab; }
+.frame canvas:active { cursor: grabbing; }
+.frame-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  text-align: center;
+  color: rgb(255 255 255 / 0.7);
+  background: repeating-linear-gradient(135deg, #131318 0 10px, #101014 10px 20px);
+}
+.frame[data-theme="light"] .frame-empty {
+  color: rgb(0 0 0 / 0.6);
+  background: repeating-linear-gradient(135deg, #e2e2e5 0 10px, #e8e8ea 10px 20px);
+}
+.frame-empty .dim { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.note {
+  padding: 11px 14px;
+  border-radius: var(--r-control);
+  background: rgb(var(--ink) / 0.05);
+  border: 1px solid rgb(var(--ink) / 0.09);
+}
+.note.warn { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
+
+/* Author display rules must not reveal elements hidden by application state. */
+[hidden] { display: none !important; }
+
+.pad[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--pad-colour); }
+
+/* A schematic screen, deliberately rounded and quieter than the editor. */
+.rx3-preview { margin: 20px 0; max-width: 760px; }
+.rx3-mock { display: block; width: 100%; aspect-ratio: 8 / 5; border-radius: 20px; }
+.rx3-preview figcaption { margin-top: 10px; color: rgb(var(--ink) / 0.7); font-size: 13px; line-height: 1.5; }
+.logo-detail { margin-top: 16px; }
+.logo-detail summary { cursor: pointer; padding: 10px 0; font-size: 14px; }
+.logo-detail summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+#logo-mock { cursor: grab; touch-action: none; }
+#logo-mock.dragging { cursor: grabbing; }
+#logo-mock:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

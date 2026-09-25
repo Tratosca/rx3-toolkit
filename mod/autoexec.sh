@@ -7,6 +7,8 @@ OUT="$USB/RX3_RUNTIME"
 LOG="$OUT/session.txt"
 RBP=/root/pdj/rbp
 TMP=/tmp/rx3-runtime
+# Named so the guards below can be run against a directory that is not /proc.
+PROC_ROOT=/proc
 PATCH_TABLE=""
 PATCH_OFFSETS=""
 SUPPORTED_SHA1=""
@@ -33,12 +35,18 @@ MODULE_LOAD_FAILED=0
 # been loaded - a run that fails while loading modules is exactly the run whose
 # log matters.
 #
-# Being off by default is not tidiness. A logging session leaves rbp holding
-# this file open for as long as it plays: on FAT that is how a drive pulled out
-# mid-write loses a directory, and the open handle also keeps the kernel from
-# releasing the device, so the drive comes back under another name and the
-# runtime sees a mount that moved.
-if [ -d /mnt/iso/modules/logging ]; then
+# Ordinary logs open and close per line. Only explicit verbose logging keeps
+# the player's continuous output on USB; ordinary player output stays in RAM.
+configure_player_logs()
+{
+    RBP_OUTPUT=/tmp/rx3-rbp_stdout.txt
+    RBP_RESTORE_OUTPUT=/tmp/rx3-rbp_restore.txt
+    if [ -d "$1/logging-verbose" ]; then
+        RBP_OUTPUT="$OUT/rbp_stdout.txt"
+        RBP_RESTORE_OUTPUT="$OUT/rbp_restore.txt"
+    fi
+}
+if [ -d /mnt/iso/modules/logging ] || [ -d /mnt/iso/modules/logging-verbose ]; then
     LOGGING=1
     mkdir -p "$OUT" 2>/dev/null
     # The run worth reading is the one that applied the patch, and the next
@@ -46,8 +54,7 @@ if [ -d /mnt/iso/modules/logging ]; then
     # one generation, or that second insertion truncates the only evidence.
     [ -f "$LOG" ] && mv -f "$LOG" "$OUT/session-previous.txt" 2>/dev/null
     : > "$LOG"
-    RBP_OUTPUT="$OUT/rbp_stdout.txt"
-    RBP_RESTORE_OUTPUT="$OUT/rbp_restore.txt"
+    configure_player_logs /mnt/iso/modules
 else
     LOGGING=0
     LOG=/dev/null
@@ -59,6 +66,92 @@ say()
 {
     [ "$LOGGING" = "1" ] || return 0
     echo "$@" >> "$LOG" 2>&1
+}
+
+rbp_alive()
+{
+    # A zombie keeps its /proc entry but no longer has an executable mapping,
+    # and a mapping is the only thing that makes writing rbp dangerous. Testing
+    # for the directory alone reports a zombie as a survivor and waits ten
+    # seconds for a process that has already gone.
+    [ -e "$PROC_ROOT/$1/exe" ] &&
+        [ "$(awk '{print $3}' "$PROC_ROOT/$1/stat" 2>/dev/null)" != "Z" ]
+}
+
+# Whether stopping the player would interrupt something that is not ours.
+#
+# Two drives in a B2B set: the other DJ is playing off theirs while this one is
+# inserted. Stopping rbp there cuts their audio. The mount table is the only
+# place that fact is visible from here, and a table we cannot read is treated
+# as unsafe rather than assumed empty.
+media_topology_is_unsafe()
+{
+    _rx3_ours=${1%/}
+    _rx3_mounts_file=${2:-$PROC_ROOT/mounts}
+    _rx3_own_count=0
+    OTHER_USB_MOUNT=""
+    OTHER_USB_DEVICE=""
+    MEDIA_GUARD_REASON=""
+    [ -r "$_rx3_mounts_file" ] || {
+        MEDIA_GUARD_REASON="mount table unavailable"
+        return 0
+    }
+    while read -r _rx3_device _rx3_mount _rx3_type _rx3_options _rx3_rest; do
+        case "$_rx3_mount" in
+            /media/usb[0-9]*/*)
+                if [ "$_rx3_mount" = "$_rx3_ours" ]; then
+                    _rx3_own_count=$((_rx3_own_count + 1))
+                elif [ -z "$OTHER_USB_MOUNT" ]; then
+                    OTHER_USB_DEVICE=$_rx3_device
+                    OTHER_USB_MOUNT=$_rx3_mount
+                fi
+                ;;
+        esac
+    done < "$_rx3_mounts_file"
+    if [ "$_rx3_own_count" != "1" ]; then
+        MEDIA_GUARD_REASON="runtime USB mount count is $_rx3_own_count (expected 1)"
+        return 0
+    fi
+    if [ -n "$OTHER_USB_MOUNT" ]; then
+        MEDIA_GUARD_REASON="other USB mounted at $OTHER_USB_MOUNT (${OTHER_USB_DEVICE:-unknown})"
+        return 0
+    fi
+    return 1
+}
+
+# Deferring is a success, not a failure: the drive can be reinserted when the
+# other one is out, and nothing has been written in the meantime.
+defer_for_unsafe_media()
+{
+    media_topology_is_unsafe "$1" || return 1
+    say "safe-load guard: $MEDIA_GUARD_REASON; not stopping rbp"
+    say "playback continues; the mod is deferred until a safe restart."
+    echo deferred > /tmp/rx3-patch.state
+    rm -rf "$TMP"
+    say "=== complete (mod deferred: unsafe USB topology) ==="
+    sync
+    return 0
+}
+
+# Ten seconds of grace, then the signal that cannot be caught, then a scan for
+# anything still holding an rbp mapping. Returning failure here is the last
+# free abort: no guarded word has been written yet.
+stop_rbp()
+{
+    target=$1
+    kill "$target" 2>/dev/null
+    i=0
+    while [ "$i" -lt 10 ] && rbp_alive "$target"; do sleep 1; i=$((i+1)); done
+    rbp_alive "$target" && { kill -9 "$target" 2>/dev/null; sleep 2; }
+    say "rbp pid $target stopped after ${i}s"
+    for process in "$PROC_ROOT"/[0-9]*; do
+        [ "$(cat "$process/comm" 2>/dev/null)" = "rbp" ] || continue
+        candidate=${process##*/}
+        rbp_alive "$candidate" || continue
+        say "FAILED: rbp pid $candidate survived the stop sequence"
+        return 1
+    done
+    return 0
 }
 
 MODULE_API=/mnt/iso/lib/module-api.sh
@@ -209,16 +302,28 @@ elif [ "$PATCH_COUNT" != "0" ]; then
 fi
 
 PID=""
-for process in /proc/[0-9]*; do
-    [ "$(cat "$process/comm" 2>/dev/null)" = "rbp" ] && PID=${process#/proc/}
+RBP_LIVE_COUNT=0
+for process in "$PROC_ROOT"/[0-9]*; do
+    [ "$(cat "$process/comm" 2>/dev/null)" = "rbp" ] || continue
+    candidate=${process##*/}
+    rbp_alive "$candidate" || continue
+    PID=$candidate
+    RBP_LIVE_COUNT=$((RBP_LIVE_COUNT + 1))
 done
-[ -n "$PID" ] || { say "FAILED: running rbp process not found"; rm -rf "$TMP"; sync; exit 1; }
+[ "$RBP_LIVE_COUNT" = "1" ] || {
+    say "FAILED: expected one live rbp, found $RBP_LIVE_COUNT"
+    rm -rf "$TMP"; sync; exit 1
+}
 ARGS=$(tr '\0' ' ' < "/proc/$PID/cmdline" | cut -d' ' -f2-)
 CWD=$(readlink "/proc/$PID/cwd" 2>/dev/null)
 PREVIOUS_PRELOAD=$(tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n 's/^LD_PRELOAD=//p' | head -1)
 RBP_PRELOAD=$PREVIOUS_PRELOAD
 say "rbp pid=$PID options=[$ARGS] cwd=$CWD"
 say "existing preload: ${PREVIOUS_PRELOAD:-none}"
+
+if defer_for_unsafe_media "$USB"; then
+    exit 0
+fi
 
 run_hooks "$PREPARE_HOOKS" || {
     say "STOP: a prepare hook failed; no guarded word was written."
@@ -242,13 +347,15 @@ echo applying > /tmp/rx3-patch.state
 # A restart is the expensive part of an insertion, so the log names what forced
 # it. On a drive that is merely being reinserted this line is the whole answer
 # to why the screen froze and the media list emptied.
+if defer_for_unsafe_media "$USB"; then
+    exit 0
+fi
 say "restart requested by:${RESTART_REQUESTED_BY:- unknown}"
 say "stopping rbp"
-kill "$PID" 2>/dev/null
-i=0
-while [ "$i" -lt 10 ] && [ -d "/proc/$PID" ]; do sleep 1; i=$((i+1)); done
-[ -d "/proc/$PID" ] && { kill -9 "$PID" 2>/dev/null; sleep 2; }
-say "rbp stopped after ${i}s"
+if ! stop_rbp "$PID"; then
+    say "STOP: the running rbp did not stop; no guarded word was written."
+    rm -rf "$TMP"; sync; exit 1
+fi
 
 write_words()
 {
@@ -275,9 +382,28 @@ verify_words()
     echo "$failures"
 }
 
+# One generation of the player's own output, kept the way the session log is.
+#
+# It happens here and not beside the session log, which is rotated far above:
+# this point is past the lock, past the RAM-root guard, past the rbp identity
+# check and past every safe-load guard. A run that then correctly decides to do
+# nothing, the B2B case, must not have renamed a file on a volume it was never
+# going to touch.
+PLAYER_LOGS_ROTATED=0
+rotate_player_logs()
+{
+    [ "$LOGGING" = "1" ] || return 0
+    [ "$PLAYER_LOGS_ROTATED" = "0" ] || return 0
+    PLAYER_LOGS_ROTATED=1
+    [ -f "$RBP_OUTPUT" ] && mv -f "$RBP_OUTPUT" "${RBP_OUTPUT%.txt}-previous.txt" 2>/dev/null
+    [ -f "$RBP_RESTORE_OUTPUT" ] && mv -f "$RBP_RESTORE_OUTPUT" "${RBP_RESTORE_OUTPUT%.txt}-previous.txt" 2>/dev/null
+    return 0
+}
+
 launch_rbp()
 {
     target_log=$1
+    rotate_player_logs
     # rbp keeps writing here long after this script exits, and the file is
     # never truncated, so without a marker one run's crash reads as the next
     # run's. It is what told us the player dies twice on a relaunch.

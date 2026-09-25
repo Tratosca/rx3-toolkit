@@ -1,0 +1,31 @@
+{
+  "id": "stems",
+  "name": "Stems",
+  "description": "Enable the use of prepared stems (on screen and on Slip Loop pads 7-8). Prepared stems on a USB stick are automatically loaded by the player when you load the corresponding song on a deck.",
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": true,
+  "order": 40,
+  "runtime_directory": "stems",
+  "namespace": "stems",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_stems_decl.h",
+    "rx3_stems_feature.h",
+    "rx3_stems_panel.h",
+    "rx3_stems_audio.h",
+    "rx3_stems_loader.h"
+  ]
+}
