@@ -13,8 +13,8 @@ import tempfile
 import threading
 
 from app.localization import LocalizedError
-from app.rx3_stems import cache, provisioning, safety, stem
-from app.rx3_stems.rekordbox import export_stem
+from app.stems import cache, provisioning, safety, stem
+from app.stems.rekordbox import export_stem
 
 # Correlation is evidence of a shared signal, never proof of a source role.
 MIN_CORRELATION = 0.55
@@ -248,7 +248,7 @@ def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None)
 
 
 def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
-    from app.rx3_stems import waveform
+    from app.stems import waveform
 
     safety.require_library_closed()
     output = drive / "RX3_STEMS"

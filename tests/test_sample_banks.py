@@ -15,8 +15,8 @@ import tempfile
 import unittest
 import wave
 
-from app.rx3_samples import bank as bank_module
-from app.rx3_service import samples as samples_service
+from app.samples import bank as bank_module
+from app.services import samples as samples_service
 
 
 def tone(path, seconds=0.25, rate=bank_module.RATE, channels=bank_module.CHANNELS):
@@ -151,8 +151,8 @@ class LogoPreviewTests(unittest.TestCase):
         import base64
         import io
         from PIL import Image
-        from app.rx3_service import logo
-        from app.rx3_logo import container
+        from app.services import logo
+        from app.logo import container
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "logo.png"
             art = Image.new("RGBA", (30, 10), (255, 255, 255, 255))

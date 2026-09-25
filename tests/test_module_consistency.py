@@ -14,8 +14,8 @@ import struct
 import unittest
 from pathlib import Path
 
-from app.rx3_runtime.build import discover_patches
-from app.rx3_stems import stem
+from app.runtime.build import discover_patches
+from app.stems import stem
 
 REPOSITORY = Path(__file__).parents[1]
 
@@ -109,13 +109,13 @@ class LogoFramingTests(unittest.TestCase):
     MARKERS = ("// PLACEMENT BEGIN", "// PLACEMENT END")
 
     def framing(self):
-        source = (REPOSITORY / "app/web/logo.js").read_text(encoding="utf-8")
+        source = (REPOSITORY / "app/ui/web/logo.js").read_text(encoding="utf-8")
         begin, end = self.MARKERS
         self.assertIn(begin, source, "the framing is no longer marked for lifting")
         return source[source.index(begin) + len(begin):source.index(end)]
 
     def cases(self):
-        from app.rx3_logo import container
+        from app.logo import container
 
         for geometry in (container.CLASSIC, container.FULL):
             for mode in ("contain", "cover"):
@@ -130,7 +130,7 @@ class LogoFramingTests(unittest.TestCase):
         import shutil
         import subprocess
 
-        from app.rx3_logo import container
+        from app.logo import container
 
         node = shutil.which("node")
         if not node:
@@ -250,7 +250,7 @@ class PadRowLayoutTests(unittest.TestCase):
         import subprocess
         import tempfile
 
-        from app.rx3_preview import layout
+        from app.preview import layout
 
         compiler = shutil.which("cc") or shutil.which("clang")
         if not compiler:
@@ -342,7 +342,7 @@ int main(void)
     def test_the_row_is_solved_without_overlaps_or_gaps_at_the_ends(self):
         """A cell drawn where nothing can be touched, or two cells over one
         pixel, is the failure this whole layer exists to prevent."""
-        from app.rx3_preview import layout
+        from app.preview import layout
 
         for count in range(1, layout.CELL_MAX + 1):
             with self.subTest(count=count):
@@ -361,7 +361,7 @@ int main(void)
 
     def test_the_solver_reproduces_the_strip_it_replaces(self):
         """The stems strip's measured widths, which the gap table carries."""
-        from app.rx3_preview import layout
+        from app.preview import layout
 
         measured_width = {1: 595, 2: 288, 3: 187, 4: 139}
         measured_gap = {1: 0, 2: 19, 3: 17, 4: 13}
@@ -462,7 +462,7 @@ class ImageTableBoundTests(unittest.TestCase):
 
     def test_the_artwork_fits_the_ids_that_were_reserved(self):
         """More glyphs than reserved ids writes records past the table's end."""
-        from app.rx3_preview.atlas import Atlas
+        from app.preview.atlas import Atlas
 
         base = self.define("RX3_PAD_GLYPH_IMAGE_BASE")
         found = re.search(r"#define RX3_PAD_GLYPH_IMAGE_MAX\s+(\d+)u?", self.hook())
@@ -486,7 +486,7 @@ class GlyphAtlasTests(unittest.TestCase):
     drawn as nothing at all: a caption silently missing a letter."""
 
     def atlases(self):
-        from app.rx3_preview.atlas import Atlas
+        from app.preview.atlas import Atlas
 
         directory = modules_by_id()["core"].directory
         for theme in ("dark", "light"):
@@ -579,7 +579,7 @@ class FirmwareCoverageTests(unittest.TestCase):
     def test_every_declared_firmware_can_actually_be_built(self):
         """A version some module names but nothing else supports is a version an
         operator can pick and get an empty or broken drive from."""
-        from app.rx3_runtime.build import available_versions, resolve_patches
+        from app.runtime.build import available_versions, resolve_patches
 
         versions = available_versions(REPOSITORY)
         self.assertTrue(versions, "no firmware is offered at all")

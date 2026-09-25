@@ -12,7 +12,7 @@ import unittest
 import wave
 
 from app.localization import LocalizedError
-from app.rx3_stems import importing, stem
+from app.stems import importing, stem
 
 
 def signal(frames, rate=44100):

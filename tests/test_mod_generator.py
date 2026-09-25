@@ -7,15 +7,15 @@ import unittest.mock
 from dataclasses import replace
 from pathlib import Path
 
-from app.rx3_runtime import build as build_module
-from app.rx3_runtime.build import build_runtime, discover_patches, resolve_patches
+from app.runtime import build as build_module
+from app.runtime.build import build_runtime, discover_patches, resolve_patches
 
 
 REPOSITORY = Path(__file__).parents[1]
 
 
 def load_firmware_codec():
-    path = REPOSITORY / "app/rx3_firmware/firmware_image.py"
+    path = REPOSITORY / "app/firmware/firmware_image.py"
     spec = importlib.util.spec_from_file_location("firmware_image_builder_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -136,7 +136,7 @@ class ModGeneratorTests(unittest.TestCase):
         build made on Windows shipped an index no module could be loaded from.
         The source assertion carries the test on Linux and macOS, where that
         translation never happens and the built image cannot show the fault."""
-        builder = (REPOSITORY / "app/rx3_runtime/build.py").read_text()
+        builder = (REPOSITORY / "app/runtime/build.py").read_text()
         self.assertRegex(
             builder, r'modules / "index"\)\.write_text\((?s:.*?)newline=""'
         )

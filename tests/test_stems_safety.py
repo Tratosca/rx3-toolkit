@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from app.localization import LocalizedError, wire
-from app.rx3_stems import safety, job, provisioning, rekordbox, stem
+from app.stems import safety, job, provisioning, rekordbox, stem
 
 
 class SafetyTests(unittest.TestCase):

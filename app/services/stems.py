@@ -19,10 +19,10 @@ from app.localization import Message, LocalizedError
 import dataclasses
 import pathlib
 
-from app.rx3_stems import estimate, provisioning, separation, safety
-from app.rx3_stems.job import JobState, StemJob
-from app.rx3_stems.rekordbox import Collection, parse_collection, parse_drive
-from app.rx3_stems.rekordbox import has_export
+from app.stems import estimate, provisioning, separation, safety
+from app.stems.job import JobState, StemJob
+from app.stems.rekordbox import Collection, parse_collection, parse_drive
+from app.stems.rekordbox import has_export
 
 
 @dataclasses.dataclass(frozen=True)

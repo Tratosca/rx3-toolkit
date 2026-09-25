@@ -30,13 +30,13 @@ import time
 import traceback
 
 from app.localization import Message, LocalizedError, catalogs, normalize, translate, wire, error_message
-from app.rx3_runtime import build as build_module
-from app.rx3_samples import bank as bank_module
-from app.rx3_service import drive as drive_service
-from app.rx3_service import logo as logo_service
-from app.rx3_service import mod as mod_service
-from app.rx3_service import samples as samples_service
-from app.rx3_service import stems as stems_service
+from app.runtime import build as build_module
+from app.samples import bank as bank_module
+from app.services import drive as drive_service
+from app.services import logo as logo_service
+from app.services import mod as mod_service
+from app.services import samples as samples_service
+from app.services import stems as stems_service
 
 
 # What a chooser offers per kind. The interface names a kind; it never hands
@@ -73,7 +73,7 @@ def reveal(path: pathlib.Path) -> None:
     """Show a path in the platform file manager.
 
     This lives here rather than in a service because opening a file manager is
-    something an interface does, and nothing under app/rx3_service opens
+    something an interface does, and nothing under app/services opens
     anything.
     """
     path = pathlib.Path(path)
@@ -604,7 +604,7 @@ class Bridge:
         if len(matches) != 1:
             raise LocalizedError("stems.importTrack")
         track = next(iter(matches.values()))
-        from app.rx3_stems.rekordbox import export_stem
+        from app.stems.rekordbox import export_stem
         basename = export_stem(track.location.stem).casefold()
         if any(other.location != track.location and export_stem(other.location.stem).casefold() == basename
                for playlist in library.collection.playlists for other in playlist.tracks):
@@ -618,20 +618,20 @@ class Bridge:
 
     @answered
     def stems_import_assign(self, track_id, values=None):
-        from app.rx3_stems import importing
+        from app.stems import importing
         self._stem_track(track_id)
         return importing.assignments(self._held(), track_id, values)
 
     @answered
     def stems_audition(self, drive, track_id, selection, start=0, seconds=30):
-        from app.rx3_stems import audition, provisioning
+        from app.stems import audition, provisioning
         track = self._stem_track(track_id)
         return audition.on_drive(track.location, pathlib.Path(drive), selection, start, seconds,
                                  provisioning.detect().ffmpeg or "ffmpeg")
 
     @answered
     def stems_import_audition(self, drive, track_id, selection, start=0, seconds=30):
-        from app.rx3_stems import audition, importing, provisioning
+        from app.stems import audition, importing, provisioning
         track = self._stem_track(track_id)
         inputs = importing.assignments(self._held(), track_id)
         return audition.imported(track.location, inputs, selection, start, seconds,
@@ -639,7 +639,7 @@ class Bridge:
 
     @answered
     def stems_import_start(self, track_id, output):
-        from app.rx3_stems import importing, safety, provisioning
+        from app.stems import importing, safety, provisioning
         safety.require_library_closed()
         track = self._stem_track(track_id)
         drive = pathlib.Path(output)
@@ -666,12 +666,12 @@ class Bridge:
 
     @answered
     def stems_cache(self, maximum=None, clear=False) -> dict:
-        from app.rx3_stems import cache
+        from app.stems import cache
         return cache.configure(maximum, clear)
 
     @answered
     def stems_library_status(self) -> dict:
-        from app.rx3_stems import safety
+        from app.stems import safety
         return {"busy": safety.library_busy()}
 
     @answered

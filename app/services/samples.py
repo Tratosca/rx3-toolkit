@@ -20,8 +20,8 @@ import subprocess
 import tempfile
 import wave
 
-from app.rx3_samples import bank as bank_module
-from app.rx3_samples.bank import Bank, Pad
+from app.samples import bank as bank_module
+from app.samples.bank import Bank, Pad
 
 
 @dataclasses.dataclass(frozen=True)

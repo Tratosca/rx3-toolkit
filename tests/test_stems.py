@@ -11,9 +11,9 @@ import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from app.rx3_stems import provisioning, stem
-from app.rx3_stems.job import StemJob
-from app.rx3_stems.rekordbox import EXPORT_STEM_LIMIT, export_stem, parse_collection
+from app.stems import provisioning, stem
+from app.stems.job import StemJob
+from app.stems.rekordbox import EXPORT_STEM_LIMIT, export_stem, parse_collection
 
 
 def write_export(root: pathlib.Path, tracks: list[tuple[str, str, str, pathlib.Path]]) -> pathlib.Path:
@@ -49,7 +49,7 @@ class RekordboxTests(unittest.TestCase):
 
 class JobTests(unittest.TestCase):
     def setUp(self):
-        process = unittest.mock.patch("app.rx3_stems.safety.library_busy", return_value=False)
+        process = unittest.mock.patch("app.stems.safety.library_busy", return_value=False)
         process.start()
         self.addCleanup(process.stop)
 

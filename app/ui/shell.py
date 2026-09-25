@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 """The window, and nothing else.
 
-Every rule about what the toolkit does lives in app/rx3_service and reaches
+Every rule about what the toolkit does lives in app/services and reaches
 the interface through bridge.Bridge. This file opens a window, points it at a
 local page, and gets out of the way.
 
@@ -17,9 +17,9 @@ import re
 import sys
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from app import bridge
+from app.ui import bridge
 
 PRODUCT = "XDJ-RX3 Toolkit"
 

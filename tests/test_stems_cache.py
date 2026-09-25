@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from app.rx3_stems import cache, job, provisioning, rekordbox, safety, separation, stem
+from app.stems import cache, job, provisioning, rekordbox, safety, separation, stem
 
 
 class CacheTests(unittest.TestCase):

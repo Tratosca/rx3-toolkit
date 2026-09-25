@@ -62,18 +62,18 @@ autoexec:
 	@test -n "$(KEY)" || { echo 'KEY=/path/outside/the/repository/aes256.key is required' >&2; exit 2; }
 	@test -f "$(KEY)" || { echo 'key not found: $(KEY)' >&2; exit 2; }
 	@mkdir -p "$(BUILD_DIR)"
-	$(PYTHON) -m app.rx3_runtime.cli build \
+	$(PYTHON) -m app.runtime.cli build \
 	  --firmware "$(FIRMWARE)" $(PATCH_ARGS) --key "$(KEY)" --output "$(BUILD_DIR)"
 
 app:
-	$(PYTHON) app/shell.py
+	$(PYTHON) app/ui/shell.py
 
 # A module is three files whose names, namespacing and order field are
 # conventions. Guessing them from a neighbouring module is how one of them ends
 # up wrong.
 new-module:
 	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock' >&2; exit 2; }
-	$(PYTHON) -m app.rx3_runtime.scaffold --id "$(ID)" --name "$(NAME)" \
+	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" \
 	  $(if $(CORE),--core,)
 
 test:

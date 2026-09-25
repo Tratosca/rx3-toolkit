@@ -541,7 +541,7 @@ def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str |
 
 
 def _load_firmware_module(root: pathlib.Path):
-    path = root / "app/rx3_firmware/firmware_image.py"
+    path = root / "app/firmware/firmware_image.py"
     spec = importlib.util.spec_from_file_location("rx3_firmware_image", path)
     if not spec or not spec.loader:
         raise ValueError(f"cannot load firmware codec from {path}")

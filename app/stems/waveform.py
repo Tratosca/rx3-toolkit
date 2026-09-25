@@ -11,8 +11,8 @@ import sys
 import tempfile
 
 from app.localization import LocalizedError
-from app.rx3_stems import analysis, audition, importing, mixing, safety, wave_dsp
-from app.rx3_stems.rekordbox import export_stem
+from app.stems import analysis, audition, importing, mixing, safety, wave_dsp
+from app.stems.rekordbox import export_stem
 
 MAGIC = b"RX3WAV1\0"
 HEADER = struct.Struct("<8s8I32s32sQ16s")

@@ -10,8 +10,8 @@ import unittest
 from unittest import mock
 import wave
 
-from app.rx3_stems import analysis, pdb, safety, stem, wave_dsp, waveform
-from app.rx3_stems.rekordbox import Track
+from app.stems import analysis, pdb, safety, stem, wave_dsp, waveform
+from app.stems.rekordbox import Track
 
 
 def tag(name, header, body):

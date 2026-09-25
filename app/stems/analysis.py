@@ -7,8 +7,8 @@ import pathlib
 import struct
 from dataclasses import dataclass
 
-from app.rx3_stems import pdb, safety
-from app.rx3_stems.rekordbox import PDB_MAX_BYTES, export_stem, pdb_path
+from app.stems import pdb, safety
+from app.stems.rekordbox import PDB_MAX_BYTES, export_stem, pdb_path
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_COLUMNS = 540000

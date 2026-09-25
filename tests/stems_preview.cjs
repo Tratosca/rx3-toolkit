@@ -21,7 +21,7 @@ const window={AudioContext,i18n:{t:key=>key,number:value=>String(value)},
  addEventListener:(name,cb)=>{events[name]=cb},
  rx3:{async ask(method,...args){calls.push([method,...args]);return {audio:'AA==',available:15,totalSeconds:60,
   seconds:30,start:args[3],peaks:[0.2,0.4],initialState:unity,finalState:unity,ramp:[]}}}};
-vm.runInNewContext(fs.readFileSync('app/web/stems-listen.js','utf8'),{
+vm.runInNewContext(fs.readFileSync('app/ui/web/stems-listen.js','utf8'),{
  window,document:{createElement:tag=>new Element(tag)},requestAnimationFrame(){},
  atob:value=>Buffer.from(value,'base64').toString('binary'),Uint8Array,Map,Math,Number,JSON});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));

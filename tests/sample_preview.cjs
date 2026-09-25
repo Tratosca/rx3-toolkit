@@ -48,7 +48,7 @@ window.rx3 = {
     throw Error(operation);
   }
 };
-vm.runInNewContext(fs.readFileSync('app/web/samples.js', 'utf8'), {window, document, Map, Number, Array, Uint8Array});
+vm.runInNewContext(fs.readFileSync('app/ui/web/samples.js', 'utf8'), {window, document, Map, Number, Array, Uint8Array});
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const key = (key, type = 'keydown') => window.send(type, {key, target:new Element(), repeat:false});
 (async () => {

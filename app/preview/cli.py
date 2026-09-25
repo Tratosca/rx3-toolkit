@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 """Write a picture of every row a deck can show.
 
-`python -m app.rx3_preview --out build/pad-preview`
+`python -m app.preview --out build/pad-preview`
 """
 
 from __future__ import annotations
@@ -9,9 +9,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from app.rx3_preview import layout
-from app.rx3_preview.atlas import INACTIVE, PRESSED, SELECTED
-from app.rx3_preview.row import (BUTTON, SLIDER, STEPPER, TOGGLE, Widget,
+from app.preview import layout
+from app.preview.atlas import INACTIVE, PRESSED, SELECTED
+from app.preview.row import (BUTTON, SLIDER, STEPPER, TOGGLE, Widget,
                                  atlas_for, render)
 
 STEM_NAMES = {2: ["DRUMS", "INSTRUMENTAL"],

@@ -20,7 +20,7 @@ import dataclasses
 import io
 import pathlib
 
-from app.rx3_logo import container
+from app.logo import container
 
 # The two names the logo module copies to the player, from its own module.sh.
 DARK_NAME = "rx3-logo-main.rgb565"

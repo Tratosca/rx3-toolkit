@@ -18,10 +18,10 @@ from app.localization import Message, LocalizedError
 import dataclasses
 import pathlib
 
-from app.rx3_service import mod as mod_service
-from app.rx3_service import samples as samples_service
-from app.rx3_session import log as session_log
-from app.rx3_stems import rekordbox
+from app.services import mod as mod_service
+from app.services import samples as samples_service
+from app.session import log as session_log
+from app.stems import rekordbox
 
 
 @dataclasses.dataclass(frozen=True)

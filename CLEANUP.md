@@ -3,7 +3,7 @@
 
 Ce que la passe de rangement a retiré de l'arbre, avec la preuve pour chaque fichier. Les fichiers suivis par git sont passés par `.attic/`, arborescence conservée, que le nettoyage du 25 septembre 2026 a supprimé ; les chemins `.attic/...` ci-dessous sont ceux d'alors, et le tag `snapshot/before-cleanup` contient l'arbre complet d'avant la passe. Les fichiers que git n'a jamais suivis ont été mis en quarantaine hors du dépôt, puis supprimés le même jour.
 
-Preuve de non-usage, appliquée à chaque entrée : aucune référence statique dans l'arbre (grep sur le nom et sur le chemin), absent du Makefile, de la CI et de `app/toolkit.spec`, hors d'atteinte des mécanismes dynamiques du dépôt (glob des `manifest.json` par `app/rx3_runtime/build.py` et par le spec, `*_feature.h` et `*_panel.h`, découverte `test_*.py` de `unittest`, wildcard `mod/modules/*/1.19/*.h` du Makefile), et aucune mention dans un `.md` autre que le CHANGELOG.
+Preuve de non-usage, appliquée à chaque entrée : aucune référence statique dans l'arbre (grep sur le nom et sur le chemin), absent du Makefile, de la CI et de `packaging/toolkit.spec`, hors d'atteinte des mécanismes dynamiques du dépôt (glob des `manifest.json` par `app/runtime/build.py` et par le spec, `*_feature.h` et `*_panel.h`, découverte `test_*.py` de `unittest`, wildcard `mod/modules/*/1.19/*.h` du Makefile), et aucune mention dans un `.md` autre que le CHANGELOG.
 
 ## Mort
 
@@ -13,7 +13,7 @@ Preuve de non-usage, appliquée à chaque entrée : aucune référence statique 
 | `.attic/tools/rx3_patcher/` (4 fichiers) | Contreparties hors ligne des patches d'octets de deux modules. Seul lecteur : `tests/test_beat_jump_patches.py` et une classe de `tests/test_module_consistency.py`, supprimés. Les tables qui s'exécutent sont dans `module.sh`. Décision de l'utilisateur. |
 | `.attic/tools/rx3_payload/` (2 fichiers) | Assembleur du payload d'un émulateur qui a quitté le dépôt (CHANGELOG, « The emulator moved to its own repository »). Atteint par `make payload` seulement, que la CI n'exécutait jamais. Décision de l'utilisateur. |
 | `.attic/mod/modules/core/1.19/rx3_core_emulator_{keys,breadcrumbs,harness}.h` | Inclus uniquement sous `RX3_EMULATOR_BUILD`, que seul `make payload-hook` définissait. Les 18 blocs gardés ont été retirés de `rx3_core_hook.c` ; `librx3_core.so` a le même SHA-256 avant et après. |
-| `.attic/app/{main,mod_generator,stems_preparation,theme}.py` | La fenêtre Tkinter, remplacée par celle de `app/shell.py`, qui fait maintenant les cinq écrans et que PyInstaller gèle. Aucun test ne les importe (vérifié : `tests/test_mod_generator.py` et `tests/test_stems.py` ne parlent qu'aux moteurs). Sortis du spec, du Makefile et de la CI dans le même lot. `theme.py` importe `tkinter` au niveau du module : tant que quelque chose l'importait, Tk entrait dans le paquet livré. |
+| `.attic/app/{main,mod_generator,stems_preparation,theme}.py` | La fenêtre Tkinter, remplacée par celle de `app/ui/shell.py`, qui fait maintenant les cinq écrans et que PyInstaller gèle. Aucun test ne les importe (vérifié : `tests/test_mod_generator.py` et `tests/test_stems.py` ne parlent qu'aux moteurs). Sortis du spec, du Makefile et de la CI dans le même lot. `theme.py` importe `tkinter` au niveau du module : tant que quelque chose l'importait, Tk entrait dans le paquet livré. |
 | `.attic/scripts/smoke_desktop_app.py` | Remplacé par une ligne de `.github/workflows/ci.yml` ; aucun autre appelant. |
 | `.attic/tools/rx3_stems/make_sidecar.py` | Ligne de commande vers l'encodeur que l'application pilote déjà. Cité une fois dans REFERENCES, jamais exécuté par rien. Décision de l'utilisateur. |
 | `.attic/tools/rx3_assets/__init__.py` | Fichier vide d'un paquet dont le seul module a rejoint `mod/modules/core/1.19/build_labels.py`. |
@@ -45,7 +45,7 @@ Tests conservés et pourquoi, fichier par fichier :
 
 ## Douteux, gardés
 
-- `app/shell.py`, `app/bridge.py`, `app/web/`, `app/rx3_service/`, `app/rx3_logo/`, `app/rx3_samples/` : atteints par un seul self-test de la CI, ne livrent pas, mais c'est le chantier « Polished interface » de la feuille de route.
+- `app/ui/shell.py`, `app/ui/bridge.py`, `app/ui/web/`, `app/services/`, `app/logo/`, `app/samples/` : atteints par un seul self-test de la CI, ne livrent pas, mais c'est le chantier « Polished interface » de la feuille de route.
 - `mod/modules/core/1.19/assets/*-selected.rgb565` : chargés à l'exécution par `module.sh` du core ; le CHANGELOG dit qu'ils partiront quand la question de palette sera tranchée.
 
 `[TODO: à vérifier]` : le dépôt de l'émulateur, s'il vit encore ailleurs, consommait `make payload` ; il n'a plus de source ici.

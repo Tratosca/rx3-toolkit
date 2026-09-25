@@ -18,7 +18,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
-from app.rx3_stems import pdb, safety
+from app.stems import pdb, safety
 
 
 DRIVE_LETTER = re.compile(r"^/[A-Za-z]:")

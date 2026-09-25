@@ -16,8 +16,8 @@ import dataclasses
 import json
 import pathlib
 
-from app.rx3_runtime import build as build_module
-from app.rx3_session import log as session_log
+from app.runtime import build as build_module
+from app.session import log as session_log
 
 IMAGE_NAME = "autoexec.bin"
 RUNTIME_DIRECTORY = session_log.RUNTIME_DIRECTORY

@@ -12,7 +12,7 @@ import struct
 import tempfile
 import threading
 
-from app.rx3_stems import provisioning, safety, stem
+from app.stems import provisioning, safety, stem
 
 DEFAULT_LIMIT = 4 * 1024 ** 3
 MAX_MANIFEST_BYTES = 4 * 1024 ** 2

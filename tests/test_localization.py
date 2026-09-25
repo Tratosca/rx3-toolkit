@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from app.localization import Message, LocalizedError, catalogs, translate, wire
-from app.bridge import Bridge
+from app.ui.bridge import Bridge
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -42,7 +42,7 @@ class LocalizationTests(unittest.TestCase):
             json.loads(path.read_text(), object_pairs_hook=unique)
 
     def test_literal_ui_keys_exist(self):
-        sources = list((ROOT / 'app/web').glob('*.js')) + list((ROOT / 'app/web').glob('*.html'))
+        sources = list((ROOT / 'app/ui/web').glob('*.js')) + list((ROOT / 'app/ui/web').glob('*.html'))
         for source in sources:
             for key in re.findall(r'(?:\bt\(|data-t(?:-label|-title|-placeholder)?=)"([\w.-]+)"', source.read_text()):
                 if not key.endswith('.'):
@@ -72,7 +72,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const data={en:JSON.parse(fs.readFileSync('app/localization/en.json')),fr:JSON.parse(fs.readFileSync('app/localization/fr.json'))};
 let saved='fr-CA';
 const window={pywebview:{api:{async localization_catalogs(){return {ok:true,value:data}},localization_language(){}}},dispatchEvent(){}};
-vm.runInNewContext(fs.readFileSync('app/web/i18n.js','utf8'),{window,Intl,navigator:{language:'en'},document:{documentElement:{},querySelectorAll(){return []}},CustomEvent:class {},localStorage:{getItem(){return saved},setItem(k,v){saved=v}}});
+vm.runInNewContext(fs.readFileSync('app/ui/web/i18n.js','utf8'),{window,Intl,navigator:{language:'en'},document:{documentElement:{},querySelectorAll(){return []}},CustomEvent:class {},localStorage:{getItem(){return saved},setItem(k,v){saved=v}}});
 (async()=>{await window.i18n.load();const i=window.i18n;
 assert.equal(i.current(),'fr');assert.equal(i.t('drive.trackCount',{count:2}),'2 morceaux');
 assert.equal(i.message({key:'job.sound',params:{done:2,count:8}}),'Préparation du son 2 sur 8');

@@ -9,7 +9,7 @@ import struct
 import subprocess
 import tempfile
 
-from app.rx3_stems.mixing import f32
+from app.stems.mixing import f32
 
 RATE = 44100
 CADENCE = 150

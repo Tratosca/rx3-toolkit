@@ -5,9 +5,9 @@ Working notes for anyone, human or agent, who edits this repository. Every line 
 ## Commands
 
 - Use the virtual environment: `make hook test preflight PYTHON=.venv/bin/python`. The system `python3` lacks `pycdlib`.
-- The self-test the CI runs, which opens no window: `.venv/bin/python app/shell.py --self-test`. It checks that every file the page pulls in shipped, so adding a script tag to `app/web/index.html` needs no edit here.
+- The self-test the CI runs, which opens no window: `.venv/bin/python app/ui/shell.py --self-test`. It checks that every file the page pulls in shipped, so adding a script tag to `app/ui/web/index.html` needs no edit here.
 - `make autoexec` refuses to run without `KEY=` or `RX3_KEY`. The key lives outside the repository and no file writes its location down. Keep it that way.
-- CI runs Python 3.12; this machine has 3.14 only. What passes here is not exactly what the CI executes. Packaging can be checked locally on macOS: `RX3_PREBUILT_HOOK=build/librx3_core.so .venv/bin/pyinstaller --noconfirm --clean --distpath <elsewhere> --workpath <elsewhere> app/toolkit.spec`, then run the bundled executable with `--self-test`.
+- CI runs Python 3.12; this machine has 3.14 only. What passes here is not exactly what the CI executes. Packaging can be checked locally on macOS: `RX3_PREBUILT_HOOK=build/librx3_core.so .venv/bin/pyinstaller --noconfirm --clean --distpath <elsewhere> --workpath <elsewhere> packaging/toolkit.spec`, then run the bundled executable with `--self-test`.
 
 ## Layout
 

@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.rx3_preview import layout
-from app.rx3_preview.atlas import INACTIVE, PRESSED, SELECTED, Atlas
+from app.preview import layout
+from app.preview.atlas import INACTIVE, PRESSED, SELECTED, Atlas
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 ASSETS = REPOSITORY / "mod/modules/core/1.19/assets"

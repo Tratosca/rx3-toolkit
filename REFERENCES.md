@@ -624,7 +624,7 @@ One window, drawn with the webview the desktop already has rather than a second 
 | `web/stems.js` | separation |
 | `web/strings.js`, `web/i18n.js` | every visible string in English and French, and the four hooks that place them |
 
-**No screen holds engine logic.** They call `bridge.Bridge`, which calls `app/rx3_service/`, which drives `app/rx3_runtime/` and `app/rx3_stems/`. That is why the command line and the packager produce identical results without duplicating anything, and why a test can hold the whole surface with no window.
+**No screen holds engine logic.** They call `bridge.Bridge`, which calls `app/services/`, which drives `app/runtime/` and `app/stems/`. That is why the command line and the packager produce identical results without duplicating anything, and why a test can hold the whole surface with no window.
 
 Two rules are easy to break and the result is invisible to whoever broke it.
 
@@ -635,7 +635,7 @@ Two rules are easy to break and the result is invisible to whoever broke it.
 Progress is polled through `job_status()`, not pushed. There is one job slot for every long task, because a build and a separation both write the same drive.
 
 ```sh
-make app                          # or: python3 app/shell.py
+make app                          # or: python3 app/ui/shell.py
 ```
 
 ### Command-line tools
@@ -643,7 +643,7 @@ make app                          # or: python3 app/shell.py
 Build a runtime with specific modules:
 
 ```sh
-python3 -m app.rx3_runtime.cli build --firmware 1.19 \
+python3 -m app.runtime.cli build --firmware 1.19 \
   --patch beatjump-32bars --patch stems \
   --key /path/to/keyfile --output build
 ```
@@ -653,13 +653,13 @@ python3 -m app.rx3_runtime.cli build --firmware 1.19 \
 Build and inspect a runtime image:
 
 ```sh
-python3 app/rx3_firmware/firmware_image.py autoexec \
+python3 app/firmware/firmware_image.py autoexec \
   build/runtime build/autoexec.bin --key /path/to/keyfile
-python3 app/rx3_firmware/firmware_image.py verify-autoexec \
+python3 app/firmware/firmware_image.py verify-autoexec \
   build/autoexec.bin --key /path/to/keyfile
 ```
 
-The stems preparation tab is the only front end to the stem encoder; a script reaches the same code through `write_stem` in `app/rx3_stems/stem.py`.
+The stems preparation tab is the only front end to the stem encoder; a script reaches the same code through `write_stem` in `app/stems/stem.py`.
 
 ### Environment variables
 

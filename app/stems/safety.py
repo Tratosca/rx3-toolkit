@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 from app.localization import LocalizedError
-from app.rx3_stems.stem import ROLE_SUFFIXES, SAMPLE_RATE
+from app.stems.stem import ROLE_SUFFIXES, SAMPLE_RATE
 
 MANIFEST_NAME = "rx3-stems-manifest.json"
 # Covers integer-second library durations, encoder padding, allocation rounding

@@ -16,7 +16,7 @@ resources = [
     (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
     (str(repository / "mod/autoexec.sh"), "resources/mod"),
     (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
-    (str(repository / "app/rx3_firmware/firmware_image.py"), "resources/app/rx3_firmware"),
+    (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
 for compatibility in (repository / "mod").glob("*/compatibility.sh"):
     destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
@@ -42,7 +42,7 @@ for manifest in (repository / "mod/modules").glob("**/manifest.json"):
 # The interface itself. shell.resources() looks for it under _MEIPASS, which
 # inside a .app is Contents/Frameworks, and nothing put it there before, so the
 # frozen application had no page to load.
-for page in sorted((repository / "app/web").iterdir()):
+for page in sorted((repository / "app/ui/web").iterdir()):
     if page.is_file():
         resources.append((str(page), "web"))
 
@@ -53,7 +53,7 @@ prebuilt_hook = pathlib.Path(os.environ["RX3_PREBUILT_HOOK"])
 resources.append((str(prebuilt_hook), "resources/prebuilt"))
 
 analysis = Analysis(
-    [str(repository / "app/shell.py")],
+    [str(repository / "app/ui/shell.py")],
     # Everything is imported as `app.*`, so the repository root is the one path.
     pathex=[str(repository)],
     binaries=[],

@@ -24,10 +24,10 @@ Everything the build copies out of `mod/` executes on the RX3, as root. Everythi
 | `mod/compatibility.sh` | Accepted `rbp` SHA-1 values, one list, commented by firmware |
 | `mod/modules/<id>/` | One directory per module, named after its manifest `id`. Its manifest lists the firmware versions it is built against |
 | `app/` | The desktop application: the window (`shell.py`), the one surface it may call (`bridge.py`), the five screens (`web/`), and the engines they drive |
-| `app/rx3_runtime/` | Build engine, its CLI, and `make new-module` |
-| `app/rx3_firmware/` | AES sector crypto and ISO 9660 authoring for `autoexec.bin` |
-| `app/rx3_stems/` | Rekordbox parsing, provisioning, separation, stem encoding |
-| `app/rx3_session/`, `app/rx3_service/`, `app/rx3_logo/`, `app/rx3_samples/` | Session log, and the services the coming window drives: drive report, mod status, samples, logo artwork |
+| `app/runtime/` | Build engine, its CLI, and `make new-module` |
+| `app/firmware/` | AES sector crypto and ISO 9660 authoring for `autoexec.bin` |
+| `app/stems/` | Rekordbox parsing, provisioning, separation, stem encoding |
+| `app/session/`, `app/services/`, `app/logo/`, `app/samples/` | Session log, and the services the coming window drives: drive report, mod status, samples, logo artwork |
 | `scripts/` | Release packaging and the publication preflight |
 | `tests/` | Unit tests |
 

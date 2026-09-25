@@ -16,12 +16,12 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Sequence
 
 from app.localization import Message, error_message
-from app.rx3_stems import safety, cache, waveform
-from app.rx3_stems.estimate import Estimator
-from app.rx3_stems.provisioning import Acceleration, Runtime, resolve_acceleration
-from app.rx3_stems.rekordbox import Collection, Playlist, Track, export_stem
-from app.rx3_stems.separation import ROLE_STEMS, VOCAL_STEM, Settings, input_normalization
-from app.rx3_stems.stem import ROLE_ORDER, ROLE_SUFFIXES, write_stem
+from app.stems import safety, cache, waveform
+from app.stems.estimate import Estimator
+from app.stems.provisioning import Acceleration, Runtime, resolve_acceleration
+from app.stems.rekordbox import Collection, Playlist, Track, export_stem
+from app.stems.separation import ROLE_STEMS, VOCAL_STEM, Settings, input_normalization
+from app.stems.stem import ROLE_ORDER, ROLE_SUFFIXES, write_stem
 
 
 MANIFEST_NAME = "rx3-stems-manifest.json"

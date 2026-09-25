@@ -11,8 +11,8 @@ import sys
 import tempfile
 
 from app.localization import LocalizedError
-from app.rx3_stems import importing, mixing, safety, stem
-from app.rx3_stems.rekordbox import export_stem
+from app.stems import importing, mixing, safety, stem
+from app.stems.rekordbox import export_stem
 
 MAX_SECONDS = 30
 

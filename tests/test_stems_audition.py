@@ -9,7 +9,7 @@ import tempfile
 import unittest
 import wave
 
-from app.rx3_stems import audition, stem, mixing
+from app.stems import audition, stem, mixing
 
 
 @unittest.skipUnless(shutil.which("ffmpeg"), "audio decoder required")

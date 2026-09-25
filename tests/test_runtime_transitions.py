@@ -59,7 +59,7 @@ int main(void) {
         import array
         import random
         import struct
-        from app.rx3_stems import mixing
+        from app.stems import mixing
         randomizer = random.Random(43)
         pcm = [array.array("h", [randomizer.randint(-32768, 32767) for _ in range(1400)]) for _ in range(3)]
         full = array.array("f", [randomizer.uniform(-1.2, 1.2) for _ in range(1400)])
@@ -474,7 +474,7 @@ int main(void) {
         one file, and a bank that reads one way here and another way there is a
         set with the wrong sounds on the wrong pads.
         """
-        from app.rx3_samples import bank as bank_module
+        from app.samples import bank as bank_module
 
         default = bank_module.PAD_COLOURS
         cases = [

@@ -152,12 +152,12 @@ jobs:
         # This imports the webview backend. A backend that reaches for a display
         # at import time fails here rather than in front of an operator, and
         # none of these runners has a display server.
-        run: python app/shell.py --self-test
+        run: python app/ui/shell.py --self-test
 
       - name: Build desktop application
         env:
           RX3_PREBUILT_HOOK: ${{ github.workspace }}/prebuilt/librx3_core.so
-        run: pyinstaller --noconfirm --clean app/toolkit.spec
+        run: pyinstaller --noconfirm --clean packaging/toolkit.spec
 
       - name: Check packaged macOS libraries
         if: runner.os == 'macOS'

@@ -20,7 +20,7 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from app.rx3_runtime.build import available_versions, discover_patches, repository_root
+from app.runtime.build import available_versions, discover_patches, repository_root
 
 
 # The manifest allows an id to start with a digit; a shell namespace cannot, and
