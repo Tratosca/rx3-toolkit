@@ -13,11 +13,16 @@ while IFS= read -r path; do
     [ -f "$path" ] || continue
     count=$((count + 1))
     case "$path" in
-        *.key|*.pem|*.p12|*.pfx|*.jks|*.keystore|*.UPD|*.upd|*.bin|*.iso|*.img|*.so|*.rx3stem|*.wav|*.aif|*.aiff|*.flac|*.mp3)
+        *.key|*.pem|*.p12|*.pfx|*.jks|*.keystore|*.UPD|*.upd|*.bin|*.iso|*.img|*.so|*.ko|*.o|*.a|*.fw|*.ucode|*.tar|*.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.zip|*.7z|*.rx3stem|*.wav|*.aif|*.aiff|*.flac|*.mp3)
             printf 'REJECTED sensitive or generated artifact: %s\n' "$path" >&2
             failed=1
             ;;
     esac
+    magic=$(LC_ALL=C od -An -N4 -tx1 "$path" | tr -d ' \n')
+    if [ "$magic" = "7f454c46" ]; then
+        printf 'REJECTED compiled ELF artifact: %s\n' "$path" >&2
+        failed=1
+    fi
     size=$(wc -c < "$path" | tr -d ' ')
     if [ "$size" -gt 2097152 ]; then
         printf 'REJECTED unusually large source file: %s (%s bytes)\n' "$path" "$size" >&2
