@@ -121,6 +121,41 @@ register_runtime_preload()
     esac
 }
 
+# Keep one preload entry at its current position, or append it when a module is
+# being enabled for the first time. Preserving position makes independently
+# packaged hook modules converge on one stable LD_PRELOAD order.
+ensure_preload_entry()
+{
+    _rx3_target=$1
+    _rx3_pending=$RBP_PRELOAD
+    _rx3_cleaned=""
+    _rx3_seen=0
+    while [ -n "$_rx3_pending" ]; do
+        case "$_rx3_pending" in
+            *:*) _rx3_entry=${_rx3_pending%%:*}; _rx3_pending=${_rx3_pending#*:} ;;
+            *)   _rx3_entry=$_rx3_pending; _rx3_pending="" ;;
+        esac
+        [ -n "$_rx3_entry" ] || continue
+        if [ "$_rx3_entry" = "$_rx3_target" ]; then
+            [ "$_rx3_seen" = "0" ] || continue
+            _rx3_seen=1
+        fi
+        if [ -n "$_rx3_cleaned" ]; then
+            _rx3_cleaned="$_rx3_cleaned:$_rx3_entry"
+        else
+            _rx3_cleaned=$_rx3_entry
+        fi
+    done
+    if [ "$_rx3_seen" = "0" ]; then
+        if [ -n "$_rx3_cleaned" ]; then
+            _rx3_cleaned="$_rx3_cleaned:$_rx3_target"
+        else
+            _rx3_cleaned=$_rx3_target
+        fi
+    fi
+    RBP_PRELOAD=$_rx3_cleaned
+}
+
 preload_without_runtime()
 {
     _rx3_pending=$1
