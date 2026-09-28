@@ -83,6 +83,11 @@ class DocumentationHygieneTests(unittest.TestCase):
                 if _is_exempt(line):
                     continue
                 for pattern, reason in FORBIDDEN:
+                    # RX3PKG2 is our stems format, implemented and tested in
+                    # this repository. Its checksum is unrelated to UPD.
+                    # Keep every other guard active on that document.
+                    if document == ROOT / "docs/stem-package.md" and pattern is FORBIDDEN[0][0]:
+                        continue
                     found = pattern.search(line)
                     if found:
                         relative = document.relative_to(ROOT)

@@ -23,11 +23,15 @@ Everything the build copies out of `mod/` executes on the RX3, as root. Everythi
 | `mod/lib/module-api.sh` | Registration contract shared by every on-device module |
 | `mod/compatibility.sh` | Accepted `rbp` SHA-1 values, one list, commented by firmware |
 | `mod/modules/<id>/` | One directory per module, named after its manifest `id`. Its manifest lists the firmware versions it is built against |
-| `app/` | The desktop application: the window (`shell.py`), the one surface it may call (`bridge.py`), the five screens (`web/`), and the engines they drive |
+| `app/` | The desktop application and the engines it drives, imported as `app.<package>` |
+| `app/ui/` | The window (`shell.py`), the one surface it may call (`bridge.py`), and the five screens (`web/`) |
+| `app/localization/` | English and French UI catalogs, shared by Python and the page |
 | `app/runtime/` | Build engine, its CLI, and `make new-module` |
 | `app/firmware/` | AES sector crypto and ISO 9660 authoring for `autoexec.bin` |
 | `app/stems/` | Rekordbox parsing, provisioning, separation, stem encoding |
 | `app/session/`, `app/services/`, `app/logo/`, `app/samples/` | Session log, and the services the coming window drives: drive report, mod status, samples, logo artwork |
+| `app/preview/` | Pad row images drawn on the computer, `python -m app.preview` |
+| `packaging/` | The PyInstaller spec that freezes the application |
 | `scripts/` | Release packaging and the publication preflight |
 | `tests/` | Unit tests |
 
@@ -94,13 +98,15 @@ Static tests do not cover the device. Run this sequence before claiming a runtim
 
 ### The performance core
 
-It is one shared object, `librx3_core.so`, built from `mod/modules/core/<firmware>/rx3_core_hook.c` and preloaded into the player's application. Its code runs inside that application, so it can intercept what the application does while it plays: a track being loaded, audio being pulled, a pad being pressed, the screen being drawn. It installs those interceptions once and hands them to whichever features are switched on.
+It is one shared object, `librx3_core.so`, built from `mod/modules/core/rx3_core_hook.c` and preloaded into the player's application. Its code runs inside that application, so it can intercept what the application does while it plays: a track being loaded, audio being pulled, a pad being pressed, the screen being drawn. It installs those interceptions once and hands them to whichever features are switched on.
 
-A feature is not a program of its own, and not a library of its own. It is C compiled into that same shared object, reached through the lifecycle contract in `rx3_feature_api.h`: `configured`, `install`, `remove`, and whichever callbacks it wants. Key shift and stems are the two that exist. So a core feature ships no code of its own to the deck. Its `module.sh` exports an environment flag, the core reads that flag and runs the feature, and the module declines when the core is not selected. The build pulls the core in through `requires`, which is why nobody picks it directly. [Its own README](mod/modules/core/README.md) covers the rest.
+A runtime module is compiled into that shared object through its own compilation unit and the public contract in `core/api/rx3_module_api.h`. Register its descriptor in `core/runtime/rx3_composition.c` and its source in the core manifest. Its shell module supplies configuration, while `requires` brings in the core automatically. Some older performance features still use the legacy panel/lifecycle contract while they migrate; do not copy their private includes into a new module. [The core README](mod/modules/core/README.md) describes the source layout.
 
 ### Saying something to the operator
 
-A feature that has something to tell the person in front of the deck calls `rx3_message_show(deck, &message)` rather than painting its own overlay. It goes on screen the way the player's own notices do, in the operator's language, and clears itself. A message is one string per language with English first; a language the table does not cover falls back to English. The switch is `RX3_MESSAGES=0`, or `/tmp/rx3-messages.off` on a deck that is already misbehaving.
+Call `services->notices->post(...)` through the public API. The framework copies and queues the text, then its firmware adapter calls rbp's native `ui::Caution::set` on the render thread. This is the mechanism used by native notices such as EMERGENCY LOOP; the toolkit uses a separate existing caution object, B051. No custom notification renderer is needed.
+
+Handle the returned queue status and check service availability; acceptance does not prove display. The [framework contract](docs/runtime-framework.md#notification-and-dsp-services-api-version-2) documents limits, priorities, cancellation and an example. `RX3_MESSAGES=0` or `/tmp/rx3-messages.off` disables toolkit messages, not rbp's own warnings.
 
 ### Which shape your idea has
 
@@ -117,19 +123,19 @@ The question is what your idea has to do, not what our internals are called.
 The command produces the manifest, the shell contract and the README, correctly named and correctly namespaced:
 
 ```sh
-make new-module ID=browse-lock NAME="Browse lock"
-make new-module ID=browse-lock NAME="Browse lock" CORE=1
+make new-module ID=browse-lock CATEGORY=screen NAME="Browse lock"
+make new-module ID=browse-lock CATEGORY=screen NAME="Browse lock" CORE=1
 ```
 
-`CORE=1` is the first row above. It also writes the feature header and the `module.sh` that declines when the core is not selected. The other two rows take the plain form.
+`CORE=1` is the first row above. It also writes a separate C module using the public framework API and the `module.sh` that declines when the core is not selected. The other two rows take the plain form.
 
-It prints what to fill in, and for a core feature the edits `mod/modules/core/<firmware>/rx3_core_hook.c` needs. It refuses to touch a module that already exists, so if you picked the wrong shape before filling anything in, delete the directory and run it again.
+It prints what to fill in and how to register the compilation unit and descriptor. New modules use the [shared framework contract](docs/runtime-framework.md), never private core state. It refuses to touch a module that already exists, so if you picked the wrong shape before filling anything in, delete the directory and run it again.
 
 Nothing else needs editing. The application, the CLI and the release packager all discover the manifest; `make hook` treats the module's headers as prerequisites. No test names the modules, so no test has to be edited to admit a new one.
 
 The generated files already follow the rules below. They are written down for when you change them.
 
-- A module lives in `mod/modules/<id>/<firmware>/`, where `<id>` is the `id` its `manifest.json` declares. The schema is in [REFERENCES.md](REFERENCES.md#modules).
+- A module lives in `mod/modules/<id>/`, where `<id>` is the `id` its `manifest.json` declares. The schema is in [REFERENCES.md](REFERENCES.md#modules).
 - Every `module.sh` starts with `module_begin <id> <namespace>`, and every lifecycle function name starts with that namespace. Sourcing a module may register contracts only; device mutation belongs in a registered lifecycle hook.
 - Dependencies belong in `requires`, and a dependency must carry a lower `order`. Feature code must never probe for a sibling module to create an implicit dependency. The build rejects missing modules, cycles and conflicts, then writes the resolved order to `modules/index`.
 - The performance core owns executable hook installation. Optional features own their state and hook group, depend only on core services, and must remove only their own hooks on failure. See [the orchestrator](REFERENCES.md#the-orchestrator).

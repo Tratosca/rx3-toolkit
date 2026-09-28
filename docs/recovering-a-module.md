@@ -22,7 +22,7 @@ All migration changes remain uncommitted. The table distinguishes prior hardware
 | Module | Source status | Hardware status |
 | --- | --- | --- |
 | [logo](../mod/modules/logo/) | Host conversion, container loading and dark/light image-table replacement. | The handover reports a byte-exact host conversion. The new light-table connection has no device run. |
-| [stemwave](../mod/modules/stemwave/) | Refresh sequencing, three column render paths, Blue overview restoration and the four-role selection adapter. | The earlier hook fired on toggles. The new renderer and refresh request are untested on hardware. |
+| [Stems waveform](../mod/modules/stems/WAVEFORM.md) | Refresh sequencing, three column render paths, Blue overview restoration and the four-role selection adapter. | The earlier hook fired on toggles. The new renderer and refresh request are untested on hardware. |
 | [theme-white](../mod/modules/theme-white/) | Solid fills, lazy image conversion, shared-bitmap cache, light logo and optional tabs, Utility row, UI-thread switching and waveform palette. | Automated queued dark/light/dark/light transitions on 1.19 preserve the unloaded-deck background, header and eight hot-cue cells. Physical shortcut, Utility and loaded-track coverage remain pending. |
 | [samples](../mod/modules/samples/) | Settings and WAV contract, resident bank loader, master mix, retriggering, shared pad routing, LEDs, volume strip and worker teardown. | No playback or pad validation. |
 | [search-latin](../mod/modules/search-latin/) | Folding hook and configuration. | The handover reports installation. Search for an accented title using unaccented input remains untested. |

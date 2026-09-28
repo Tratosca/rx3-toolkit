@@ -12,8 +12,10 @@ The Mozilla Public License 2.0 applies only to original source code identified a
 | PyInstaller | `6.21.0` | GPL-2.0-or-later with the PyInstaller bootloader exception |
 | pywebview | `6.2.1` | BSD-3-Clause |
 | Pillow | `12.3.0` | MIT-CMU |
+| inflate64 | `1.0.4` | LGPL-2.1-or-later |
+| certifi | `2026.7.22` | MPL-2.0 |
 
-PyInstaller is a release build tool. Its exception permits applications built with it to be distributed under the application's own license, subject to the licenses of the bundled dependencies. pywebview draws the coming window with the webview the operating system already has. Pillow resizes logo artwork and draws the label artwork beside the core module.
+PyInstaller is a release build tool. Its exception permits applications built with it to be distributed under the application's own license, subject to the licenses of the bundled dependencies. pywebview draws the coming window with the webview the operating system already has. Pillow resizes logo artwork and draws the label artwork beside the core module. inflate64 reads the Deflate64 archives of the manufacturer's source package when the app fetches the key, and certifi supplies the certificates that download is checked against.
 
 ## Separation runtime
 
@@ -23,4 +25,4 @@ The separation models are third-party research artifacts published through the U
 
 ## Material not relicensed
 
-This project does not grant rights to RX3 firmware, manufacturer executables, product names, trademarks, user-provided encryption keys, music, Rekordbox exports, or generated stem audio. None of that material is covered by the project's MPL-2.0 license.
+This project does not grant rights to RX3 firmware, manufacturer executables, product names, trademarks, encryption keys, whether provided by the user or fetched on their request from the manufacturer's published sources, music, Rekordbox exports, or generated stem audio. None of that material is covered by the project's MPL-2.0 license.

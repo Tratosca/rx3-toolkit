@@ -72,7 +72,7 @@ Everything runs from the stick and disappears when the power goes off. Any RX3 y
 | 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` or `1.20` |
 | 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
 | 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
-| 🧱 **A root filesystem** | Built on your machine from the manufacturer's published GPL sources — [see below](#4-getting-a-root-filesystem) |
+| 🔑 **The deck's key** | Fetched by the app from Pioneer's published GPL sources, on your request - [see below](#4-getting-the-key) |
 | 📀 **Disk space** | ~1.5 GB, only if you want stems |
 
 About **20 minutes** to set everything up. After that, stems take from a few seconds to a few minutes per track. A GPU (NVIDIA, AMD, or Apple Silicon) makes that dramatically faster.
@@ -196,31 +196,37 @@ If you already have `audio-separator` and `ffmpeg` on your machine, they get use
 
 </details>
 
-### 4. Getting a root filesystem
+### 4. Getting the key
 
-The player only loads the file we are about to build if it is encrypted the way its own maintenance path expects, so the app needs that material to author it. You get it yourself, on your own machine, from sources the manufacturer publishes.
+The player only loads the file we are about to build if it is encrypted with the key its own maintenance path expects. That key is not in this repository or in the app. It is inside the XDJ-RX3 source package Pioneer publishes under the GPL on its [open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/).
 
-> [!CAUTION]
-> **Nothing of the sort is distributed here.** This step is yours to run, and what it leaves on your disk stays on your disk.
+The first time you open the app without a key, it offers to get it for you. Read the terms to the end, tick the box, and it downloads that package (about 250 MB) from Pioneer's own servers, checks every file against known fingerprints, keeps only the key in your application folder, and deletes the rest. Nothing is sent anywhere else. Next time, the app finds the key on its own.
 
-The XDJ-RX3 runs Linux, so under the GPL/LGPL Pioneer publishes the corresponding source archives on its [open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/). Getting a root filesystem out of those archives is described in [**Getting a root filesystem**](docs/extract-initramfs.md). It is archive handling, the same on all three systems. A Linux environment is needed only to rebuild that filesystem, not to read it. What comes out stays on your disk; point the app at it in the next step.
+| | Where the key is kept |
+| --- | --- |
+| **macOS** | `~/Library/Application Support/XDJ-RX3 Toolkit` |
+| **Windows** | `%LOCALAPPDATA%\XDJ-RX3 Toolkit` |
+| **Linux** | `~/.local/share/xdj-rx3-toolkit` |
+
+`RX3_TOOLKIT_HOME` moves it somewhere else. **Delete the key**, beside the key path in the app, removes it and anything half downloaded; deleting that folder does the same.
+
+Prefer to do it by hand? [Getting a root filesystem](docs/extract-initramfs.md) walks through the same archives yourself, and **Browse** points the app at the key file you produced. A key you choose is never replaced by a download.
 
 ### 5. Build the file for your stick
 
-Now that the hard part is done, in the **Modules installation** tab: pick the firmware your deck reported in step 1, choose the modules you want, pick what step 4 produced, pick the **root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
+Now that the hard part is done, in the **Modules installation** tab: pick the firmware your deck reported in step 1, choose the modules you want, check the key from step 4 is filled in, pick the **root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
 
 Here is what you are choosing from:
 
 | Module | What it does | On by default |
 | --- | --- | :--: |
-| **Stems control** | Slip Loop pads 5/6/7/8 control drums, bass, remaining instruments and vocals when the corresponding files are prepared. Not yet run on hardware | Yes |
+| **Stems control** | SLIP LOOP pads 5/6/7/8 control drums, bass, remaining instruments and vocals when prepared. Waveform adaptation is included automatically. Not yet run on hardware | Yes |
 | **Per-deck key shift** | A **KEY** tab on screen, twelve semitones either way, independently per deck | ✅ |
 | **Beat Jump ±32** | Beat Jump pads 7 and 8 become −32 and +32 instead of −8 and +8 | ✅ |
 | **Immediate Beat Jump** | Repeated jumps fire straight away instead of waiting for the grid. Quantize, Hot Cues, loops and Beat FX are untouched | ✅ |
 | **No more wait between beatjumps** | Makes the player access audio files faster when beatjumping, so big jumps can be repeated sooner. Nothing to see, it just helps the two above | ✅ |
-| **Sample pads** | Fire your own sounds from the performance pads, each with its own colour and its own way of playing: once, only while you hold it, looping until you press it again, or right through with the same pad to stop it early. SLIP LOOP reaches them as the page after its own, so your hot cues stay where they are. SHIFT can stop them all. Prepared on the computer. Not yet run on hardware | ❌ |
-| **Stem waveform** | Colour the waveform by the stem you have soloed, so the display agrees with the pads. Not yet run on hardware | ❌ |
-| **Light display mode** | A light interface for a lit room, with the waveform kept dark so it stays readable. Not yet run on hardware | ❌ |
+| **Sample pads** | Fire your own sounds from the performance pads, each with its own colour and its own way of playing: once, only while you hold it, looping until you press it again, or right through with the same pad to stop it early. Touch SAMPLES to assign the pads; touch it again to return to STATUS without stopping playing sounds. Your stored hot cues stay unchanged. SHIFT can stop them all. Prepared on the computer. Not yet run on hardware | ❌ |
+| **Light display** | A light interface for bright rooms. The waveform stays dark so it remains readable. Not yet run on hardware | ❌ |
 | **Accent-insensitive search** | Find a track without typing its accents, which the on-screen keyboard makes slow. Not yet run on hardware | ❌ |
 | **Logo** | Replace the wordmark in the middle of the performance screen with your own artwork. Not yet run on hardware | ❌ |
 | **Session logging** | Writes what happened to `RX3_RUNTIME/session.txt` on the stick. Tick it when something went wrong and you want to know why | ❌ |
@@ -289,7 +295,7 @@ Putting the stick back in later costs nothing: anything already running is recog
 
 Load one of your prepared tracks and open **Slip Loop**.
 
-Available stem pads blink while loading, then act as independent switches. Pad 5 toggles drums, 6 bass, 7 the remaining instruments and 8 vocals; without additional roles, pad 7 is the full instrumental. Turning off only pad 8 removes vocals. With no valid vocal file the player retains its native controls. Not yet run on hardware.
+Available stem controls act as independent switches for INST, VOCAL and, when prepared, DRUMS. On the touchscreen, tap a stem to mute or enable it; hold, then drag to adjust its volume. With no valid vocal file the player retains its native controls. The numerical pad mapping still needs hardware validation; it is not specified here.
 
 Open **Beat Jump** on the same track: pads 7 and 8 now read `32`.
 
@@ -391,6 +397,9 @@ What is being worked on next. No dates, no promises but this is the direction.
 | **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
 | **Polished interface** | Icons and lettering on every button the mod adds, close enough to the player's own that you stop noticing which is which | 🚧 In progress |
 | **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
+| **Real key with Master Tempo off** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)) | The screen shows the key the track is actually playing in once the pitch has moved it, not the key it was analysed in | 💡 Planned |
+| **CDJ-3000 style browsing** ([#15](https://github.com/Tratosca/rx3-toolkit/issues/15)) | Track, artist, BPM and key in one browse list, instead of one column at a time | 💡 Planned |
+| **Now playing** ([#20](https://github.com/Tratosca/rx3-toolkit/pull/20), [#32](https://github.com/Tratosca/rx3-toolkit/issues/32)) | The track on each deck, sent to a computer over USB for overlays, VJ screens or track ID logs, with no rekordbox and no PRO DJ LINK | 💡 Planned |
 
 Want one of these sooner? Or something else? Say so in an issue, or build it yourself (see [Contributing](#contributing)).
 

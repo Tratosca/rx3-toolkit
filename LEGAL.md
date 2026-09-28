@@ -20,9 +20,17 @@ Nothing in this repository, its history, or its releases contains:
 - any binary authored by the manufacturer;
 - any font, typeface, or other licensed resource belonging to a third party.
 
-Where the toolkit needs material of that kind, the operator produces it on their own machine and points the toolkit at it. Locations are configured locally, in files that are never committed. The project does not fetch such material, does not tell anyone where to find it, and does not accept contributions that add either capability.
-
 Where the device runs software covered by the GPL or LGPL, this project relies on the sources the manufacturer publishes itself in satisfaction of those licences, and on nothing else.
+
+## Obtaining the key
+
+The player runs a maintenance image only if it decrypts with a key the player holds. That key is part of the root filesystem archive the manufacturer ships inside the XDJ-RX3 GPL source package, on its own open source distribution page.
+
+The application can obtain it, and does so only when the operator asks, after it has shown terms they must scroll through and accept. It then downloads the manufacturer's package from the manufacturer's own servers, verifies every file against fixed SHA-256 fingerprints, reads the key from it in memory, keeps that one file in the operator's per-user application folder, readable by their account alone, and deletes the rest. The link and the fingerprints are the only information about the package the project carries; a fingerprint identifies a file and cannot be turned back into it.
+
+The project does not host, mirror, relay, or transmit the key, the package, or any part of either. Nothing the application obtains leaves the operator's machine. An operator who prefers to produce the key themselves can still do so and point the application at the file; the application never replaces a key the operator named.
+
+The terms the operator accepts say that the key is to be used only on an XDJ-RX3 they own, not shared or published, and that whether obtaining and using it is lawful where they live is theirs to check.
 
 ## The maintenance path
 

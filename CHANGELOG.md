@@ -3,12 +3,116 @@
 
 ## Unreleased
 
+- Keep full-sized KEY and STEMS tabs aligned with the modules that actually registered: either missing tab is blank and inert. Keep STATUS visible and touchable without Samples; retain native ZOOM/GRID when neither KEY nor STEMS is active. Document the ZOOM/GRID replacement beside module selection in the Toolkit. Emulator captures cover isolated KEY, isolated STEMS, isolated Samples and all three enabled; hardware is pending.
+
+- Read Key Shift keys from native deck metadata updates, independently of visible text and of the order relative to decoder loading. Keep deck identities separate, clear absent keys, and publish updates atomically. Tested with DECK 2 loaded alone in the machine emulator; not yet run on hardware.
+
+- Refresh the harmonic reference from the published MASTER deck key without waiting for a new Browse page. Use classic Camelot neighbours until the matching native compatibility snapshot arrives; not yet run on hardware.
+
+- Keep a Browse column's semantic field separate from compatibility badge categories when preserving it through sorting. Green rows no longer select a nonexistent metadata field; not yet run on hardware.
+
+- Fetch the added Browse column and the preserved sort column in one metadata stream per track, instead of two. Keep native string ownership and filter state intact. Host regression verifies the request count and both values; not yet run on hardware.
+
+- Preserve the native filter header and green compatibility markers when reconstructing a Browse column after custom sorting. The header also drives the firmware's filter-applied state. Host regressions cover header and marker retention; not yet run on hardware.
+
+- Populate module checkboxes from the selected USB drive's installation manifest, resolving dependencies and ignoring unknown modules. Do not infer installed modules from previous runtime logs or an unrecorded image.
+
+- Invalidate Key Shift metadata before native track loading, so key text observed during that load survives its completion. Request a panel refresh when invalidating. Host regression covers that event order; not yet run on hardware.
+
+- Treat unchanged Key Match and Browse Columns settings as successful preparation on USB reinsertion. Their export helper's no-restart status no longer aborts the module lifecycle. Shell regressions pass; the corrected reinsertion path is not yet run on hardware.
+
+- Restrict performance-core initialization and teardown to the rbp process. Utilities inheriting LD_PRELOAD no longer clear the player's readiness marker or access firmware hook addresses. Host lifecycle regressions cover this case; not yet run on hardware.
+
+- Rename the English XML source button to "Open Rekordbox Library XML export" and update its tutorial reference.
+
+- Match the OverCue website link to the Mixed In Key reference style, shorten additional-storage messages, and remove the ready-state support notice and empty-library click instruction from Stems.
+
+- Move the experimental OverCue checkbox into Your music, link to overcue.gg, and remove the separate VOCAL/DRUMS/INST preparation card. Keep the additional-storage estimate beside the option.
+
+- Include the 75,520-byte OverCue reference coefficient table for the experimental desktop exporter, verify its hash, and locate the native helper without manual environment settings. Application packaging includes the table and an available platform helper. No OverCue installation is needed for export.
+
+- Mark the OverCue compatibility checkbox as experimental directly in its French and English labels.
+
+- Keep RX3 packages as the normal playback format. An unchecked-by-default OverCue compatibility option adds desktop-generated files and displays estimated additional USB storage for the selected playlist. It reuses prepared stems and preserves RX3 output on export failure. The experimental native preparation engine/profile and lossless sources are required; CDJ-3000 validation remains pending. This option enables no RX3 resampling.
+
+- Add an optional native OverCue preparation prototype and a verified PCM comparison command. The helper reproduces the seven role PCM streams of the local Desktop 2.1.9 manual reference; its coefficient profile remains a local input and hardware validation is pending.
+
+- Extend the experimental OverCue exporter with manual provenance and measured full-mix loudness ceilings; vectorize the reader with NEON and add per-block CPU/cache diagnostics. Not yet run on hardware.
+
+
+- Add an opt-in OverCue stems prototype: read the original seven 96 kHz paged roles through a bounded 44.1 kHz cache, and export existing VOCAL/DRUMS packages to the shared USB format without rerunning separation. Emulator and synthetic format checks are documented in `docs/overcue-prototype.md`; physical RX3 and CDJ-3000 interoperability remains unverified.
+
+- Cancel separation, decoding, waveform filtering and runtime installation with their owned child processes. Closing the window waits for job cleanup; an interrupted installation remains unavailable until completed. Automatic PCM reuse now records inference package versions as well as model hashes. Managed installs fix audio-separator at 0.44.5, librosa at 0.11.0 and imageio-ffmpeg at 0.6.0.
+- macOS builds accept a Developer ID signing identity with hardened runtime and timestamps. A local notarization command verifies the signature, submits to Apple using a Keychain profile, staples the accepted ticket and checks Gatekeeper before creating the archive. No release is published by that command.
+
+- Stems prepare two modes only, VOCAL + INST and VOCAL + DRUMS + INST; bass stays in INST and a request for bass comes down to the vocal. Drums are refused before separation when the chosen quality cannot separate them, naming the quality that can or the manual import. Each track gets the loader's verdict from its listed duration (fits, shared-memory risk, too long, near a limit); a certain refusal stops that track before separation or import, a track near a limit is decoded and counted exactly first, and the package writer refuses with the same message instead of "package limits". The limits come from one header, `rx3_stems_limits.h`, compared with `app/stems/limits.py` by a test. A v2 package is recognised without its former separate files, imported stems are no longer replaced by a separation, and job stages and errors are translated. Pads read one table: 5 INST red, 6 VOCAL green, 7 DRUMS blue, 8 native. Not yet run on hardware.
+
+- Replace names in the Key Match browser example with neutral bars, emphasize the MASTER key, connect coloured matches with +2/+7/+4 Camelot arrows and show every marker colour regardless of enabled rules. Keep the KEY SYNC calculation tied to the selected rules.
+
+- Render the Key Match example on the same 1280x800 canvas scale as Logo, following the RX3 BROWSE layout with twelve tracks, bank rail, load controls and compact deck strips. Keep rule-dependent markers and an accessible text equivalent.
+
+- Split Harmonic mixing into manual Key Shift, independent Key Match and Key Sync requiring both. Gate the native sync action on its module selection. Refine the Key Match browser example with waveforms, artist columns, bank rail and deck strips.
+
+- Expose Key Match as a selectable module with its own rules and BROWSE preview. Keep it as a dependency of Transposition for KEY SYNC compatibility rules.
+
+- Show Core and Decoder wait in a collapsed Advanced section, with their roles and selected dependents. Keep Core automatic and prevent disabling required advanced dependencies.
+
+- Remove the obsolete Performance category. Internal core dependencies have no display category; new modules require an explicit category identifier.
+
+- Remove routine loading and preview-updated banners so logo adjustments and background requests do not move the interface. Preserve errors and long-running job progress.
+
+- Remove schematic-preview disclaimers from Samples, Logo and Key Match in both languages. Keep preview labels concise.
+
+- Move bilingual module names, descriptions and settings text into module manifests. Keep category definitions in mod/categories.json, referenced by identifier from modules. Compose these translations with shared application text at load time.
+
+- Replace the Toolkit firmware version picker with a compatibility indication for RX3 1.19 / 1.20, which share the same modules.
+
+- Group Beat Jump and Transposition into dedicated module categories alongside Samples. Keep Key Match inside Transposition and all three Beat Jump options together.
+
+- Give sample pads their own Samples category in Modules, separate from Performance. Bank preparation remains on the Samples screen.
+
+- Organize Transposition around finding compatible tracks, then adjusting the next track with KEY SYNC. Preserve saved preferences; new configurations use compatible mode, a one-semitone limit and no Energy Boost extensions. Show conditional cautions and a live BROWSE/KEY SYNC example. Share the observed native compatibility set and local MASTER through the core, including reference transposition and reload invalidation. Not yet run on hardware.
+
+- Offer Same key and Key Match rules modes for KEY SYNC. The latter follows the selected Energy Boost rules using the other deck as the reference, while preserving pitch limits and classic Camelot matches. Not yet run on hardware.
+
+- Include Key Match in the Performance Key shift module, with its three colour rules configured in the same card. Keep separate runtime components through an internal dependency.
+
+- Colour Key Match suggestions by transition: Energy Boost +2 yellow, +7 orange and experimental +4 red. Remove the diagonal option while preserving the other saved choices and existing green matches. Show the colour names and a caution list in both Toolkit languages. Not yet run on hardware.
+
+- Rebuild the desktop interface around a persistent sidebar and toolbars, grouped forms, focused sample and logo editors, and preparation/import views for stems. Add explicit destructive confirmations, keyboard focus preservation, contextual states and a System/Light/Dark appearance setting. Keep existing Python operations, audio behavior and legal consent unchanged.
+
+- Add framework panel registration with shared buttons and coloured sliders. Stems now offer per-deck ON/OFF and LEVEL views backed by the same 0-100% audio gains and existing 256-frame transitions; hardware pads use the same state. Samples use the shared slider for bank volume. Not yet run on hardware.
+
+- Fix Logo-only startup and guarded native logo centering, ship the four light tab images, and publish runtime readiness only after all selected modules succeed. Stop waveform consumers before their providers on rollback. Not yet run on hardware.
+
+- Polish the desktop window: paths keep their slashes and the drive path survives a language change; removing the mod and deleting a sample bank now take two presses; a success no longer appears as an error; the stems screen gets its own cards for manual import and listening, shown once music is open; modules are whole clickable tiles that mark what is ticked; the language, logo framing and screen theme buttons show which is chosen; the tab list moves with the arrow keys and every screen opens at its top.
+
+- Group the modules by what a DJ uses them for (Performance, Stems, Screen and library, Streaming, Diagnostics) through a new `category` manifest field, with a build summary beside the list; a module ticked by another says which. The logo screen chooses its pane with a double button and lets you keep the artwork's greys as drawn on a light screen instead of inverting them.
+
+- Rewrite the interface text and module descriptions in both languages: French keeps sample for a sound played from the pads and uses native legal wording on the terms screen, English says USB drive throughout, error messages say what happened and what to do, and module switches are turned on rather than ticked. The logo screen no longer says the logo is built into the key.
+
+- Organize the core into public API, runtime, services, firmware adapters, UI and diagnostics. Keep notification rendering in rbp's native caution system; this layout change preserves the ARM binary.
+
+- Expose bounded, prioritized screen notifications and shared PCM conversion, gain, mixing and level primitives through framework API v2. Route the startup notice and existing audio kernels through these services. Not yet run on hardware.
+
+- Begin the shared runtime framework: compile Search Latin, Now Playing and Stemwave separately, centralize hook ownership and logging, and publish mix observations without exposing Stems state. The remaining performance features still need migration. Not yet run on hardware.
+
+- Correct the RGB middle-band high-pass cutoff to 300 Hz. An optional hash-pinned export corpus checks generated RGB payloads against real analysis bytes without shipping audio or library data.
+
 - Now playing: a new module sends what each deck is playing to the computer on the rear USB port, as one JSON datagram on UDP 50123 whenever a deck changes and every two seconds: title, track id, BPM, tempo, play mode and on-air state for both decks. `scripts/now_playing.py` prints it. It merges the event hooks from evanpurkhiser's USB telemetry prototype (#32) with the UDP transport from jacksight's Now Playing export (#20), runs inside the performance core and stops its worker when removed. Off by default. Not yet run on hardware.
+- Accent-insensitive search also folds the eth, the thorn and the sharp s, to D, T and S, since the deck's keyboard cannot type any of them. The sharp s becomes a single S so the length holds. Not yet run on hardware.
+
+- Accept repeated cue sections and the observed RGB analysis header when reading real library waveforms. Keep terminal-column padding out of the RGB envelope time axis. Duplicate waveform or beat-grid data still disables generation for the track.
+
+- The `app/` tree says what each part is. The window moved to `app/ui/` (`shell.py`, `bridge.py`, `web/`), the services to `app/services/`, and the engine packages lost their `rx3_` prefix (`app.runtime`, `app.firmware`, `app.stems`, `app.samples`, `app.logo`, `app.session`, `app.preview`). The PyInstaller spec moved to `packaging/toolkit.spec`. `make app` and the CI self-test now run `app/ui/shell.py`; nothing changes for the operator.
+
 - Compute optional per-role Blue/RGB waveform columns from published stems on the exported analysis axis, including the reconstructed instrumental, with strict counts and verified publication. The player renderer is unchanged.
 
 - Stem audition reconstructs the instrumental and every available selection from final drive PCM using a single host mixer checked against native C output. Bounded float-audio excerpts carry the 256-frame ramp state across selection changes, with waveform seeking, Original and imported-versus-drive views. Preparation stays asynchronous and may briefly pause playback while a new selection is prepared.
 
 - Manual lossless stems can be assigned per library track and imported after duration, multi-window alignment and heuristic gain checks. Constant offsets and trimming are reported, gain is never silently changed, and uncertain gain is not presented as certified. Imports preserve the existing PCM format and verified drive publication; assignments survive restarts.
+
+- Fetch the deck's key on request from the XDJ-RX3 GPL source package on Pioneer's own servers, after terms the operator must scroll to the end of and accept. Every archive, the filesystem inside them and the key are checked against fixed SHA-256 fingerprints kept in `app/firmware/key_source.json`; only the key is kept, readable by the operator's account alone, in the per-user application folder, and the app loads it on its own next time. Interrupted downloads resume. A key the operator chose, or `RX3_KEY`, is never replaced. LEGAL.md now describes this instead of ruling it out; the README's step 4 follows. Adds inflate64 and certifi. **Delete the key** removes the kept key and any partial download, after a second press, and leaves a key the operator chose alone.
 
 - Multi-role loading now counts earlier roles in the pending set against the shared 512 MiB ceiling, as well as the other deck. Native tests cover missing prerequisites, mismatched lengths, residual reconstruction and the exact 256-frame ramp. Preparation shows size per role and track, warns above 256 MiB, and includes drums whenever bass is requested. The README describes both library inputs and all four unchanged pads. Not yet run on hardware.
 
@@ -64,7 +168,7 @@
 
 - **The pad colours are read off the artwork instead of being written down twice.** Two measured palettes disagreed in the tree: the core called an orange the reference build's own value, and `build_labels.py` had measured Pioneer's own captions and found blue, noting that the interface is monochrome and blue is what marks a selection. The atlas carries the ground each set of glyphs was drawn on, and the row paints that same colour underneath, so there is one palette and it is the measured one. A selected control is now blue on white rather than orange, and the light row takes the measured grey rather than pure white. The two theme flags the row read also disagreed: the controls followed the mode chosen at boot while the stems strip followed the live toggle, so on a deck started dark and switched mid-set one row moved and the other did not. Both follow the toggle now.
 
-- **A picture of the pad row, drawn on the computer.** Nothing in this repository reaches a deck, so a change to the row could not be looked at before someone carried a stick to one. `python -m app.preview` composites the artwork that ships at the geometry the deck solves and writes one image per panel, theme, state and control count. It is not a simulator and does not try to be. The layout it draws from is the deck's own: `rx3_pad_layout.h` is free of player types, globals and libc so the test compiles it and runs it against the preview's copy, over every count and both spans, rather than reading it as text.
+- **A picture of the pad row, drawn on the computer.** Nothing in this repository reaches a deck, so a change to the row could not be looked at before someone carried a stick to one. `python -m app.rx3_preview` composites the artwork that ships at the geometry the deck solves and writes one image per panel, theme, state and control count. It is not a simulator and does not try to be. The layout it draws from is the deck's own: `rx3_pad_layout.h` is free of player types, globals and libc so the test compiles it and runs it against the preview's copy, over every count and both spans, rather than reading it as text.
 
 - **A level per pad, written beside the sound rather than into it.** The bank had one volume for all eight, so a kick and an airhorn arrived at the same setting and at nowhere near the same loudness, and the only correction was riding the on-screen strip mid-set. `settings.ini` gains `padN.gain`, a percentage of the sound as it was recorded, and the mixer spends it on top of the bank volume. It is plain amplitude rather than squared like the bank volume, because this is a trim to match levels, where half means half, and the bank volume is the knob. Keeping it in the file that already sits beside the audio means a level can be corrected later without re-encoding anything, and the sound on the drive stays the sound the operator chose. The trim is copied into the voice when the pad is hit, so a bank reloaded mid-sound cannot step the level of something already playing. **Not yet run on hardware.**
 
@@ -84,11 +188,11 @@
 
 - **Pad modes, on the deck and in the file that carries them.** A pad plays once, plays while it is held, or loops until it is pressed again, and SHIFT can stop every pad at once. `settings.ini` gains `padN.mode` and `shift.silence`, and `padN.name` for a label the deck passes over and the computer shows. The pad handler already saw the release event and threw it away; it is what stops a held pad now. The mixer walks a running index rather than a modulo, because this arm has no hardware integer divide and a modulo there is one division per frame per pad, and a loop deliberately fills the whole block so a short sound has no gap after each wrap. **Not yet run on hardware.**
 
-- The samples module says what it can do, so the computer can offer exactly that. `app/session/log.py` has looked for `SAMPLE pad modes:` and `SAMPLE shift.silence:` in the session file since it was written, and nothing has ever emitted either, so three of its five capability fields could never read anything but "declared". The module writes both lines when it is ready.
+- The samples module says what it can do, so the computer can offer exactly that. `app/rx3_session/log.py` has looked for `SAMPLE pad modes:` and `SAMPLE shift.silence:` in the session file since it was written, and nothing has ever emitted either, so three of its five capability fields could never read anything but "declared". The module writes both lines when it is ready.
 
 - The window can build a key. `mod_build` validates what an operator can get wrong on the thread that called it, so a refusal is the answer to the button rather than a job that fails a second later, and runs the build on one job slot with progress and cancellation. There is one slot rather than one per kind: a build and a separation both write the same drive, so two at once damages a stick, and one slot makes cancelling mean exactly one thing. Progress is polled rather than pushed, which is what lets the whole of it be proven by a self-test with no window and no display.
 
-- The window can choose a file. `app/ui/shell.py` created its window and threw the handle away, and the chooser is the window's, so no screen could turn what an operator picked into a path a service can open. That is why `app/services/samples.py:save()` and `app/services/logo.py:files()` had been finished and correct for months with no caller.
+- The window can choose a file. `app/shell.py` created its window and threw the handle away, and the chooser is the window's, so no screen could turn what an operator picked into a path a service can open. That is why `app/rx3_service/samples.py:save()` and `app/rx3_service/logo.py:files()` had been finished and correct for months with no caller.
 
 - The interface speaks French and English, switched while it is running. One catalogue with every language on the line that has the key, so a gap shows up in a diff beside what is missing rather than as blank space nobody notices. Sentences that come back from the toolkit itself stay in English for now: they are written by the service layer as prose, and translating them means a code beside every message rather than a message.
 
@@ -113,7 +217,7 @@
 
 - A pad carried over from a save is checked against what the deck reads rather than copied on trust. The deck skips a pad it cannot parse and writes one line to a log nobody is looking at, so the pad is simply silent at the moment it is pressed.
 
-- `app/services/samples.py:save()` never set a pad colour, so the eight colours the format has always carried were unreachable through the only function that writes a bank. It now carries the colour, the name and the mode.
+- `app/rx3_service/samples.py:save()` never set a pad colour, so the eight colours the format has always carried were unreachable through the only function that writes a bank. It now carries the colour, the name and the mode.
 
 - The logging module's on-deck report claimed that nothing held the drive open and that ejecting was a formality. The player's own output is still redirected to `RX3_RUNTIME/rbp_stdout.txt` for as long as it plays, so the report says again what the README and the manifest say: eject the drive, never pull it. It was the reassuring direction of a wrong statement, the one that costs a folder on a FAT stick.
 - The `beatjump-32bars` manifest said bars where the module jumps beats, a factor of four in the name and description the application shows. It now says what the module's README says: pads 7 and 8 become -32 and +32 beats.
@@ -128,7 +232,7 @@
 
 ### Changed
 
-- **The window drawn with the system's own webview is the application.** `packaging/toolkit.spec` freezes `app/ui/shell.py`, ships `app/ui/web/` as the page it loads, and excludes nothing. The Tkinter window and its two panes are retired to `.attic/`. Three things had to be true first, and all three are: the spec put the page under `_MEIPASS` where `shell.resources()` looks for it, so the frozen application had a page at all; `excludes=["ssl", ...]` went, because `webview.http` imports `ssl` when webview is imported and the excluded build could not have opened a window, which is safe now that cryptography's wheels link their OpenSSL statically and `scripts/check_macos_bundle.py` proves the bundle carries one and not two; and nothing imports `app/theme.py` any more, which is what actually kept Tk out of the bundle. Verified by packaging on macOS and running the bundled executable's self-test.
+- **The window drawn with the system's own webview is the application.** `app/toolkit.spec` freezes `app/shell.py`, ships `app/web/` as the page it loads, and excludes nothing. The Tkinter window and its two panes are retired to `.attic/`. Three things had to be true first, and all three are: the spec put the page under `_MEIPASS` where `shell.resources()` looks for it, so the frozen application had a page at all; `excludes=["ssl", ...]` went, because `webview.http` imports `ssl` when webview is imported and the excluded build could not have opened a window, which is safe now that cryptography's wheels link their OpenSSL statically and `scripts/check_macos_bundle.py` proves the bundle carries one and not two; and nothing imports `app/theme.py` any more, which is what actually kept Tk out of the bundle. Verified by packaging on macOS and running the bundled executable's self-test.
 
 - The one requirement this adds is on Linux, where the desktop has to have WebKit. Most do. The README said so as a promise about a coming version; it says so as a requirement now.
 
@@ -136,10 +240,10 @@
 
 - The window is rebuilt around what an operator does rather than around what the toolkit contains: a rail of screens instead of a strip of tabs, one colour per theme spent as alpha steps so both themes stay consistent, and the contrast of every text step measured rather than assumed. The system's own typeface, because no third-party font ships from here.
 
-- `app/ui/shell.py` no longer imports the Tkinter theme module for one Windows call about pixel density. That import is what would have put Tk in the frozen application even after the interface stopped using it.
+- `app/shell.py` no longer imports the Tkinter theme module for one Windows call about pixel density. That import is what would have put Tk in the frozen application even after the interface stopped using it.
 
 - The README's module table lists the five ported modules the application already offers (sample pads, stem waveform, light display mode, accent-insensitive search, logo), each marked as not yet run on hardware. CONTRIBUTING, REFERENCES and the third-party notices describe the tree as it is: one `app/` directory, two windows of which one ships, no guards, no payload, pywebview and Pillow declared.
-- One word for the file a deck reads beside a track: a stem. "Sidecar" is gone from the Python (`write_stem`, `Stem`, `StemResult`, the `stems` field of a track result, the module `app/stems/stem.py`), from the C (`struct stem_header`, `enum stem_format`, `pending_has_stem`, `stem_path_for_track`), from the shell messages of the stems module and from the documentation. The stems manifest the application writes beside its output names the vocal file under `stem` rather than `sidecar`; nothing reads that file back. One log line of the hook changed with it, so the library no longer hashes the same. **Not yet run on hardware.**
+- One word for the file a deck reads beside a track: a stem. "Sidecar" is gone from the Python (`write_stem`, `Stem`, `StemResult`, the `stems` field of a track result, the module `app/rx3_stems/stem.py`), from the C (`struct stem_header`, `enum stem_format`, `pending_has_stem`, `stem_path_for_track`), from the shell messages of the stems module and from the documentation. The stems manifest the application writes beside its output names the vocal file under `stem` rather than `sidecar`; nothing reads that file back. One log line of the hook changed with it, so the library no longer hashes the same. **Not yet run on hardware.**
 - "Stem Studio", the name of an application that no longer exists, is gone from the code: the tab is `app/stems_preparation.py` and `StemsPreparationPane`, its test `tests/test_stems.py`. The per-user data directory and `RX3_STEM_STUDIO_HOME` keep the old name on purpose, so a runtime already installed is found rather than downloaded again.
 
 - Everything that runs on the computer lives under `app/`: the window (`main.py`, `mod_generator.py`, `stem_studio.py`, `theme.py`, the coming `shell.py` and `bridge.py`) and the engines it drives (`rx3_runtime`, `rx3_firmware`, `rx3_stems`, `rx3_session`, `rx3_service`, `rx3_logo`, `rx3_samples`), imported as `app.*`. `apps/rx3-toolbox/` and `tools/` are gone; `make autoexec`, `make new-module` and `make app` run the same code through `python -m app...`. The label generator moved beside the assets it draws, `mod/modules/core/1.19/build_labels.py`; it never ships to a deck. The packaged application's smoke test is one line of the CI workflow rather than a script.
