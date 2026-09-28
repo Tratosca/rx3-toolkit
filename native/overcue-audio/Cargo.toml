@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MPL-2.0
+[package]
+name = "rx3-overcue-audio"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MPL-2.0"
+
+[dependencies]
+ebur128 = "=0.1.10"
