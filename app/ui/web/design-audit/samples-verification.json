@@ -1,0 +1,113 @@
+{
+  "fixture": true,
+  "checks": [
+    "Technical group removed",
+    "Creation stays local",
+    "Bank switch retains edits",
+    "Pending badge visible",
+    "Explicit export includes both banks",
+    "Active selection exported",
+    "Pending badge cleared after success",
+    "No overflow or unresolved labels",
+    "No browser errors"
+  ],
+  "matrix": [
+    {
+      "width": 880,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 1180,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 1180,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 1180,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 1180,
+      "height": 788,
+      "screen": "stems-legacy-warning",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    }
+  ],
+  "status": "complete"
+}

@@ -1,0 +1,442 @@
+[
+  {
+    "operation": "localization_catalogs",
+    "old_references": [
+      "app/ui/web/i18n.js:44"
+    ],
+    "new_references": [
+      "app/ui/web/i18n.js:44"
+    ],
+    "new_flow": "Shared startup"
+  },
+  {
+    "operation": "localization_language",
+    "old_references": [
+      "app/ui/web/i18n.js:75"
+    ],
+    "new_references": [
+      "app/ui/web/i18n.js:75"
+    ],
+    "new_flow": "Settings > Language"
+  },
+  {
+    "operation": "job_status",
+    "old_references": [
+      "app/ui/web/app.js:506"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:524"
+    ],
+    "new_flow": "Shared job region; existing polling"
+  },
+  {
+    "operation": "job_cancel",
+    "old_references": [
+      "app/ui/web/app.js:648"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:672"
+    ],
+    "new_flow": "Shared job region > Cancel"
+  },
+  {
+    "operation": "pick_folder",
+    "old_references": [
+      "app/ui/web/app.js:610",
+      "app/ui/web/app.js:643",
+      "app/ui/web/stems.js:347",
+      "app/ui/web/stems.js:356"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:366",
+      "app/ui/web/stems.js:375",
+      "app/ui/web/app.js:632",
+      "app/ui/web/app.js:665"
+    ],
+    "new_flow": "Drive / Modules output / Stems library and output"
+  },
+  {
+    "operation": "pick_file",
+    "old_references": [
+      "app/ui/web/app.js:629",
+      "app/ui/web/logo.js:283",
+      "app/ui/web/stems.js:351"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:370",
+      "app/ui/web/logo.js:285",
+      "app/ui/web/app.js:651"
+    ],
+    "new_flow": "Modules key / Logo image / Stems XML"
+  },
+  {
+    "operation": "pick_files",
+    "old_references": [
+      "app/ui/web/samples.js:477",
+      "app/ui/web/stems.js:292"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:309",
+      "app/ui/web/samples.js:535"
+    ],
+    "new_flow": "Samples sounds / Stems role assignment"
+  },
+  {
+    "operation": "drive_report",
+    "old_references": [
+      "app/ui/web/app.js:182"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:67",
+      "app/ui/web/app.js:189"
+    ],
+    "new_flow": "Drive > Choose or Refresh"
+  },
+  {
+    "operation": "mod_modules",
+    "old_references": [
+      "app/ui/web/app.js:396"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:411"
+    ],
+    "new_flow": "Modules > Grouped module rows"
+  },
+  {
+    "operation": "mod_firmwares",
+    "old_references": [
+      "app/ui/web/app.js:558"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:580"
+    ],
+    "new_flow": "Modules > Firmware"
+  },
+  {
+    "operation": "mod_key_hint",
+    "old_references": [
+      "app/ui/web/app.js:477"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:492"
+    ],
+    "new_flow": "Modules > Key status"
+  },
+  {
+    "operation": "mod_key_fetch",
+    "old_references": [
+      "app/ui/web/app.js:462"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:477"
+    ],
+    "new_flow": "Terms > Scroll > Explicit consent > Download"
+  },
+  {
+    "operation": "mod_key_forget",
+    "old_references": [
+      "app/ui/web/app.js:470"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:485"
+    ],
+    "new_flow": "Modules > Forget > Confirm"
+  },
+  {
+    "operation": "mod_selection",
+    "old_references": [
+      "app/ui/web/app.js:389",
+      "app/ui/web/app.js:406",
+      "app/ui/web/app.js:692"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:404",
+      "app/ui/web/app.js:421",
+      "app/ui/web/app.js:718"
+    ],
+    "new_flow": "Module switches / Logo > Enable module"
+  },
+  {
+    "operation": "mod_remove",
+    "old_references": [
+      "app/ui/web/app.js:621"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:67",
+      "app/ui/web/app.js:643"
+    ],
+    "new_flow": "Drive > Remove > Confirm"
+  },
+  {
+    "operation": "mod_build",
+    "old_references": [
+      "app/ui/web/app.js:490"
+    ],
+    "new_references": [
+      "app/ui/web/app.js:507"
+    ],
+    "new_flow": "Modules toolbar > Build"
+  },
+  {
+    "operation": "samples_defaults",
+    "old_references": [
+      "app/ui/web/samples.js:648"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:707"
+    ],
+    "new_flow": "Samples bootstrap"
+  },
+  {
+    "operation": "samples_read",
+    "old_references": [
+      "app/ui/web/samples.js:529"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:587"
+    ],
+    "new_flow": "Samples > Bank selector and refresh after save"
+  },
+  {
+    "operation": "samples_save",
+    "old_references": [
+      "app/ui/web/samples.js:517"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:575"
+    ],
+    "new_flow": "Samples toolbar > Save"
+  },
+  {
+    "operation": "samples_analyse",
+    "old_references": [
+      "app/ui/web/samples.js:479"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:537"
+    ],
+    "new_flow": "Samples > Add/change sound"
+  },
+  {
+    "operation": "samples_audition",
+    "old_references": [
+      "app/ui/web/samples.js:295"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:347"
+    ],
+    "new_flow": "Samples > Audition or simulate pads"
+  },
+  {
+    "operation": "samples_activate",
+    "old_references": [
+      "app/ui/web/samples.js:631"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:690"
+    ],
+    "new_flow": "Samples > Activate"
+  },
+  {
+    "operation": "samples_remove",
+    "old_references": [
+      "app/ui/web/samples.js:616"
+    ],
+    "new_references": [
+      "app/ui/web/samples.js:675"
+    ],
+    "new_flow": "Samples > Delete bank > Confirm"
+  },
+  {
+    "operation": "logo_canvases",
+    "old_references": [
+      "app/ui/web/logo.js:381"
+    ],
+    "new_references": [
+      "app/ui/web/logo.js:384"
+    ],
+    "new_flow": "Logo > Canvas choice"
+  },
+  {
+    "operation": "logo_limits",
+    "old_references": [
+      "app/ui/web/logo.js:380"
+    ],
+    "new_references": [
+      "app/ui/web/logo.js:383"
+    ],
+    "new_flow": "Logo bootstrap / Zoom"
+  },
+  {
+    "operation": "logo_open",
+    "old_references": [
+      "app/ui/web/logo.js:285",
+      "app/ui/web/logo.js:391"
+    ],
+    "new_references": [
+      "app/ui/web/logo.js:287",
+      "app/ui/web/logo.js:394"
+    ],
+    "new_flow": "Logo toolbar > Choose/change image or restored artwork"
+  },
+  {
+    "operation": "logo_render",
+    "old_references": [
+      "app/ui/web/logo.js:186"
+    ],
+    "new_references": [
+      "app/ui/web/logo.js:187"
+    ],
+    "new_flow": "Logo > Framing, zoom and invert setting"
+  },
+  {
+    "operation": "stems_tracks",
+    "old_references": [
+      "app/ui/web/stems.js:248"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:265"
+    ],
+    "new_flow": "Stems > Import & listen > Track"
+  },
+  {
+    "operation": "stems_import_assign",
+    "old_references": [
+      "app/ui/web/stems.js:264",
+      "app/ui/web/stems.js:276"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:281",
+      "app/ui/web/stems.js:293"
+    ],
+    "new_flow": "Stems > Import & listen > Role choose/change/clear"
+  },
+  {
+    "operation": "stems_audition",
+    "old_references": [
+      "app/ui/web/stems-listen.js:90"
+    ],
+    "new_references": [
+      "app/ui/web/stems-listen.js:92"
+    ],
+    "new_flow": "Stems > Listen > Drive source / seek / components"
+  },
+  {
+    "operation": "stems_import_audition",
+    "old_references": [
+      "app/ui/web/stems-listen.js:90"
+    ],
+    "new_references": [
+      "app/ui/web/stems-listen.js:92"
+    ],
+    "new_flow": "Stems > Listen > Imported source / seek / components"
+  },
+  {
+    "operation": "stems_import_start",
+    "old_references": [
+      "app/ui/web/stems.js:336"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:355"
+    ],
+    "new_flow": "Stems > Import & listen toolbar > Import"
+  },
+  {
+    "operation": "stems_cache",
+    "old_references": [
+      "app/ui/web/stems.js:221",
+      "app/ui/web/stems.js:234",
+      "app/ui/web/stems.js:241"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:237",
+      "app/ui/web/stems.js:250",
+      "app/ui/web/stems.js:258"
+    ],
+    "new_flow": "Stems > Engine and cache > Limit or Clear"
+  },
+  {
+    "operation": "stems_library_status",
+    "old_references": [
+      "app/ui/web/stems.js:167"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:181"
+    ],
+    "new_flow": "Stems > Library guard and Recheck"
+  },
+  {
+    "operation": "stems_runtime",
+    "old_references": [
+      "app/ui/web/stems.js:215",
+      "app/ui/web/stems.js:403"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:231",
+      "app/ui/web/stems.js:422"
+    ],
+    "new_flow": "Stems > Engine and cache"
+  },
+  {
+    "operation": "stems_library",
+    "old_references": [
+      "app/ui/web/stems.js:196"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:211"
+    ],
+    "new_flow": "Stems > USB drive or XML"
+  },
+  {
+    "operation": "stems_qualities",
+    "old_references": [
+      "app/ui/web/stems.js:402"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:421"
+    ],
+    "new_flow": "Stems > Preparation > Quality"
+  },
+  {
+    "operation": "stems_choose",
+    "old_references": [
+      "app/ui/web/stems.js:79",
+      "app/ui/web/stems.js:360"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:91",
+      "app/ui/web/stems.js:379"
+    ],
+    "new_flow": "Stems quality and accelerator choices"
+  },
+  {
+    "operation": "stems_forecast",
+    "old_references": [
+      "app/ui/web/stems.js:143"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:157"
+    ],
+    "new_flow": "Stems > Playlist and role estimate"
+  },
+  {
+    "operation": "stems_install",
+    "old_references": [
+      "app/ui/web/stems.js:367"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:386"
+    ],
+    "new_flow": "Stems > Engine > Install/reinstall"
+  },
+  {
+    "operation": "stems_start",
+    "old_references": [
+      "app/ui/web/stems.js:375"
+    ],
+    "new_references": [
+      "app/ui/web/stems.js:394"
+    ],
+    "new_flow": "Stems > Preparation toolbar > Prepare"
+  }
+]

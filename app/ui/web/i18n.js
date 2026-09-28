@@ -35,10 +35,18 @@
     return value && typeof value === "object" && value.key
       ? t(value.key, value.params) : String(value == null ? "" : value);
   }
+  function primary(value) {
+    if (!value || typeof value !== "object" || !value.key) return message(value);
+    if (value.key === "unit.mib" || value.key === "unit.kib") return bytes(Number(value.params.value) * (value.key === "unit.mib" ? 1048576 : 1024));
+    var vars = Object.assign({},value.params || {});
+    if (value.key === "stems.space") { vars.requiredSize=bytes(vars.required);vars.availableSize=bytes(vars.available); }
+    var key=value.key+".summary";
+    return t(key,vars) !== key ? t(key,vars) : message(value);
+  }
   function bytes(count) {
-    var unit = count >= 1048576 ? "unit.mib" : count >= 1024 ? "unit.kib" : "unit.bytes";
-    var value = count >= 1048576 ? count / 1048576 : count >= 1024 ? count / 1024 : count;
-    return t(unit, {value:number(value, {maximumFractionDigits:count >= 1048576 ? 1 : 0})});
+    var unit = count >= 1e9 ? "unit.gb" : count >= 1e6 ? "unit.mb" : count >= 1000 ? "unit.kb" : "unit.bytes";
+    var value = count >= 1e9 ? count / 1e9 : count >= 1e6 ? count / 1e6 : count >= 1000 ? count / 1000 : count;
+    return t(unit, {value:number(value, {maximumFractionDigits:count >= 1e6 ? 1 : 0})});
   }
   async function load() {
     var answer = await window.pywebview.api.localization_catalogs();
@@ -91,6 +99,6 @@
     });
     return gaps;
   }
-  window.i18n = {t:t, message:message, number:number, bytes:bytes, load:load,
+  window.i18n = {t:t, message:message, primary:primary, number:number, bytes:bytes, load:load,
     apply:apply, setLanguage:setLanguage, current:current, missing:missing};
 })();

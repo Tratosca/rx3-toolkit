@@ -1,8 +1,11 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: MPL-2.0 -->
+<html lang="en">
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title data-t="app.name"></title>
 <link rel="stylesheet" href="app.css">
+<script src="components.js"></script>
 
 <aside id="rail">
   <header>
@@ -10,109 +13,125 @@
     <p class="dim" data-t="app.tagline"></p>
   </header>
 
-  <nav role="tablist">
-    <button role="tab" data-screen="drive" aria-selected="true">
-      <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="1.8" width="9" height="12.4" rx="2.2"/><path d="M6.5 4.6h3"/></svg></span>
-      <span data-t="nav.drive"></span>
-      <span class="tag" id="tag-drive" hidden></span>
-    </button>
-    <button role="tab" data-screen="modules" aria-selected="false">
+  <nav role="tablist" aria-orientation="vertical" data-t-label="ui.navigation">
+    <button role="tab" data-screen="modules" aria-selected="false" id="tab-modules" aria-controls="modules" tabindex="0">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="5" height="5" rx="1.3"/><rect x="9" y="2" width="5" height="5" rx="1.3"/><rect x="2" y="9" width="5" height="5" rx="1.3"/><rect x="9" y="9" width="5" height="5" rx="1.3"/></svg></span>
       <span data-t="nav.modules"></span>
     </button>
-    <button role="tab" data-screen="samples" aria-selected="false">
-      <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="4" width="3" height="3.4" rx="1"/><rect x="6.3" y="4" width="3" height="3.4" rx="1"/><rect x="11.1" y="4" width="3" height="3.4" rx="1"/><rect x="1.5" y="8.8" width="3" height="3.4" rx="1"/><rect x="6.3" y="8.8" width="3" height="3.4" rx="1"/><rect x="11.1" y="8.8" width="3" height="3.4" rx="1"/></svg></span>
+    <button role="tab" data-screen="samples" aria-selected="false" id="tab-samples" aria-controls="samples" tabindex="-1">
+      <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1"><rect x="1" y="4" width="2.8" height="3.4" rx=".6"/><rect x="4.8" y="4" width="2.8" height="3.4" rx=".6"/><rect x="8.6" y="4" width="2.8" height="3.4" rx=".6"/><rect x="12.4" y="4" width="2.8" height="3.4" rx=".6"/><rect x="1" y="8.6" width="2.8" height="3.4" rx=".6"/><rect x="4.8" y="8.6" width="2.8" height="3.4" rx=".6"/><rect x="8.6" y="8.6" width="2.8" height="3.4" rx=".6"/><rect x="12.4" y="8.6" width="2.8" height="3.4" rx=".6"/></svg></span>
       <span data-t="nav.samples"></span>
       <span class="tag" id="tag-samples" hidden></span>
     </button>
-    <button role="tab" data-screen="logo" aria-selected="false">
+    <button role="tab" data-screen="logo" aria-selected="false" id="tab-logo" aria-controls="logo" tabindex="-1">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="3" width="12.4" height="10" rx="2.2"/><circle cx="5.8" cy="6.6" r="1.1"/><path d="M2.6 11.8l3.4-3.2 2.4 2.2 2.2-2 2.8 2.6"/></svg></span>
       <span data-t="nav.logo"></span>
     </button>
-    <button role="tab" data-screen="stems" aria-selected="false">
+    <button role="tab" data-screen="stems" aria-selected="false" id="tab-stems" aria-controls="stems" tabindex="-1">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 6.2v3.6M6.3 3.4v9.2M9.7 5.2v5.6M13 4.2v7.6"/></svg></span>
       <span data-t="nav.stems"></span>
     </button>
 
+    <button role="tab" data-screen="installation" aria-selected="false" id="tab-installation" aria-controls="installation" tabindex="-1">
+      <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1v9m-3-3 3 3 3-3M2 10v4h12v-4"/></svg></span>
+      <span data-t="modules.build"></span>
+    </button>
+
     <span class="spacer"></span>
 
-    <button role="tab" data-screen="settings" aria-selected="false">
+    <button role="tab" data-screen="settings" aria-selected="false" id="tab-settings" aria-controls="settings" tabindex="-1">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 5.2h6.2M12.2 5.2H14M2 10.8h1.8M7.8 10.8H14"/><circle cx="10.2" cy="5.2" r="1.9"/><circle cx="5.8" cy="10.8" r="1.9"/></svg></span>
       <span data-t="nav.settings"></span>
     </button>
   </nav>
+  <button id="tasks-open" class="rail-context" aria-haspopup="dialog" aria-controls="tasks-dialog"><span data-t="tasks.title"></span> <span id="tasks-count" class="tag" hidden>1</span><small id="tasks-running" role="status" data-t="tasks.running" hidden></small></button>
+  <button id="rail-drive" class="rail-context" data-go="drive" data-t="drive.empty"></button>
 </aside>
 
 <main>
   <!-- The drive ------------------------------------------------------------ -->
-  <section id="drive" class="screen">
+  <section id="drive" class="screen" role="region" aria-labelledby="drive-title">
     <header>
-      <h1 data-t="drive.title"></h1>
-      <p class="lede" data-t="drive.lede"></p>
+      <div>
+      <h1 id="drive-title" tabindex="-1" data-t="drive.title"></h1>
+          </div>
+      <button class="btn primary" id="drive-choose" data-t="drive.choose"></button>
     </header>
-
-    <div class="card">
+    <div class="screen-body"><div class="screen-content">
+      <div class="screen-state" role="status" hidden></div>
+      <div class="card"><p class="dim" data-t="ui.destinationHelp"></p>
       <div class="spread">
-        <p class="path num" id="drive-path" data-t="drive.empty"></p>
-        <button class="btn primary" id="drive-choose" data-t="drive.choose"></button>
+        <p class="path num unset" id="drive-path" data-t="drive.empty"></p>
+
       </div>
-      <dl id="drive-summary" style="margin-top:20px" hidden></dl>
-      <div class="row" id="drive-actions" style="margin-top:20px" hidden>
+      <dl id="drive-summary" style="margin-top:var(--s5)" hidden aria-live="polite"></dl>
+      <div class="row" id="drive-actions" style="margin-top:var(--s5)" hidden>
         <button class="btn small" id="drive-refresh" data-t="common.refresh"></button>
         <button class="btn small harm" id="drive-remove" data-t="drive.removeMod"></button>
       </div>
-    </div>
+    </div><section class="emergency-help"><h2 data-t="ui.restore"></h2><p class="dim" data-t="ui.restoreSteps"></p></section>
+    </div></div>
   </section>
 
   <!-- Modules and the build ------------------------------------------------ -->
-  <section id="modules" class="screen" hidden>
+  <section id="modules" class="screen" role="tabpanel" aria-labelledby="tab-modules" hidden>
     <header>
+      <div>
       <h1 data-t="modules.title"></h1>
       <p class="lede" data-t="modules.lede"></p>
+          </div>
     </header>
+    <div class="screen-body"><div class="screen-content">
+      <div class="screen-state" role="status" hidden></div>
 
-    <div class="card">
-      <div class="row">
-        <label for="firmware" data-t="modules.firmware"></label>
-        <select id="firmware"></select>
-      </div>
-      <ul id="module-list" class="stack" style="list-style:none;padding:0;margin:18px 0 0"></ul>
-    </div>
-
-    <div class="card">
-      <h2 data-t="modules.key"></h2>
-      <p class="lede" data-t="modules.keyLede"></p>
-      <div class="row" style="margin-top:14px">
-        <span class="path num" id="key-path"></span>
-        <button class="btn small" id="key-choose" data-t="common.browse"></button>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <label data-t="modules.output"></label>
-        <span class="path num" id="output-path"></span>
-        <button class="btn small" id="output-choose" data-t="common.browse"></button>
-      </div>
-      <div class="row" style="margin-top:20px">
-        <button class="btn primary" id="build" data-t="modules.build"></button>
-        <span class="dim" id="build-note"></span>
-      </div>
-    </div>
+    <p id="modules-performance-tradeoff" class="notice" data-t="modules.performanceTradeoff" hidden></p>
+    <div id="module-list" class="categories"></div>
+    </div></div>
   </section>
 
   <!-- The pads -------------------------------------------------------------- -->
-  <section id="samples" class="screen" hidden>
+  <section id="samples" class="screen" role="tabpanel" aria-labelledby="tab-samples" hidden>
     <header>
+      <div>
       <h1 data-t="samples.title"></h1>
       <p class="lede" data-t="samples.lede"></p>
+          </div>
+      <button class="btn primary" id="bank-save" disabled data-t="samples.save"></button>
     </header>
+    <div class="screen-body"><div class="screen-content">
+      <details class="screen-guide"><summary data-t="ui.onDeck"></summary><ol class="tutorial-steps"><li data-t="tutorial.sampleCreate"></li><li data-t="tutorial.sampleEdit"></li><li data-t="tutorial.sampleSave"></li></ol><p data-t="samples.onDeck"></p><figure class="rx3-preview"><canvas class="rx3-mock" data-preview="samples" role="img" data-t-label="preview.label"></canvas></figure></details>
+      <div class="screen-state" role="status" hidden></div>
 
-    <figure class="rx3-preview">
-      <canvas class="rx3-mock" data-preview="samples" role="img" data-t-label="preview.label"></canvas>
-      <figcaption data-t="preview.caption"></figcaption>
-    </figure>
+    <p id="samples-sync" class="notice" role="status" hidden></p>
+    <button id="samples-local-retry" class="btn small" data-t="ui.retry" hidden></button>
 
-    <p class="card" id="samples-need-drive" data-t="samples.needDrive"></p>
+    <div class="card empty-state" id="samples-need-drive">
+      <p data-t="samples.needDrive"></p>
+      <button class="btn primary" id="samples-choose-drive" data-t="drive.choose"></button>
+    </div>
+
+
+
 
     <div id="samples-editor" hidden>
+      <div class="card bank-settings">
+        <div class="spread">
+          <div>
+            <h2 data-t="samples.bank"></h2>
+            <p class="lede" data-t="samples.bankHint"></p>
+          </div>
+          <div class="row"><span class="pill" id="bank-state"></span><button class="btn small" id="bank-activate" data-t="samples.makeActive"></button></div>
+        </div>
+
+        <div class="row">
+          <label for="bank-name" data-t="samples.bankName"></label>
+          <input type="text" id="bank-name" maxlength="64" size="20">
+          <select id="bank-pick" data-t-label="ui.bankPicker"></select>
+          <button class="btn small" id="bank-new" data-t="samples.newBank"></button>
+          <button class="btn small harm" id="bank-delete" data-t="common.remove"></button>
+        </div>
+        <p class="dim" id="bank-note"></p><p id="bank-active" role="status"></p><p class="dim" id="samples-module-note"></p><button class="btn quiet small" id="samples-modules" data-go="modules" data-t="ui.goModules"></button>
+      </div>
       <div class="pad-layout">
         <div class="card">
           <div class="spread">
@@ -120,181 +139,197 @@
             <span class="dim num" id="bank-size"></span>
           </div>
           <p class="lede" data-t="samples.gridHint"></p>
-          <div class="row" style="margin:12px 0">
-            <label><input type="checkbox" id="samples-simulate"> <span data-t="samples.simulate"></span></label>
+          <div class="row" style="margin:var(--s3) 0">
+            <input type="checkbox" id="samples-simulate" hidden><div class="segmented" role="group" data-t-label="samples.grid"><button class="btn" id="samples-edit" aria-pressed="true" data-t="ui.editPads"></button><button class="btn" id="samples-play" aria-pressed="false" data-t="ui.playPads"></button></div>
             <button class="btn small" id="samples-stop" data-t="samples.stopAll"></button>
           </div>
           <p class="dim" data-t="samples.simulateHint"></p>
-          <div class="pad-grid" id="pad-grid"></div>
-          <p class="dim" style="margin-top:14px" data-t="samples.onDeck"></p>
+          <div class="pad-grid" id="pad-grid" role="radiogroup" data-t-label="ui.padSelection"></div>
+
+
         </div>
 
         <div class="card" id="inspector"></div>
-      </div>
-
-      <div class="card">
-        <div class="spread">
-          <div>
-            <h2 data-t="samples.bank"></h2>
-            <p class="lede" data-t="samples.bankHint"></p>
-          </div>
-          <span class="pill" id="bank-state"></span>
-        </div>
-
-        <div class="row" style="margin-top:16px">
-          <label for="bank-name" data-t="samples.bankName"></label>
-          <input type="text" id="bank-name" maxlength="64" size="20">
-          <select id="bank-pick"></select>
-          <button class="btn small" id="bank-new" data-t="samples.newBank"></button>
-          <button class="btn small harm" id="bank-delete" data-t="common.remove"></button>
-        </div>
-
-        <div class="row" style="margin-top:16px">
+      </div><div class="bank-playback">        <div class="row" style="margin-top:var(--s4)">
           <label for="bank-volume" data-t="samples.volume"></label>
-          <input type="range" id="bank-volume" min="0" max="100" style="max-width:280px">
+          <input type="range" id="bank-volume" min="0" max="100" style="max-width:var(--range-width)">
           <span class="num" id="bank-volume-value"></span>
-        </div>
-
-        <div class="row" style="margin-top:14px">
+        </div>        <div class="row" style="margin-top:var(--s4)">
           <label class="row tight"><input type="checkbox" id="shift-silence">
             <span data-t="samples.shiftSilence"></span></label>
           <span class="pill" id="cap-shift"></span>
-        </div>
+        </div></div>
 
-        <div class="row" style="margin-top:20px">
-          <button class="btn primary" id="bank-save" data-t="samples.save"></button>
-          <button class="btn small" id="bank-activate" data-t="samples.makeActive"></button>
-          <span class="dim" id="bank-note"></span>
-        </div>
-      </div>
+
     </div>
+
+
+    </div></div>
   </section>
 
   <!-- The logo -------------------------------------------------------------- -->
-  <section id="logo" class="screen" hidden>
+  <section id="logo" class="screen" role="tabpanel" aria-labelledby="tab-logo" hidden>
     <header>
+      <div>
       <h1 data-t="logo.title"></h1>
       <p class="lede" data-t="logo.lede"></p>
+          </div>
+      <div class="row"><button class="btn primary" id="logo-pick" data-t="logo.choose"></button></div>
     </header>
+    <div class="screen-body"><div class="screen-content">
+      <details class="screen-guide"><summary data-t="ui.onDeck"></summary><ol class="tutorial-steps"><li data-t="tutorial.logoChoose"></li><li data-t="tutorial.logoFrame"></li><li data-t="tutorial.logoInstall"></li></ol></details>
+      <div class="screen-state" role="status" hidden></div>
 
+    <p id="logo-empty" class="empty-state" data-t="ui.logoEmpty"></p>
     <div class="logo-layout">
       <div class="card">
         <div class="spread">
           <h2 data-t="logo.preview"></h2>
-          <button class="btn" id="logo-pick" data-t="logo.choose"></button>
+
         </div>
 
         <figure class="rx3-preview">
           <canvas id="logo-mock" class="rx3-mock" data-preview="logo" role="img" tabindex="0" data-t-label="preview.label"></canvas>
-          <figcaption data-t="preview.caption"></figcaption>
         </figure>
         <canvas id="logo-canvas" hidden aria-hidden="true"></canvas>
         <p class="dim" data-t="logo.frameHint"></p>
       </div>
 
-      <div class="card">
+      <fieldset class="card logo-controls" id="logo-controls" disabled>
         <h2 data-t="logo.framing"></h2>
 
-        <div style="margin-top:16px">
-          <label for="logo-pane" data-t="logo.pane"></label>
-          <select id="logo-pane" style="margin-left:10px"></select>
+        <div class="field" style="margin-top:var(--s4)">
+          <span class="field-label" id="logo-pane-label" data-t="logo.pane"></span>
+          <div class="segmented stretch" id="logo-pane" role="group" aria-labelledby="logo-pane-label"></div>
         </div>
 
-        <div style="margin-top:18px">
+        <div style="margin-top:var(--s5)">
           <label for="logo-zoom" data-t="logo.zoom"></label>
           <div class="row">
-            <input type="range" id="logo-zoom" min="0" max="1000" value="0" style="max-width:220px">
+            <input type="range" id="logo-zoom" min="0" max="1000" value="0" style="max-width:var(--range-width)">
             <span class="num" id="logo-zoom-value"></span>
           </div>
         </div>
 
-        <div class="row tight" style="margin-top:18px">
-          <button class="btn small" id="logo-fit" data-t="logo.fit"></button>
-          <button class="btn small" id="logo-fill" data-t="logo.fill"></button>
+        <div class="row" style="margin-top:var(--s5)">
+          <div class="segmented" role="group" data-t-label="logo.framing">
+            <button class="btn small" id="logo-fit" aria-pressed="true" data-t="logo.fit"></button>
+            <button class="btn small" id="logo-fill" aria-pressed="false" data-t="logo.fill"></button>
+          </div>
           <button class="btn small quiet" id="logo-reset" data-t="logo.reset"></button>
         </div>
 
-        <div class="row tight" style="margin-top:18px">
-          <button class="btn small" id="logo-theme-dark" data-t="logo.themeDark"></button>
-          <button class="btn small" id="logo-theme-light" data-t="logo.themeLight"></button>
+        <div class="field" style="margin-top:var(--s5)">
+          <span class="field-label" id="logo-theme-label" data-t="logo.screenTheme"></span>
+          <div class="segmented" role="group" aria-labelledby="logo-theme-label">
+            <button class="btn small" id="logo-theme-dark" aria-pressed="true" data-t="logo.themeDark"></button>
+            <button class="btn small" id="logo-theme-light" aria-pressed="false" data-t="logo.themeLight"></button>
+          </div>
+          <label class="switch-row" id="logo-invert-row">
+            <input type="checkbox" role="switch" id="logo-invert" checked>
+            <span>
+              <strong data-t="logo.invert"></strong>
+              <span class="dim" id="logo-invert-hint"></span>
+            </span>
+          </label>
         </div>
 
-        <div class="stack" style="margin-top:18px" id="logo-notes"></div>
+        <div class="stack" style="margin-top:var(--s5)" id="logo-notes"></div>
 
-        <p class="dim" style="margin-top:18px" data-t="logo.buildHint"></p>
-      </div>
+
+      </fieldset>
     </div>
+
+    </div></div>
   </section>
 
   <!-- Separation ------------------------------------------------------------ -->
-  <section id="stems" class="screen" hidden>
+  <section id="stems" class="screen" role="tabpanel" aria-labelledby="tab-stems" hidden>
     <header>
+      <div>
       <h1 data-t="stems.title"></h1>
       <p class="lede" data-t="stems.lede"></p>
+          </div>
+      <button class="btn primary" id="stems-start" disabled data-t="stems.start"></button>
     </header>
-
-    <div class="card">
-      <div class="spread">
-        <div>
-          <h2 data-t="stems.machine"></h2>
-          <p class="lede num" id="runtime-summary"></p>
-        </div>
-        <span class="pill" id="runtime-state"></span>
-      </div>
-      <div class="row" style="margin-top:14px">
-        <label for="accelerator" data-t="stems.accelerator"></label>
-        <select id="accelerator"></select>
-        <button class="btn small" id="runtime-install" data-t="stems.install"></button>
-      </div>
-    </div>
+    <div class="screen-body"><div class="screen-content">
+      <details class="screen-guide"><summary data-t="ui.onDeck"></summary><ol class="tutorial-steps"><li data-t="tutorial.stemSource"></li><li data-t="tutorial.stemPrepare"></li><li data-t="tutorial.stemPreview"></li></ol></details>
+      <div class="screen-state" role="status" hidden></div>
 
     <div class="card">
       <h2 data-t="stems.music"></h2>
-      <p class="lede" data-t="stems.musicHint"></p>
-      <div class="row" style="margin-top:14px">
+      <div class="notice" id="library-warning" role="alert" style="margin-top:var(--s4)" hidden>
+        <p></p>
+        <button class="btn small" type="button" id="library-recheck"></button>
+      </div>
+      <div class="row" style="margin-top:var(--s4)">
         <button class="btn small" id="library-drive" data-t="stems.fromDrive"></button>
         <button class="btn small" id="library-file" data-t="stems.fromExport"></button>
-        <span class="path num" id="library-path"></span>
-      </div>
-      <div class="row" style="margin-top:16px" id="playlist-row" hidden>
+        </div>
+      <p class="dim num" id="library-count"></p>
+      <div class="row" style="margin-top:var(--s4)" id="playlist-row" hidden>
         <label for="playlist" data-t="stems.playlist"></label>
         <select id="playlist"></select>
-        <span class="dim num" id="forecast"></span>
+
       </div>
+      <div class="memory" id="stems-memory"></div>
+      <label class="switch-row" for="stems-overcue">
+        <input type="checkbox" id="stems-overcue" aria-describedby="stems-overcue-help stems-overcue-storage stems-overcue-status">
+        <span><strong data-t="stems.overcueLabel"></strong></span>
+      </label>
+      <p class="dim" id="stems-overcue-help" data-t="stems.overcueHelp"></p>
+      <a class="module-meta linked" href="https://overcue.gg" target="_blank" rel="noopener noreferrer" data-t="stems.overcueLink"></a>
+      <p class="dim num" id="stems-overcue-storage" role="status" aria-live="polite"></p>
+      <p class="dim" id="stems-overcue-status"></p>
+      <p class="notice" id="roles-warning" role="status" hidden></p>
+      <p class="dim" id="stems-note"></p>
     </div>
 
-    <div class="card">
-      <h2 data-t="stems.quality"></h2>
-      <div class="modes" id="quality-row" style="margin-top:14px"></div>
-      <p class="dim" id="quality-summary" style="margin-top:10px"></p>
-
-      <div style="margin-top:20px">
-        <label data-t="stems.parts"></label>
-        <div class="row" id="roles-row" style="margin-top:8px"></div>
+    <div id="stems-track-picker" hidden>      <div class="row" style="margin-top:var(--s4)">
+        <label for="stem-track" data-t="stems.importTrackLabel"></label>
+        <select id="stem-track"></select>
       </div>
-
-      <div class="row" style="margin-top:18px">
-        <label data-t="stems.writeTo"></label>
-        <span class="path num" id="stems-output"></span>
-        <button class="btn small" id="stems-output-choose" data-t="common.browse"></button>
+</div><div class="card" id="stems-listen" hidden></div>
+    <section class="card" id="stems-runtime" aria-labelledby="runtime-title"><h2 id="runtime-title" data-t="ui.runtimeSettings"></h2><div class="runtime-content">
+      <div class="spread">
+        <div>
+          <h2 data-t="stems.machine"></h2>
+          <p class="lede" id="runtime-summary"></p>
+        </div>
+        <span class="pill" id="runtime-state"></span>
       </div>
-
-      <div class="row" style="margin-top:20px">
-        <button class="btn primary" id="stems-start" data-t="stems.start"></button>
-        <span class="dim" id="stems-note"></span>
+      <button class="btn" id="runtime-install" data-t="stems.install"></button>
+      <div class="runtime-settings">
+        <div class="row"><label for="accelerator" data-t="stems.accelerator"></label><select id="accelerator"></select></div>
+        <div class="row" id="stems-cache" style="margin-top:var(--s3)"></div>
       </div>
-    </div>
+    </div></section>
+
+
+    </div></div>
   </section>
 
   <!-- Settings -------------------------------------------------------------- -->
-  <section id="settings" class="screen" hidden>
+  <section id="settings" class="screen" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <header>
+      <div>
       <h1 data-t="settings.title"></h1>
+          </div>
     </header>
+    <div class="screen-body"><div class="screen-content">
+      <div class="screen-state" role="status" hidden></div>
+    <div class="card settings-group">
+      <div><h2 data-t="ui.appearance"></h2><p class="lede" data-t="ui.appearanceHint"></p></div>
+      <div class="segmented" role="group" data-t-label="ui.appearance">
+        <button class="btn" data-theme-choice="system" data-t="ui.themeSystem"></button>
+        <button class="btn" data-theme-choice="light" data-t="ui.themeLight"></button>
+        <button class="btn" data-theme-choice="dark" data-t="ui.themeDark"></button>
+      </div>
+    </div>
     <div class="card">
       <h2 data-t="settings.language"></h2>
       <p class="lede" data-t="settings.languageLede"></p>
-      <div class="row tight" style="margin-top:14px" id="language-row">
+      <div class="segmented" style="margin-top:var(--s4)" id="language-row" role="group" data-t-label="settings.language">
         <button class="btn small" data-language="en" data-t="locale.en"></button>
         <button class="btn small" data-language="fr" data-t="locale.fr"></button>
       </div>
@@ -303,19 +338,119 @@
       <h2 data-t="settings.about"></h2>
       <p class="lede" data-t="settings.aboutLede"></p>
     </div>
+      <p class="dim" data-t="ui.immediateSettings"></p>
+    </div></div>
   </section>
 
-  <div id="job" hidden>
-    <div class="spread">
-      <p><strong id="job-message"></strong> <span class="dim num" id="job-detail"></span></p>
-      <button class="btn small" id="job-cancel" data-t="job.cancel"></button>
-    </div>
-    <div id="job-bar"><span></span></div>
+<section id="installation" class="screen" role="tabpanel" aria-labelledby="tab-installation" hidden>
+  <header><div><h1 id="installation-title" data-t="modules.build"></h1><p class="lede" data-t="install.recap"></p></div><button class="btn primary" id="installation-confirm" data-t="modules.build"></button></header>
+  <div class="screen-body"><div class="screen-content installation-body">
+    <div class="screen-state" role="status" hidden></div>
+    <section><h2 id="summary-count"></h2><ul class="chips" id="summary-chips"></ul><button class="btn small" data-go="modules" data-t="nav.modules"></button></section>
+    <dl id="installation-assets"></dl><p class="dim" data-t="install.assetsHint"></p>
+    <div class="row"><button class="btn small" data-go="logo" data-t="nav.logo"></button><button class="btn small" data-go="samples" data-t="nav.samples"></button><button class="btn small" data-go="stems" data-t="nav.stems"></button></div>
+        <div class="field">
+          <span class="field-label" data-t="modules.output"></span>
+          <span class="path num" id="output-path"></span><p class="dim" data-t="ui.destinationHelp"></p><p class="dim" id="output-mismatch" hidden></p>
+          <div class="row tight">
+            <button class="btn small" id="output-choose" data-t="ui.destinationChoose"></button>
+          </div>
+        </div>
+    <p id="installation-step" role="status"></p>
+    <p class="dim" id="build-note"></p>
+      <article id="tutorial-start" class="installation-guide" aria-labelledby="tutorial-start-title"><h2 id="tutorial-start-title" data-t="tutorial.start"></h2>
+        <ol class="tutorial-steps"><li data-t="tutorial.startUsb"></li><li data-t="tutorial.startModules"></li><li data-t="tutorial.startAssets"></li><li data-t="tutorial.startInstall"></li></ol>
+<div class="row"><button class="btn small" data-go="drive" data-t="nav.drive"></button><button class="btn small" data-go="modules" data-t="nav.modules"></button><button class="btn small" data-go="installation" data-t="modules.build"></button></div>      </article>
+    <details id="installation-options"><summary data-t="install.options"></summary>
+        <div class="field">
+          <span class="field-label" id="firmware-label" data-t="modules.firmware"></span>
+          <p id="firmware" aria-labelledby="firmware-label"></p><details class=""><summary data-t="ui.firmwareHelp"></summary><p class="dim" data-t="ui.firmwareSteps"></p></details>
+        </div>
+        <div class="field">
+          <span class="field-label"><svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="5" r="3"/><path d="m7 7 7 7m-3-3 2-2m-4 0 2-2"/></svg> <span data-t="modules.key"></span></span>
+          <p id="key-state" role="status"></p>
+          <p class="dim" data-t="ui.encryptionExplanation"></p>
+          <p class="dim" id="key-note"></p>
+          <button class="btn small" id="key-fetch" data-t="modules.keyFetch"></button>
+          <details><summary data-t="ui.keyManage"></summary>
+            <span class="path num" id="key-path"></span>
+            <div class="stack">
+              <button class="btn small" id="key-choose" data-t="ui.keyChoose"></button>
+              <button class="btn small" id="key-recover" data-t="modules.keyFetch"></button>
+              <button class="btn small quiet" id="key-forget" data-t="modules.keyForget" hidden></button>
+            </div>
+          </details>
+        </div>
+
+    </details>
   </div>
+  </div>
+</section>
 </main>
 
+
+  <dialog id="tasks-dialog" aria-labelledby="tasks-title">
+    <div class="spread"><h2 id="tasks-title" data-t="tasks.title"></h2><button class="btn small" id="tasks-close" data-t="common.close"></button></div>
+    <p id="tasks-empty" class="dim" data-t="tasks.empty"></p>
+    <div id="tasks-content"></div>
+  </dialog>
+  <span id="job-anchor" hidden></span>
+  <div id="job" hidden data-state="idle">
+    <div class="spread">
+      <p><strong id="job-message" tabindex="-1" role="status" aria-live="polite"></strong> <span class="dim" id="job-detail"></span></p>
+      <div class="row tight"><button class="btn small" id="job-cancel" data-t="job.cancel"></button><button class="btn small" id="job-close" data-t="common.close"></button></div>
+    </div>
+    <div class="row"><button class="btn small" id="job-retry" hidden data-t="ui.keyRetry"></button><button class="btn small" id="job-next" hidden></button></div>
+    <details id="job-details" hidden><summary data-t="ui.details"></summary><pre id="job-diagnostics"></pre></details>
+    <div id="job-bar" role="progressbar" aria-labelledby="job-message" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+  </div>
+
+<div id="connection" role="status">
+  <p id="connection-message" data-t="ui.connecting">Opening the app…</p>
+  <button class="btn" id="connection-retry" data-t="ui.retry" hidden>Try again</button>
+</div>
+
+
+
+
+
+
+
+<dialog id="confirmation" aria-labelledby="confirmation-title" aria-describedby="confirmation-body">
+  <h2 id="confirmation-title"></h2>
+  <p id="confirmation-body"></p>
+  <div class="dialog-actions">
+    <button class="btn" id="confirmation-cancel" data-t="common.cancel"></button>
+    <button class="btn harm" id="confirmation-accept"></button>
+  </div>
+</dialog>
+
+<!-- Shown before the key is fetched. The box unlocks only once the text has
+     been scrolled to its end, and Python refuses a fetch without it. -->
+<dialog id="terms" aria-labelledby="terms-title">
+  <h2 id="terms-title" data-t="terms.title"></h2><p class="dim" data-t="ui.initialSetup"></p><div class="segmented" id="terms-language" role="group" data-t-label="settings.language"><button class="btn small" data-language="fr">Français</button><button class="btn small" data-language="en">English</button></div>
+  <div id="terms-body" tabindex="0">
+    <h3 data-t="ui.termsStorage"></h3><p data-t="terms.what"></p>
+    <p data-t="terms.nothingElse"></p>
+    <h3 data-t="ui.termsUse"></h3><p data-t="terms.purpose"></p>
+    <p data-t="terms.owner"></p>
+    <p data-t="terms.law"></p>
+    <p data-t="terms.risk"></p>
+    <h3 data-t="ui.termsRemove"></h3><p data-t="terms.remove"></p>
+  </div>
+  <p class="dim" id="terms-size"></p><p class="dim" id="terms-hint" data-t="terms.scroll"></p>
+  <label class="row" id="terms-accept-row">
+    <input type="checkbox" id="terms-accept" disabled>
+    <span data-t="terms.accept"></span>
+  </label>
+  <div class="row" style="margin-top:var(--s4);justify-content:flex-end">
+    <button class="btn small quiet" id="terms-cancel" data-t="ui.later"></button>
+    <button class="btn small primary" id="terms-download" data-t="terms.download" disabled></button>
+  </div>
+</dialog>
+
 <p id="failure" role="alert" hidden>
-  <span id="failure-text"></span>
+  <span id="failure-text" style="flex:1"></span>
   <button class="btn small quiet" id="failure-close" data-t="common.dismiss"></button>
 </p>
 
@@ -323,6 +458,9 @@
 <script src="rx3-mock.js"></script>
 <script src="samples.js"></script>
 <script src="logo.js"></script>
+<script src="stems-audio.js"></script>
 <script src="stems-listen.js"></script>
-  <script src="stems.js"></script>
+<script src="stems.js"></script>
 <script src="app.js"></script>
+
+</html>

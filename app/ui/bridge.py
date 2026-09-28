@@ -30,13 +30,18 @@ import time
 import traceback
 
 from app.localization import Message, LocalizedError, catalogs, normalize, translate, wire, error_message
+from app.firmware import key_source
 from app.runtime import build as build_module
 from app.samples import bank as bank_module
 from app.services import drive as drive_service
+from app.services import keyshift as keyshift_service
+from app.services import key_match as key_match_service
+from app.services import browse_columns as browse_columns_service
 from app.services import logo as logo_service
 from app.services import mod as mod_service
 from app.services import samples as samples_service
 from app.services import stems as stems_service
+from app.stems import processes
 
 
 # What a chooser offers per kind. The interface names a kind; it never hands
@@ -108,13 +113,19 @@ def _framing(value) -> dict:
     return {"mode": mode, **numbers}
 
 
+def _invert_light(value) -> bool:
+    """Whether a light screen gets the artwork's greys inverted. On unless the
+    screen said no, which is what every logo built before the choice existed got."""
+    return dict(value or {}).get("invertLight", True) is not False
+
+
 def _logo_request(value) -> tuple:
-    """An artwork choice as the encoder takes it: path, pane, framing."""
+    """An artwork choice as the encoder takes it: path, pane, framing, inversion."""
     request = dict(value or {})
     path = pathlib.Path(str(request.get("path", "")))
     if not path.is_file():
         raise LocalizedError("error.artwork", path=str(path))
-    return path, str(request.get("canvas", "classic")), _framing(request)
+    return path, str(request.get("canvas", "classic")), _framing(request), _invert_light(request)
 
 
 def idle_job() -> dict:
@@ -139,6 +150,8 @@ class Bridge:
     """The toolkit, as one flat surface."""
 
     def __init__(self) -> None:
+        self._preview_lock = threading.Lock()
+        self._preview = None
         # Set once the window exists. Only the choosers need it: progress is
         # polled rather than pushed, so nothing else here draws anything.
         self._window = None
@@ -149,6 +162,10 @@ class Bridge:
         # computer busy, and one slot makes cancelling mean exactly one thing.
         self._job = idle_job()
         self._stop = None
+        self._cancel_requested = False
+        self._closing = False
+        self._job_done = threading.Event()
+        self._job_done.set()
         # The last export or drive that was read, so a forecast and a run do
         # not each parse it again.
         self._library = None
@@ -170,11 +187,48 @@ class Bridge:
         """
         self._window = window
 
+    def _on_closing(self):
+        """Keep the window alive until the worker has released files and children."""
+        with self._lock:
+            if self._closing:
+                return self._job_done.is_set()
+            running = self._job["state"] == "running"
+            if running:
+                self._closing = True
+        if running:
+            try:
+                accepted = self._window.create_confirmation_dialog(
+                    translate("tasks.closeTitle", self._locale),
+                    translate("tasks.closeBody", self._locale),
+                )
+            except Exception:
+                with self._lock:
+                    self._closing = False
+                raise
+            if not accepted:
+                with self._lock:
+                    self._closing = False
+                return False
+        with self._preview_lock:
+            if self._preview:
+                self._preview.close()
+                self._preview = None
+        if not running:
+            return True
+        def finish():
+            self.job_cancel()
+            self._job_done.wait()
+            self._window.destroy()
+        threading.Thread(target=finish, daemon=True).start()
+        return False
+
     # The one job slot -------------------------------------------------------
 
     def _claim(self, kind: str, message: str) -> None:
         """Take the slot, or refuse in a sentence naming what holds it."""
         with self._lock:
+            if self._closing:
+                raise LocalizedError("error.busy")
             if self._job["state"] == "running":
                 held = self._job["message"] or self._job["kind"]
                 raise LocalizedError("error.busy")
@@ -183,11 +237,16 @@ class Bridge:
                 kind=kind, state="running", message=message, startedAt=time.time()
             )
             self._stop = None
+            self._cancel_requested = False
+            self._job_done.clear()
 
     def _watch(self, stop) -> None:
         """Register what cancelling this job calls."""
         with self._lock:
             self._stop = stop
+            pending = self._cancel_requested
+        if pending:
+            stop()
 
     def _step(self, message: str, progress=None, detail=None) -> None:
         """Report where a running job has got to. Never raises."""
@@ -207,6 +266,7 @@ class Bridge:
                 state=state, message=message, result=result, error=error
             )
             self._stop = None
+            self._job_done.set()
 
     @answered
     def job_status(self) -> dict:
@@ -224,6 +284,8 @@ class Bridge:
     def job_cancel(self) -> bool:
         """Ask the running job to stop. False when there is nothing to stop."""
         with self._lock:
+            if self._job["state"] == "running":
+                self._cancel_requested = True
             stop = self._stop if self._job["state"] == "running" else None
         if stop is None:
             return False
@@ -323,6 +385,9 @@ class Bridge:
                 "description": patch.description,
                 "default": patch.default,
                 "selectable": patch.selectable,
+                "category": patch.category,
+                "categoryUi": patch.category_ui,
+                "advanced": patch.advanced,
                 "requires": list(patch.requires),
                 "conflicts": list(patch.conflicts),
             }
@@ -330,13 +395,81 @@ class Bridge:
         ]
 
     @answered
+    def keyshift_preview(self, limit=1, mode="harmonic", rules=0) -> dict:
+        return keyshift_service.preview(limit, mode, rules)
+
+    @answered
     def mod_firmwares(self) -> list:
         return list(build_module.available_versions())
 
     @answered
     def mod_key_hint(self) -> dict:
-        """Where the key was last said to be, so the field opens filled in."""
-        return {"path": os.environ.get("RX3_KEY", "")}
+        """Where the key is, so the field opens filled in.
+
+        An explicit `RX3_KEY` wins over the kept one, so a developer's own key
+        is never silently replaced by a download.
+        """
+        explicit = os.environ.get("RX3_KEY", "")
+        kept = key_source.stored()
+        return {
+            "path": explicit or (str(kept) if kept else ""),
+            "kept": bool(kept),
+            "bytes": key_source.total_size(),
+            "page": key_source.load_source().page,
+        }
+
+    @answered
+    def mod_key_fetch(self, accepted=False) -> dict:
+        """Start getting the key from the manufacturer's GPL source package.
+
+        Refused unless the operator accepted the terms the page shows first.
+        Checked here as well, so no other caller of this surface can skip them.
+        """
+        if accepted is not True:
+            raise LocalizedError("error.keyTerms")
+        kept = key_source.stored()
+        if kept:
+            return {"started": False, "path": str(kept)}
+        self._claim("key", Message("job.keyDownload", part=1, count=len(key_source.load_source().parts)))
+        stop = threading.Event()
+        self._watch(stop.set)
+        threading.Thread(target=self._fetch_key, args=(stop,), daemon=True).start()
+        return {"started": True}
+
+    @answered
+    def mod_key_forget(self) -> dict:
+        """Delete the key the app fetched. A key the operator chose is not touched."""
+        with self._lock:
+            if self._job["state"] == "running" and self._job["kind"] == "key":
+                raise LocalizedError("error.busy")
+        return {"removed": list(key_source.forget())}
+
+    def _fetch_key(self, stop) -> None:
+        """The download, off the calling thread. Every exit settles the slot."""
+        count = len(key_source.load_source().parts)
+        total = key_source.total_size()
+        sizes = [part.size for part in key_source.load_source().parts]
+
+        def progress(done, size, index):
+            before = sum(sizes[:index])
+            if before + done >= total:
+                # Everything is here; what follows is one pass over it.
+                self._step(Message("job.keyRead"), progress=None)
+                return
+            self._step(
+                Message("job.keyDownload", part=index + 1, count=count),
+                progress=round(100 * (before + done) / total, 1),
+                detail={"done": before + done, "total": total},
+            )
+
+        try:
+            path = key_source.obtain(progress=progress, stopped=stop.is_set)
+        except key_source.Cancelled:
+            self._settle("cancelled", Message("job.cancelled"))
+        except Exception as error:
+            self._settle("failed", Message("job.failed"), error=error_message(error))
+        else:
+            self._settle("done", Message("job.done"), result={"path": str(path)})
 
     @answered
     def mod_selection(self, firmware: str, selected: list, toggled: str, on: bool) -> list:
@@ -374,7 +507,7 @@ class Bridge:
 
     @answered
     def mod_build(
-        self, firmware: str, selected: list, key: str, output: str, logo=None
+        self, firmware: str, selected: list, key: str, output: str, logo=None, key_sync_range=1, key_sync_mode="harmonic", key_match_rules=key_match_service.DEFAULT_RULES, browse_column=13
     ) -> dict:
         """Start writing an autoexec.bin, and answer once it has started.
 
@@ -397,26 +530,37 @@ class Bridge:
                 raise LocalizedError("error.logoModule")
             frame = _logo_request(logo)
 
+        key_sync_range = keyshift_service.sync_range(key_sync_range)
+        key_sync_mode = keyshift_service.sync_mode(key_sync_mode)
+        key_match_rules = key_match_service.rules(key_match_rules)
+        browse_column = browse_columns_service.field(browse_column)
         self._claim("mod", Message("job.build"))
         stop = build_module.Cancellation()
         self._watch(stop.stop)
         threading.Thread(
             target=self._build,
-            args=(firmware, chosen, key_path, destination, frame, stop),
+            args=(firmware, chosen, key_path, destination, frame, stop, key_sync_range, key_sync_mode, key_match_rules, browse_column),
             daemon=True,
         ).start()
         return {"started": True}
 
-    def _build(self, firmware, chosen, key_path, destination, frame, stop) -> None:
+    def _build(self, firmware, chosen, key_path, destination, frame, stop, key_sync_range=1, key_sync_mode="harmonic", key_match_rules=key_match_service.DEFAULT_RULES, browse_column=13) -> None:
         """The build, off the calling thread. Every exit settles the slot."""
         try:
-            supplied = None
+            resolved = {module.patch_id for module in build_module.resolve_patches(
+                build_module.discover_patches(None, firmware), chosen)}
+            supplied = {}
+            if "key-sync" in resolved:
+                supplied["key-sync"] = keyshift_service.files(key_sync_range, key_sync_mode)
+            if "browse-columns" in chosen:
+                supplied["browse-columns"] = browse_columns_service.files(browse_column)
+            if "key-match" in resolved:
+                supplied["key-match"] = key_match_service.files(key_match_rules)
             if frame:
                 self._step(Message("job.logo"))
-                path, canvas, framing = frame
-                supplied = {
-                    logo_service.MODULE_ID: logo_service.files(path, canvas, **framing)
-                }
+                path, canvas, framing, invert = frame
+                supplied[logo_service.MODULE_ID] = logo_service.files(
+                    path, canvas, invert_light=invert, **framing)
             result = build_module.build_runtime(
                 firmware,
                 chosen,
@@ -472,6 +616,43 @@ class Bridge:
             "active": banks.active,
             "banks": [samples_service.describe(drive, name) for name in banks.names],
         }
+
+    @answered
+    def samples_draft_load(self, path):
+        from app.samples import drafts
+        return drafts.load(path)
+
+    @answered
+    def samples_draft_store(self, path, project):
+        from app.samples import drafts
+        return drafts.store(path, project)
+
+    @answered
+    def samples_draft_asset(self, path):
+        from app.samples import drafts
+        return drafts.asset(path)
+
+    @answered
+    def samples_push(self, path, project):
+        from app.samples import drafts
+        drafts.validate(project, exporting=True)
+        self._claim("samples", Message("job.bank"))
+        stopping = threading.Event()
+        self._watch(stopping.set)
+        def run():
+            def progress(done, count):
+                if stopping.is_set(): raise Cancelled(Message("job.cancelled"))
+                self._step(Message("job.sound", done=done, count=count), min(100, int(done*100/max(1,count))))
+            try:
+                drafts.push(path, project, progress)
+            except Cancelled:
+                self._settle("cancelled", Message("job.cancelled"))
+            except Exception as error:
+                self._settle("failed", Message("job.failed"), error=error_message(error))
+            else:
+                self._settle("done", Message("job.done"))
+        threading.Thread(target=run, daemon=True).start()
+        return {"started": True}
 
     @answered
     def samples_save(self, path: str, name: str, pads: list, options=None) -> dict:
@@ -592,7 +773,7 @@ class Bridge:
         them could only ever run at its defaults.
         """
         return logo_service.render(
-            pathlib.Path(path), canvas, **_framing(frame)
+            pathlib.Path(path), canvas, invert_light=_invert_light(frame), **_framing(frame)
         )
 
     # Separation -------------------------------------------------------------
@@ -611,6 +792,99 @@ class Bridge:
             raise LocalizedError("stems.importCollision")
         return track
 
+    def _wave_collection(self, drive):
+        destination = pathlib.Path(drive)
+        if self._library and (not self._library.source.is_dir() or
+                              self._library.source.resolve() == destination.resolve()):
+            return self._library.collection
+        from app.stems import rekordbox
+        return rekordbox.parse_drive(destination) if rekordbox.has_export(destination) else None
+
+    @answered
+    def stems_wave_settings(self, drive, format=None):
+        from app.stems import wave_conversion
+        return wave_conversion.status(pathlib.Path(drive), self._wave_collection(drive), format)
+
+    @answered
+    def stems_wave_choose(self, drive, format, fingerprint):
+        from app.stems import wave_settings
+        with self._lock:
+            if self._job["state"] == "running":
+                raise LocalizedError("error.busy")
+            return wave_settings.save(pathlib.Path(drive), format, fingerprint)
+
+    @answered
+    def stems_wave_convert(self, drive, format=None, fingerprint=None):
+        from app.stems import wave_conversion, wave_settings, safety, provisioning
+        safety.require_library_closed()
+        destination = pathlib.Path(drive)
+        if format is not None:
+            if wave_settings.fingerprint(destination) != fingerprint:
+                raise LocalizedError('stems.waveSettingsChanged')
+            selected = wave_settings.choice(destination)
+            if selected['format'] != format:
+                raise LocalizedError('stems.waveSelection')
+        collection = self._wave_collection(drive)
+        report = wave_conversion.status(destination, collection, format)
+        ids = {item['id'] for item in report['items'] if item['available']}
+        tracks = {str(t.location): t for p in (collection.playlists if collection else [])
+                  for t in p.tracks if t.track_id in ids}
+        if not tracks:
+            return {'started':False}
+        self._claim('stems', Message('stems.wavePreparing'))
+        control = processes.Control()
+        self._watch(control.cancel)
+        def run():
+            try:
+                with control.bind():
+                    ffmpeg = provisioning.detect().ffmpeg or 'ffmpeg'
+                    result = wave_conversion.run(list(tracks.values()), destination, format, fingerprint,
+                                                 ffmpeg, control.checkpoint, self._step)
+                self._settle('failed' if result['errors'] else 'done', Message('job.done'), result=result)
+            except processes.Cancelled:
+                self._settle('cancelled', Message('job.cancelled'))
+            except Exception as error:
+                self._settle('failed', Message('job.failed'), error=error_message(error))
+        threading.Thread(target=run, daemon=True).start()
+        return {'started':True}
+
+    @answered
+    def stems_waveform_status(self, playlist_id, output):
+        from app.stems import deferred_waveforms
+        if not output:
+            return []
+        return [{"id": track.track_id, "title": track.title, "artist": track.artist,
+                 "status": deferred_waveforms.status(track, pathlib.Path(output))}
+                for track in self._held().collection.playlist(playlist_id).tracks]
+
+    @answered
+    def stems_waveforms_start(self, playlist_id, output, track_id=None):
+        from app.stems import deferred_waveforms, provisioning, safety
+        safety.require_library_closed()
+        drive = pathlib.Path(output)
+        if not drive.is_dir():
+            raise LocalizedError("error.directory", path=output)
+        playlist = self._held().collection.playlist(playlist_id)
+        ffmpeg = provisioning.detect().ffmpeg or "ffmpeg"
+        self._claim("stems", Message("stems.wavePreparing"))
+        control = processes.Control()
+        self._watch(control.cancel)
+        def run():
+            try:
+                with control.bind():
+                    result = deferred_waveforms.run(playlist, drive, ffmpeg, control.checkpoint,
+                                                   lambda stage, value: self._step(stage, value), track_id=track_id)
+                if result["errors"]:
+                    self._settle("failed", Message("job.failed"), result=result)
+                else:
+                    self._settle("done", Message("job.done"), result=result)
+            except processes.Cancelled:
+                self._settle("cancelled", Message("job.cancelled"))
+            except Exception as error:
+                self._settle("failed", Message("job.failed"), error=error_message(error))
+        threading.Thread(target=run, daemon=True).start()
+        return {"started": True}
+
     @answered
     def stems_tracks(self, playlist_id):
         return [{"id": track.track_id, "title": track.title, "artist": track.artist}
@@ -621,6 +895,40 @@ class Bridge:
         from app.stems import importing
         self._stem_track(track_id)
         return importing.assignments(self._held(), track_id, values)
+
+    @answered
+    def stems_preview_open(self, drive, track_id, imported=False):
+        from app.stems import audition, importing, preview, provisioning
+        track = self._stem_track(track_id)
+        with self._preview_lock:
+            if self._preview:
+                self._preview.close()
+                self._preview = None
+            files, rejected = [], []
+            inputs = None
+            if imported:
+                inputs = importing.assignments(self._held(), track_id)
+            else:
+                files, _, rejected = audition.role_files(
+                    pathlib.Path(drive) / "RX3_STEMS", audition.export_stem(track.location.stem))
+            self._preview = preview.Preview(track.location, files[:2], inputs,
+                                            provisioning.detect().ffmpeg or "ffmpeg", streaming=True, verified=True)
+            return dict(self._preview.describe(), rejected=rejected)
+
+    @answered
+    def stems_preview_chunk(self, token, first):
+        with self._preview_lock:
+            if not self._preview or self._preview.token != token:
+                return None
+            return self._preview.chunk(first)
+
+    @answered
+    def stems_preview_close(self, token):
+        with self._preview_lock:
+            if self._preview and self._preview.token == token:
+                self._preview.close()
+                self._preview = None
+            return True
 
     @answered
     def stems_audition(self, drive, track_id, selection, start=0, seconds=30):
@@ -638,7 +946,7 @@ class Bridge:
                                  provisioning.detect().ffmpeg or "ffmpeg")
 
     @answered
-    def stems_import_start(self, track_id, output):
+    def stems_import_start(self, track_id, output, waveforms=True):
         from app.stems import importing, safety, provisioning
         safety.require_library_closed()
         track = self._stem_track(track_id)
@@ -648,20 +956,63 @@ class Bridge:
         inputs = importing.assignments(self._held(), track_id)
         ffmpeg = provisioning.detect().ffmpeg or "ffmpeg"
         self._claim("stems", Message("stems.importChecking"))
-        cancelled = threading.Event()
-        self._watch(cancelled.set)
-        def checkpoint():
-            if cancelled.is_set():
-                raise Cancelled()
+        control = processes.Control()
+        self._watch(control.cancel)
         def run():
             try:
-                entry = importing.publish(track, inputs, drive, ffmpeg, checkpoint)
+                with control.bind():
+                    control.checkpoint()
+                    entry = importing.publish(track, inputs, drive, ffmpeg, control.checkpoint, waveforms=bool(waveforms))
                 self._settle("done", Message("job.done"), result={"imported": entry})
-            except Cancelled:
+            except processes.Cancelled:
                 self._settle("cancelled", Message("job.cancelled"))
             except Exception as error:
                 self._settle("failed", Message("job.failed"), error=error_message(error))
         threading.Thread(target=run, daemon=True).start()
+        return {"started": True}
+
+    @answered
+    def stems_migration_status(self, output):
+        from app.stems import migration, package
+        from app.stems.rekordbox import export_stem
+        directory = pathlib.Path(output) / "RX3_STEMS"
+        by_base = {}
+        library = self._library
+        if library and library.source.is_dir() and library.source.resolve() != pathlib.Path(output).resolve():
+            library = None
+        for playlist in (library.collection.playlists if library else []):
+            for track in playlist.tracks:
+                by_base.setdefault(export_stem(track.location.stem).casefold(), {})[str(track.location)] = track
+        items = []
+        for path in sorted(directory.glob("*.rx3stem")):
+            if package.is_package(path):
+                continue
+            matches = list(by_base.get(path.stem.casefold(), {}).values())
+            track = matches[0] if len(matches) == 1 else None
+            valid = bool(track and track.location.is_file())
+            if valid:
+                try:
+                    valid = bool(migration.legacy_files(track, pathlib.Path(output)))
+                except LocalizedError:
+                    valid = False
+            items.append({"id": track.track_id if valid else "", "title": track.title if track else path.stem,
+                          "artist": track.artist if track else "", "available": valid})
+        return {"items": items}
+
+    @answered
+    def stems_migrate(self, track_ids, output, add_drums=False):
+        """Older clients enter the same fixed three-stem preparation pipeline."""
+        destination = pathlib.Path(output)
+        if not destination.is_dir():
+            raise LocalizedError("error.directory", path=output)
+        tracks = tuple(self._stem_track(key) for key in dict.fromkeys(track_ids))
+        if not tracks:
+            return {"started": False}
+        job = stems_service.job(self._held(), None, destination, tracks=tracks,
+                                observer=lambda state: self._step(Message("job.separate"), state.get("progress"), state))
+        self._claim("stems", Message("job.separate"))
+        self._watch(job.cancel)
+        threading.Thread(target=self._separate, args=(job,), daemon=True).start()
         return {"started": True}
 
     @answered
@@ -713,29 +1064,35 @@ class Bridge:
         return library
 
     @answered
-    def stems_qualities(self) -> dict:
-        return stems_service.qualities()
+    def stems_qualities(self, roles=("vocals",)) -> dict:
+        return stems_service.qualities(roles)
 
     @answered
-    def stems_choose(self, mode=None, accelerator=None) -> dict:
-        return stems_service.choose(mode or None, accelerator or None)
+    def stems_choose(self, mode=None, accelerator=None, roles=("vocals",)) -> dict:
+        return stems_service.choose(mode or None, accelerator or None, roles)
 
     @answered
-    def stems_forecast(self, playlist_id: str, roles=("vocals",)) -> dict:
+    def stems_forecast(self, playlist_id: str, roles=("vocals",), waveforms=True) -> dict:
         return stems_service.forecast(
-            self._held(), playlist_id, stems_service.settings(), roles)
+            self._held(), playlist_id, stems_service.settings(), roles, bool(waveforms))
 
     @answered
     def stems_install(self, accelerator: str = "auto") -> dict:
         self._claim("runtime", Message("job.runtime"))
+        control = processes.Control()
+        self._watch(control.cancel)
         threading.Thread(
-            target=self._provision, args=(accelerator,), daemon=True
+            target=self._provision, args=(accelerator, control), daemon=True
         ).start()
         return {"started": True}
 
-    def _provision(self, accelerator) -> None:
+    def _provision(self, accelerator, control) -> None:
         try:
-            stems_service.install(accelerator, progress=lambda line: self._step(Message("job.runtime"), detail={"diagnostic": line}))
+            with control.bind():
+                control.checkpoint()
+                stems_service.install(accelerator, progress=lambda line: self._step(Message("job.runtime"), detail={"diagnostic": line}))
+        except processes.Cancelled:
+            self._settle("cancelled", Message("job.cancelled"))
         except Exception as error:
             detail = error_message(error)
             self._settle("failed", Message("job.failed"), error=detail)
@@ -743,7 +1100,7 @@ class Bridge:
             self._settle("done", Message("job.done"), result={"runtime": True})
 
     @answered
-    def stems_start(self, playlist_id: str, output: str, roles: list) -> dict:
+    def stems_start(self, playlist_id: str, output: str, roles: list, waveforms=True, overcue_compatible=False) -> dict:
         """Start separating one playlist into the files a deck reads."""
         library = self._held()
         destination = pathlib.Path(output)
@@ -754,7 +1111,8 @@ class Bridge:
         # machine is the answer to the button rather than a job that fails.
         job = stems_service.job(
             library, playlist_id, destination,
-            settings=stems_service.settings(), roles=wanted,
+            settings=stems_service.settings(), roles=wanted, waveforms=bool(waveforms),
+            overcue_compatible=bool(overcue_compatible),
             observer=lambda state: self._step(
                 Message("job.separate"), state.get("progress"), state,
             ),

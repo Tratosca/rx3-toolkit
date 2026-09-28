@@ -1,0 +1,1975 @@
+{
+  "fixture": true,
+  "renderer": "pywebview native",
+  "page": "file://app/ui/web/index.html",
+  "matrix": [
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "import",
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "import",
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "import",
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "import",
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "import",
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "import",
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "import",
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "import",
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "Text contrast on designed surfaces",
+      "passed": true
+    },
+    {
+      "name": "56 rendered configurations including import view",
+      "passed": true
+    },
+    {
+      "name": "Module focus survives selection",
+      "passed": true
+    },
+    {
+      "name": "Destructive default focus is Cancel",
+      "passed": true
+    },
+    {
+      "name": "No deletion before confirmation",
+      "passed": true
+    },
+    {
+      "name": "Cancel preserves deletion boundary",
+      "passed": true
+    },
+    {
+      "name": "Dialog restores invoking focus",
+      "passed": true
+    },
+    {
+      "name": "Progress 23",
+      "passed": true
+    },
+    {
+      "name": "Progress None",
+      "passed": true
+    },
+    {
+      "name": "Drive error is inline",
+      "passed": true
+    },
+    {
+      "name": "Drive retry recovers",
+      "passed": true
+    },
+    {
+      "name": "Confirmed deletion sent once",
+      "passed": true
+    },
+    {
+      "name": "No key deletion before confirmation",
+      "passed": true
+    },
+    {
+      "name": "Confirmed key deletion has no arguments",
+      "passed": true
+    },
+    {
+      "name": "Consent is unchecked and download disabled",
+      "passed": true
+    },
+    {
+      "name": "Consent becomes available only after scrolling",
+      "passed": true
+    },
+    {
+      "name": "Fetch receives explicit true",
+      "passed": true
+    },
+    {
+      "name": "Build keeps all nine positional arguments",
+      "passed": true
+    },
+    {
+      "name": "Draft survives discarded navigation",
+      "passed": true
+    },
+    {
+      "name": "Save keeps pad and option contracts",
+      "passed": true
+    },
+    {
+      "name": "Import keeps track and destination arguments",
+      "passed": true
+    },
+    {
+      "name": "No horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "Minimum hit targets",
+      "passed": true
+    },
+    {
+      "name": "All visible form controls labeled",
+      "passed": true
+    },
+    {
+      "name": "All displayed keys resolved",
+      "passed": true
+    },
+    {
+      "name": "No uncaught browser errors",
+      "passed": true
+    }
+  ],
+  "contrast": [
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "body",
+      "ratio": 15.457,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "canvas",
+      "ratio": 16.83,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "sidebar",
+      "ratio": 14.274,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "raised",
+      "ratio": 16.83,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "accent-soft",
+      "ratio": 14.519,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "body",
+      "ratio": 6.092,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "canvas",
+      "ratio": 6.633,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "sidebar",
+      "ratio": 5.626,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "raised",
+      "ratio": 6.633,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "accent-soft",
+      "ratio": 5.722,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "on-accent",
+      "background": "accent",
+      "ratio": 5.985,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "good",
+      "background": "good-soft",
+      "ratio": 6.141,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "warning",
+      "background": "warning-soft",
+      "ratio": 5.986,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "danger",
+      "background": "danger-soft",
+      "ratio": 5.933,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "on-danger",
+      "background": "danger-fill",
+      "ratio": 6.574,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "body",
+      "ratio": 15.626,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "canvas",
+      "ratio": 12.8,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "sidebar",
+      "ratio": 14.23,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "raised",
+      "ratio": 11.074,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "accent-soft",
+      "ratio": 10.59,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "body",
+      "ratio": 8.619,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "canvas",
+      "ratio": 7.06,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "sidebar",
+      "ratio": 7.849,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "raised",
+      "ratio": 6.108,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "accent-soft",
+      "ratio": 5.841,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "on-accent",
+      "background": "accent",
+      "ratio": 5.487,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "good",
+      "background": "good-soft",
+      "ratio": 7.516,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "warning",
+      "background": "warning-soft",
+      "ratio": 7.839,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "danger",
+      "background": "danger-soft",
+      "ratio": 7.658,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "on-danger",
+      "background": "danger-fill",
+      "ratio": 7.135,
+      "passed": true
+    }
+  ],
+  "browserErrors": [],
+  "calls": [
+    {
+      "operation": "localization_catalogs",
+      "args": []
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "mod_firmwares",
+      "args": []
+    },
+    {
+      "operation": "mod_modules",
+      "args": [
+        "1.19"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "decoder-sleep",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "decoder-sleep"
+        ],
+        "beatjump-32bars",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "decoder-sleep"
+        ],
+        "beatjump-no-quantize",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "decoder-sleep"
+        ],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "core",
+          "decoder-sleep",
+          "keyshift"
+        ],
+        "stems",
+        true
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "samples_defaults",
+      "args": []
+    },
+    {
+      "operation": "logo_limits",
+      "args": []
+    },
+    {
+      "operation": "logo_canvases",
+      "args": []
+    },
+    {
+      "operation": "stems_qualities",
+      "args": []
+    },
+    {
+      "operation": "stems_runtime",
+      "args": []
+    },
+    {
+      "operation": "stems_library_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_read",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_library_status",
+      "args": []
+    },
+    {
+      "operation": "stems_library",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        null
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "pick_file",
+      "args": [
+        "image",
+        ""
+      ]
+    },
+    {
+      "operation": "logo_open",
+      "args": [
+        "/UI-fixture/image.svg"
+      ]
+    },
+    {
+      "operation": "logo_render",
+      "args": [
+        "/UI-fixture/image.svg",
+        "classic",
+        {
+          "invertLight": true,
+          "mode": "contain",
+          "zoom": 1,
+          "offsetX": 0,
+          "offsetY": 0
+        }
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        null
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "en"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        null
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        null
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "en"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        null
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "core",
+          "decoder-sleep",
+          "keyshift",
+          "stems"
+        ],
+        "decoder-sleep",
+        false
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_read",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_remove",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_read",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_key_forget",
+      "args": []
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_key_fetch",
+      "args": [
+        true
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "stems"
+        ],
+        "logo",
+        true
+      ]
+    },
+    {
+      "operation": "mod_build",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "logo",
+          "stems"
+        ],
+        "/UI-fixture/retained-key",
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "path": "/UI-fixture/image.svg",
+          "canvas": "classic",
+          "mode": "contain",
+          "zoom": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "invertLight": true
+        },
+        1,
+        "identical",
+        3,
+        13
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_read",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_save",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "Demo",
+        [
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#87A5FF",
+            "name": "Edited sample",
+            "mode": 0,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#E4A767",
+            "name": "Sample 2",
+            "mode": 1,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#9BD8C1",
+            "name": "Sample 3",
+            "mode": 2,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#C3ACE7",
+            "name": "Sample 4",
+            "mode": 3,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#87A5FF",
+            "name": "Sample 5",
+            "mode": 0,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#E4A767",
+            "name": "Sample 6",
+            "mode": 1,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#9BD8C1",
+            "name": "Sample 7",
+            "mode": 2,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          },
+          {
+            "source": null,
+            "keep": true,
+            "colour": "#C3ACE7",
+            "name": "Sample 8",
+            "mode": 3,
+            "gain": 100,
+            "start": 0,
+            "duration": 2.5
+          }
+        ],
+        {
+          "volume": 50,
+          "shiftSilence": true,
+          "activate": true
+        }
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "samples_read",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "pick_files",
+      "args": [
+        "stem",
+        ""
+      ]
+    },
+    {
+      "operation": "stems_import_assign",
+      "args": [
+        "1",
+        {
+          "vocals": "/UI-fixture/audio.wav"
+        }
+      ]
+    },
+    {
+      "operation": "stems_audition",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        {
+          "mask": "original",
+          "state": null
+        },
+        0,
+        30
+      ]
+    },
+    {
+      "operation": "stems_library_status",
+      "args": []
+    },
+    {
+      "operation": "stems_import_start",
+      "args": [
+        "1",
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    }
+  ],
+  "status": "complete"
+}

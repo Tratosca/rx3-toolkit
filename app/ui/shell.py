@@ -88,6 +88,9 @@ def self_test() -> None:
 
     from app.localization import catalogs
     catalogs()  # Refuse a bundle missing its translation resources.
+    from app.firmware import key_source
+    key_source.load_source()  # And one that could not say where the key comes from.
+    import inflate64  # noqa: F401  The package cannot be read without it.
     surface = bridge.Bridge()
     names = bridge.operations(surface)
     if not names:
@@ -129,6 +132,7 @@ def main() -> None:
     # The choosers are the window's, and there is no other way to turn what an
     # operator picked into a path the services can open.
     surface._attach(window)
+    window.events.closing += surface._on_closing
     # Retain local editor preferences (logo framing and language) between runs.
     webview.start(private_mode=False,
                   storage_path=str(pathlib.Path.home() / ".rx3-toolbox" / "webview"))

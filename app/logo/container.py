@@ -348,16 +348,20 @@ class Logo:
     # True when the artwork is too dark to read against the deck's own dark
     # background. The logo is written anyway; this only lets the caller say so.
     faint: bool
-    # False when the artwork needed no separate light form, which is why `light`
-    # then repeats `dark`.
+    # False when the light form repeats `dark`: the artwork needed none, or the
+    # operator chose to keep it as it is on a light screen.
     themed: bool
 
 
-def encode(image, geometry: Geometry = CLASSIC, **frame) -> Logo:
-    """Frame artwork and write both theme variants of the container."""
+def encode(image, geometry: Geometry = CLASSIC, *, invert_light: bool = True, **frame) -> Logo:
+    """Frame artwork and write both theme variants of the container.
+
+    `invert_light=False` writes the dark form under both names, for artwork
+    whose greys are meant to stay as drawn on a light screen.
+    """
     ink = fit_ink(image, geometry, **frame)
     dark = pack_canvas(pad_canvas(ink, geometry), geometry)
-    light = light_ink(ink)
+    light = light_ink(ink) if invert_light else None
     return Logo(
         geometry=geometry,
         dark=dark,

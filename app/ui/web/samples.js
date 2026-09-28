@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //
-// The pad editor. It holds one bank in memory, compares it against what the
-// drive last said, and writes nothing until the operator saves. Every limit it
-// obeys arrives from samples_defaults(), so the deck's numbers are stated once,
+// The pad editor autosaves local projects; only an explicit export writes USB.
+// Every limit it obeys arrives from samples_defaults(), so the deck's numbers are stated once,
 // in Python, beside the code that enforces them.
 
 (function () {
@@ -15,6 +14,53 @@
   var active = null;
   var bank = null;      // what is being edited
   var saved = null;     // the same bank as the drive last described it
+  var project=null, entry=null, persisting=null, pending=null, persisted="", localError=false, pushing=false, switching=false;
+  function draftKey(path){return "rx3.samples.draft:"+path;}
+  function projectDirty(){return project && (project.deleted.length || project.active!==project.savedActive || project.entries.some(e=>JSON.stringify(e.value)!==JSON.stringify(e.saved)));}
+  function stash(){
+    if(!project || !drive || switching || pushing)return;
+    var text=JSON.stringify(project);
+    if(text===persisted)return;
+    try{localStorage.setItem(draftKey(drive),text);}catch(error){}
+    pending={path:drive,text:text};localError=false;
+    if(!persisting) persisting=drain();
+  }
+  async function drain(){
+    while(pending){
+      var item=pending;pending=null;
+      var ok=await window.rx3.ask("samples_draft_store",item.path,JSON.parse(item.text));
+      if(!ok){localError=true;pending=null;break;}
+      if(item.path===drive)persisted=item.text;
+      try{if(localStorage.getItem(draftKey(item.path))===item.text)localStorage.removeItem(draftKey(item.path));}catch(error){}
+    }
+    persisting=null;drawSync();
+  }
+  async function flush(){stash();if(persisting)await persisting;return !localError;}
+  function drawSync(){
+    var warning=document.getElementById("samples-sync");
+    var unsent=projectDirty();
+    warning.hidden=!project;
+    warning.textContent=t(localError ? "samples.localError" : persisting ? "samples.localSaving" : unsent ? "samples.localOnly" : "samples.synced");
+    warning.className="notice"+(unsent || localError ? " warn" : "");
+    document.getElementById("samples-local-retry").hidden=!localError;
+    document.getElementById("bank-save").disabled=!drive || !unsent || !!persisting || localError || pushing;
+    document.getElementById("samples-editor").inert=pushing || switching;
+    var tag=document.getElementById("tag-samples");tag.hidden=!unsent;tag.textContent=t("samples.pendingTag");tag.title=t("samples.localOnly");
+  }
+  function chooseEntry(id){
+    stopAudition();audioCache.clear();
+    entry=project.entries.find(e=>e.id===id)||project.entries[0];
+    if(!entry){entry={id:String(Date.now())+"-"+Math.random(),value:emptyBank(freeName()),saved:null};project.entries.push(entry);project.active=entry.id;}
+    bank=entry.value;saved=entry.saved;project.selected=entry.id;
+    banks=project.entries.map(e=>e.value);
+    var selected=project.entries.find(e=>e.id===project.active);active=selected ? selected.value.name : null;
+    chosen=0;
+    document.getElementById("bank-name").value=bank.name;
+    document.getElementById("bank-volume").value=bank.volume;
+    document.getElementById("bank-volume-value").textContent=t("unit.percent",{value:bank.volume});
+    document.getElementById("shift-silence").checked=bank.shiftSilence;
+    drawBankPicker();redraw();
+  }
   var simulate = false;
   var chosen = 0;       // which pad the inspector is showing
 
@@ -89,8 +135,10 @@
 
   // Drawing -------------------------------------------------------------------
 
-  function drawGrid() {
+  function drawGrid() { if (window.ui) window.ui.preserve(drawGridContent); else drawGridContent(); }
+  function drawGridContent() {
     var grid = document.getElementById("pad-grid");
+    grid.setAttribute("role", simulate ? "group" : "radiogroup");
     grid.replaceChildren();
     for (var i = 0; i < bank.pads.length; i++) {
       grid.append(drawPad(i));
@@ -104,7 +152,27 @@
     var pad = bank.pads[index];
     var tile = el("button", "pad" + (filled(pad) ? "" : " empty"));
     tile.type = "button";
-    tile.setAttribute("aria-selected", String(index === chosen));
+    tile.id = "sample-pad-" + index;
+    if (!simulate) {
+      tile.setAttribute("role", "radio");
+      tile.setAttribute("aria-checked", String(index === chosen));
+      tile.tabIndex = index === chosen ? 0 : -1;
+    }
+    tile.addEventListener("keydown", function (event) {
+      if (simulate && pad.mode === 1 && [" ", "Enter"].includes(event.key) && !event.repeat) {
+        event.preventDefault(); hear(pad, true);
+      } else if (!simulate && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End"].includes(event.key)) {
+        event.preventDefault();
+        var offset = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : event.key === "ArrowUp" ? -4 : 4;
+        chosen = event.key === "Home" ? 0 : event.key === "End" ? bank.pads.length - 1 : (index + offset + bank.pads.length) % bank.pads.length;
+        stopAudition(); drawGrid(); drawInspector();
+        document.getElementById("sample-pad-" + chosen).focus({preventScroll:true});
+      }
+    });
+    tile.addEventListener("keyup", function (event) {
+      if (simulate && pad.mode === 1 && [" ", "Enter"].includes(event.key)) { event.preventDefault(); stopPad(pad); }
+    });
+    tile.addEventListener("blur", function () { if (simulate && pad.mode === 1) stopPad(pad); });
     tile.style.setProperty("--pad-colour", pad.colour);
     tile.addEventListener("pointerdown", function (event) {
       if (simulate && pad.mode === 1) {
@@ -116,6 +184,11 @@
     tile.addEventListener("click", function () {
       if (simulate) { if (pad.mode !== 1) hear(pad, false); return; }
       stopAudition(); chosen = index; drawGrid(); drawInspector();
+      if (!filled(pad)) {
+        var inspector = document.getElementById("inspector"), picker = document.getElementById("sample-pick");
+        if (inspector.scrollIntoView) inspector.scrollIntoView({block:"nearest"});
+        if (picker.focus) picker.focus({preventScroll:true});
+      }
     });
 
     tile.append(el("span", "index", String(index + 1)));
@@ -135,34 +208,39 @@
     return tile;
   }
 
-  function drawInspector() {
+  function drawInspector() { if (window.ui) window.ui.preserve(drawInspectorContent); else drawInspectorContent(); }
+  function drawInspectorContent() {
     var panel = document.getElementById("inspector");
+    panelField = 0;
     panel.replaceChildren();
     var pad = bank.pads[chosen];
 
     panel.append(el("h2", null, t("samples.padTitle", {index: chosen + 1})));
 
     var sound = el("div", "row");
-    sound.style.marginTop = "14px";
+    sound.style.marginTop = "var(--s4)";
     var pick = el("button", "btn small", pad.source || pad.keep
       ? t("common.change") : t("samples.addSound"));
     pick.type = "button";
+    pick.id = "sample-pick";
     pick.addEventListener("click", chooseSound);
     sound.append(pick);
-    sound.append(el("span", "path num",
+    sound.append(el("span", "path num" + (pad.sourceName ? "" : " unset"),
       pad.sourceName || (pad.keep ? t("samples.kept") : t("samples.empty"))));
     panel.append(sound);
 
+    var excerpt = el("div","excerpt-controls");
+    if (filled(pad)) excerpt.append(field(t("samples.trim"), trimRow(pad), t("ui.excerptStart") + ". " + t("samples.trimHint")));
+    excerpt.append(field(t("samples.hear"), hearRow(pad), t("samples.hearHint"))); panel.append(excerpt);
+    panel.append(field(t("samples.mode"), modeRow(pad), t(MODE_HINTS[pad.mode])));
     panel.append(field(t("samples.padName"), nameInput(pad)));
     panel.append(field(t("samples.colour"), colourRow(pad), t("samples.colourHint")));
-    panel.append(field(t("samples.mode"), modeRow(pad), t(MODE_HINTS[pad.mode])));
-    if (filled(pad)) panel.append(field(t("samples.trim"), trimRow(pad), t("samples.trimHint")));
-    panel.append(field(t("samples.hear"), hearRow(pad), t("samples.hearHint")));
     panel.append(field(t("samples.gain"), gainRow(pad), t("samples.gainHint")));
 
     var clear = el("button", "btn small quiet", t("samples.clear"));
     clear.type = "button";
-    clear.style.marginTop = "18px";
+    clear.id = "sample-clear";
+    clear.style.marginTop = "var(--s5)";
     clear.disabled = !filled(pad) && !pad.name;
     clear.addEventListener("click", function () {
       stopPad(pad);
@@ -172,15 +250,35 @@
     panel.append(clear);
   }
 
+  var panelField = 0;
   function field(label, control, hint) {
+    panelField++;
     var block = el("div");
-    block.style.marginTop = "18px";
-    block.append(el("label", null, label));
-    control.style.marginTop = "8px";
+    block.style.marginTop = "var(--s5)";
+    block.className = "form-field";
+    var caption = el("label", null, label);
+    function firstInput(node) {
+      if (/^(INPUT|SELECT)$/.test(node.tagName) && node.type !== "color") return node;
+      for (var child of node.children || []) { var found = firstInput(child); if (found) return found; }
+      return null;
+    }
+    var input = firstInput(control);
+    if (input) {
+      if (!input.id) input.id = "sample-field-" + panelField;
+      caption.htmlFor = input.id;
+    } else {
+      caption.id = "sample-label-" + panelField;
+      control.setAttribute("role", "group");
+      control.setAttribute("aria-labelledby", caption.id);
+    }
+    block.append(caption);
+    control.style.marginTop = "var(--s2)";
     block.append(control);
     if (hint) {
       var note = el("p", "dim", hint);
-      note.style.marginTop = "6px";
+      note.style.marginTop = "var(--s2)";
+      note.id = "sample-help-" + panelField;
+      (input || control).setAttribute("aria-describedby", note.id);
       block.append(note);
     }
     return block;
@@ -189,6 +287,7 @@
   function nameInput(pad) {
     var input = document.createElement("input");
     input.type = "text";
+    input.id = "sample-name";
     input.value = pad.name;
     input.maxLength = limits.nameMaxChars;
     input.placeholder = t("samples.padNamePlaceholder");
@@ -208,6 +307,7 @@
     }
     var custom = document.createElement("input");
     custom.type = "color";
+    custom.id = "sample-color";
     custom.value = pad.colour;
     custom.setAttribute("aria-label", t("samples.colourOther"));
     custom.addEventListener("input", function () {
@@ -223,7 +323,8 @@
     button.type = "button";
     button.style.background = colour;
     button.setAttribute("aria-pressed", String(pad.colour.toUpperCase() === colour));
-    button.setAttribute("aria-label", colour);
+    button.setAttribute("data-focus", "swatch-" + colour);
+    button.setAttribute("aria-label", t("ui.colorValue", {color:colour}));
     button.addEventListener("click", function () {
       pad.colour = colour;
       redraw();
@@ -235,10 +336,11 @@
     var row = el("div", "row");
     var slider = document.createElement("input");
     slider.type = "range";
+    slider.id = "sample-gain";
     slider.min = "0";
     slider.max = String(limits.gainMax);
     slider.value = String(pad.gain);
-    slider.style.maxWidth = "200px";
+    slider.style.maxWidth = "var(--range-width)";
     var readout = el("span", "num", t("unit.percent", {value:pad.gain}));
     slider.addEventListener("input", function () {
       pad.gain = Number(slider.value);
@@ -248,6 +350,7 @@
     });
     var reset = el("button", "btn small quiet", t("samples.gainReset"));
     reset.type = "button";
+    reset.id = "sample-gain-reset";
     reset.addEventListener("click", function () {
       pad.gain = limits.gainUnity;
       redraw();
@@ -261,9 +364,10 @@
     function input(label, value, maximum, change) {
       var wrapper = el("label", null, label + " ");
       var control = document.createElement("input");
+      control.id = "sample-trim-" + row.children.length;
       control.type = "number"; control.min = "0"; control.step = "0.01";
       control.max = String(maximum); control.value = String(value);
-      control.style.width = "90px";
+      control.style.width = "var(--number-width)";
       control.addEventListener("change", function () {
         var number = Number(control.value);
         if (!Number.isFinite(number)) return;
@@ -305,8 +409,14 @@
     if (window.rx3mock) window.rx3mock.setPads(bank.pads, chosen,
       bank.pads.map(function (pad, i) { return voices.has(pad) ? i : -1; }));
     var tiles = document.getElementById("pad-grid").children;
-    for (var i = 0; i < tiles.length; i++)
-      tiles[i].setAttribute("aria-pressed", String(voices.has(bank.pads[i])));
+    for (var i = 0; i < tiles.length; i++) {
+      tiles[i].setAttribute("data-playing", String(voices.has(bank.pads[i])));
+      if (simulate) {
+        tiles[i].setAttribute("aria-pressed", String(voices.has(bank.pads[i])));
+        tiles[i].setAttribute("aria-label", t("samples.padTitle",{index:i+1}) + " · " + (bank.pads[i].name || t("samples.empty")) + (voices.has(bank.pads[i]) ? " · " + t("ui.playing") : ""));
+      }
+      else if (tiles[i].removeAttribute) tiles[i].removeAttribute("aria-pressed");
+    }
   }
 
   function stopPad(pad) {
@@ -393,6 +503,7 @@
     var button = el("button", "btn small",
       playing(pad) && (pad.mode === 2 || pad.mode === 3) ? t("samples.hearStop") : t("samples.hearPlay"));
     button.type = "button";
+    button.id = "sample-audition";
     button.disabled = !(pad.source || pad.audioPath);
     if (pad.mode === 1) {
       button.addEventListener("pointerdown", function (event) {
@@ -422,6 +533,7 @@
   function modeButton(pad, mode) {
     var button = el("button", null, t(MODE_KEYS[mode]));
     button.type = "button";
+    button.id = "sample-mode-" + mode;
     button.setAttribute("aria-pressed", String(pad.mode === mode));
     button.addEventListener("click", function () {
       stopAudition();
@@ -434,16 +546,13 @@
   function state() {
     var pill = document.getElementById("bank-state");
     var unsaved = dirty();
-    pill.textContent = !bank.onDrive ? t("samples.isNew")
-      : unsaved ? t("samples.dirty") : t("samples.clean");
-    pill.className = "pill " + (unsaved || !bank.onDrive ? "off" : "on");
-
-    document.getElementById("bank-note").textContent =
-      !bank.settingsOk ? t("samples.settingsBad")
-      : unsaved ? t("samples.nothingYet") : "";
-    document.getElementById("bank-activate").disabled =
-      !bank.onDrive || unsaved || active === bank.name;
-    document.getElementById("bank-delete").disabled = !bank.onDrive;
+    pill.textContent=t(unsaved ? "samples.isNew" : "samples.clean");
+    pill.className="pill "+(unsaved ? "off" : "on");
+    document.getElementById("bank-note").textContent=!bank.settingsOk ? t("samples.settingsBad") : "";
+    document.getElementById("bank-activate").disabled=!entry || project.active===entry.id;
+    document.getElementById("bank-delete").disabled=!entry;
+    document.getElementById("bank-active").textContent=active ? t("ui.activeBank",{name:active}) : "";
+    stash();drawSync();
 
     var shift = document.getElementById("cap-shift");
     var known = capabilities.shift_silence === "ready";
@@ -460,15 +569,13 @@
   function drawBankPicker() {
     var picker = document.getElementById("bank-pick");
     picker.replaceChildren();
-    for (var i = 0; i < banks.length; i++) {
-      var option = document.createElement("option");
-      option.value = option.textContent =
-        banks[i].name + (banks[i].name === active ? " *" : "");
-      option.value = banks[i].name;
-      picker.append(option);
-    }
-    picker.hidden = !banks.length;
-    picker.value = bank && bank.onDrive ? bank.name : "";
+    if(!project)return;
+    project.entries.forEach(function(item){
+      var option=document.createElement("option");option.value=item.id;
+      option.textContent=item.value.name+(item.id===project.active ? t("ui.activeSuffix") : "");picker.append(option);
+    });
+    picker.hidden=!project.entries.length;
+    picker.value=entry ? entry.id : "";
   }
 
   // Doing ---------------------------------------------------------------------
@@ -487,7 +594,9 @@
       }
       var pad = bank.pads[at];
       stopAudition();
-      pad.source = source.path;
+      var local=await window.rx3.ask("samples_draft_asset",source.path);
+      if(!local)continue;
+      pad.source = local;
       pad.audioPath = null;
       pad.start = 0;
       pad.sourceSeconds = source.seconds;
@@ -499,57 +608,52 @@
       pad.gain = limits.gainUnity;
       at += 1;
     }
-    chosen = Math.min(at, limits.padCount - 1);
+    var first = chosen;
     redraw();
-  }
-
-  function payload() {
-    return bank.pads.map(function (pad) {
-      return {
-        source: pad.source, keep: pad.keep && !pad.source,
-        colour: pad.colour, name: pad.name, mode: pad.mode, gain: pad.gain,
-        start: pad.start, duration: pad.seconds,
-      };
-    });
+    if (at > first) document.getElementById("bank-note").textContent = t(at-first === 1 ? "ui.sampleAdded" : "ui.samplesAdded", {first:first+1,last:at});
   }
 
   async function save() {
-    var started = await window.rx3.ask("samples_save", drive, bank.name, payload(), {
-      volume: bank.volume,
-      shiftSilence: bank.shiftSilence,
-      activate: !active || active === bank.name,
+    if(pushing || !project || !(await flush()))return;
+    if(pushing)return;
+    pushing=true;drawSync();
+    var started=await window.rx3.ask("samples_push",drive,copy(project));
+    if(!started){pushing=false;drawSync();return;}
+    window.rx3.watchJob(async function(result){
+      pushing=false;
+      // Failure/cancellation keeps the local project and its pending USB state.
+      if(result && result.state && result.state!=="done"){drawSync();return;}
+      await reload();
     });
-    if (started) window.rx3.watchJob(reload);
   }
 
-  async function reload(keepName) {
-    stopAudition();
-    audioCache.clear();
-    if (!drive) return;
-    var answer = await window.rx3.ask("samples_read", drive);
-    if (!answer) return;
-    banks = answer.banks;
-    active = answer.active;
-    var wanted = typeof keepName === "string" ? keepName : (bank ? bank.name : active);
-    var found = null;
-    for (var i = 0; i < banks.length; i++) if (banks[i].name === wanted) found = banks[i];
-    if (!found && banks.length) found = banks[0];
-    bank = found ? fromDrive(found) : emptyBank(freeName());
-    saved = copy(bank);
-    chosen = 0;
-    document.getElementById("bank-name").value = bank.name;
-    document.getElementById("bank-volume").value = bank.volume;
-    document.getElementById("bank-volume-value").textContent = bank.volume;
-    document.getElementById("shift-silence").checked = bank.shiftSilence;
-    drawBankPicker();
-    redraw();
+  async function reload() {
+    var path=drive;switching=true;drawSync();
+    var answer=await window.rx3.ask("samples_draft_load",path);
+    if(path!==drive)return;
+    switching=false;
+    if(!answer){drawSync();return;}
+    project=answer.project;
+    var recovered=null;
+    try{recovered=JSON.parse(localStorage.getItem(draftKey(path))||"null");}catch(error){}
+    if(recovered)project=recovered;
+    if(!project){
+      project={version:1,entries:[],active:null,savedActive:null,deleted:[],selected:null};
+      (answer.banks||[]).forEach(function(described,index){
+        var value=fromDrive(described),id="bank-"+index;
+        project.entries.push({id:id,value:value,saved:copy(value)});
+        if(described.name===answer.active)project.active=project.savedActive=id;
+      });
+    }
+    persisted=answer.project && !recovered ? JSON.stringify(answer.project) : "";
+    localError=false;chooseEntry(project.selected||project.active);
   }
 
   function freeName() {
     for (var n = 1; ; n++) {
-      var candidate = "bank" + n;
+      var candidate = t("ui.bankDefault", {count:n});
       var taken = false;
-      for (var i = 0; i < banks.length; i++) if (banks[i].name === candidate) taken = true;
+      for (var i = 0; project && i < project.entries.length; i++) if (project.entries[i].value.name === candidate) taken = true;
       if (!taken) return candidate;
     }
   }
@@ -565,8 +669,20 @@
     window.addEventListener("pointerup", releaseHeld);
     window.addEventListener("pointercancel", releaseHeld);
     window.addEventListener("blur", stopAudition);
+    function setPadMode(play) {
+      stopAudition(); simulate=play; document.getElementById("samples-simulate").checked=play;
+      document.getElementById("samples-edit").setAttribute("aria-pressed",String(!play));
+      document.getElementById("samples-play").setAttribute("aria-pressed",String(play)); drawGrid();
+    }
+    document.getElementById("samples-edit").addEventListener("click",function () {setPadMode(false);});
+    document.getElementById("samples-play").addEventListener("click",function () {setPadMode(true);});
+    window.addEventListener("rx3selection",function(event) {
+      var report=event.detail.report, present=report && report.mod && report.mod.modules.includes("samples");
+      document.getElementById("samples-module-note").textContent=t(present ? "ui.samplesInstalled" : "ui.samplesModule") + (event.detail.selected.includes("samples") ? " " + t("ui.samplesSelected") : "");
+      document.getElementById("samples-modules").hidden=present;
+    });
     document.getElementById("samples-simulate").addEventListener("change", function (event) {
-      stopAudition(); simulate = event.target.checked; drawGrid();
+      setPadMode(event.target.checked);
     });
     document.getElementById("samples-stop").addEventListener("click", function () {
       stopAudition(); drawInspector();
@@ -588,37 +704,33 @@
       }
     });
     window.addEventListener("beforeunload", function (event) {
-      if (bank && dirty()) { event.preventDefault(); event.returnValue = ""; }
+      if (persisting || localError) { event.preventDefault(); event.returnValue = ""; }
     });
     document.getElementById("bank-name").addEventListener("input", function (event) {
       bank.name = event.target.value;
-      state();
+      if(project.active===entry.id)active=bank.name;
+      drawBankPicker();state();
     });
-    document.getElementById("bank-pick").addEventListener("change", function (event) {
-      if (dirty() && !window.confirm(t("samples.discard"))) { drawBankPicker(); return; }
-      reload(event.target.value);
+    document.getElementById("bank-pick").addEventListener("change", async function (event) {
+      chooseEntry(event.target.value);
     });
     document.getElementById("bank-new").addEventListener("click", function () {
-      if (dirty() && !window.confirm(t("samples.discard"))) return;
-      stopAudition();
-      bank = emptyBank(freeName());
-      saved = null;
-      chosen = 0;
-      document.getElementById("bank-name").value = bank.name;
-      document.getElementById("bank-volume").value = bank.volume;
-      document.getElementById("bank-volume-value").textContent = bank.volume;
-      document.getElementById("shift-silence").checked = false;
-      redraw();
+      var id=String(Date.now())+"-"+Math.random();
+      project.entries.push({id:id,value:emptyBank(freeName()),saved:null});
+      chooseEntry(id);
     });
     document.getElementById("bank-delete").addEventListener("click", async function () {
-      if (!bank.onDrive) return;
-      var gone = await window.rx3.ask("samples_remove", drive, bank.name);
-      if (gone) reload(null);
+      if(!entry)return;
+      if(!(await window.rx3.confirm(t("ui.deleteBankTitle"),t("samples.deleteLocalBody",{name:bank.name}),t("common.remove"))))return;
+      if(entry.saved)project.deleted.push(entry.saved.name);
+      project.entries=project.entries.filter(e=>e!==entry);
+      if(project.active===entry.id)project.active=project.entries.length ? project.entries[0].id : null;
+      banks=project.entries.map(e=>e.value);chooseEntry(null);
     });
     document.getElementById("bank-volume").addEventListener("input", function (event) {
       bank.volume = Number(event.target.value);
       updateGains();
-      document.getElementById("bank-volume-value").textContent = bank.volume;
+      document.getElementById("bank-volume-value").textContent = t("unit.percent",{value:bank.volume});
       state();
     });
     document.getElementById("shift-silence").addEventListener("change", function (event) {
@@ -626,11 +738,14 @@
       state();
     });
     document.getElementById("bank-save").addEventListener("click", save);
+    document.getElementById("samples-local-retry").addEventListener("click",flush);
     document.getElementById("bank-activate").addEventListener("click", async function () {
-      var done = await window.rx3.ask("samples_activate", drive, bank.name);
-      if (done) reload(bank.name);
+      project.active=entry.id;active=bank.name;drawBankPicker();state();
     });
 
+    window.addEventListener("rx3jobfinished",function(event){
+      if(pushing && event.detail.kind==="samples" && event.detail.state!=="done") {pushing=false;drawSync();}
+    });
     window.addEventListener("rx3drive", function (event) {
       drive = event.detail.path;
       capabilities = event.detail.capabilities || {};
@@ -639,17 +754,21 @@
       reload();
     });
     window.addEventListener("rx3language", function () {
-      if (bank) redraw();
+      if (bank) {drawBankPicker();redraw();}
     });
   }
 
   async function start() {
     limits = await window.rx3.ask("samples_defaults");
     if (!limits) return;
-    bank = emptyBank("bank1");
+    bank = emptyBank(t("ui.bankDefault", {count:1}));
     saved = null;
     wire();
   }
 
-  window.rx3samples = {start: start};
+  window.rx3samples = {
+    summary:function(){return bank ? {name:bank.name,count:bank.pads.filter(filled).length,saved:!projectDirty(),drive:drive} : null;},
+    start:start,
+    beforeDrive:async function(){return !pushing && (!drive || await flush());}
+  };
 })();

@@ -43,7 +43,8 @@ window.rx3 = {
   fail: message => { failures.push(message); },
   async ask(operation) {
     if (operation === 'samples_defaults') return {padCount:8, maxVoices:4, colours:Array(8).fill('#FFFFFF'), gainUnity:100, volumeDefault:50, maxSeconds:8, bankMaxBytes:16777216};
-    if (operation === 'samples_read') return {active:'live', banks:[{name:'live', pads, volume:50, shiftSilence:true, settingsOk:true}]};
+    if (operation === 'samples_draft_store') return true;
+    if (operation === 'samples_draft_load') return {active:'live', banks:[{name:'live', pads, volume:50, shiftSilence:true, settingsOk:true}]};
     if (operation === 'samples_audition') return deferred ? await deferred : {audio:'AA=='};
     throw Error(operation);
   }

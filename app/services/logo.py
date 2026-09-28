@@ -150,23 +150,27 @@ def preview(path: pathlib.Path, canvas: str = "classic", **frame) -> Placement:
     return Placement(x, y, width, height, faint=measures.faint, themed=measures.themed)
 
 
-def render(path: pathlib.Path, canvas: str = "classic", **frame) -> dict:
+def render(path: pathlib.Path, canvas: str = "classic", *, invert_light: bool = True, **frame) -> dict:
     """A picture of the pane as it will be written, and how it reads.
 
     Both pictures decode the actual RGB565 containers, including their colour
-    quantization, transparency and theme transformation.
+    quantization, transparency and theme transformation. `invertible` says
+    whether the artwork has greys a light screen would invert, which is when the
+    choice `invert_light` makes is visible at all; `themed` says what was built.
     """
     geometry = _canvas(canvas)
-    logo = container.encode(_open(path), geometry, **frame)
+    logo = container.encode(_open(path), geometry, invert_light=invert_light, **frame)
     measures = preview(path, canvas, **frame)
     return {
         **dataclasses.asdict(measures),
+        "themed": logo.themed,
+        "invertible": measures.themed,
         "canvas": _png(container.decode(logo.dark)),
         "lightCanvas": _png(container.decode(logo.light)),
     }
 
 
-def files(path: pathlib.Path, canvas: str = "classic", **frame) -> dict[str, bytes]:
+def files(path: pathlib.Path, canvas: str = "classic", *, invert_light: bool = True, **frame) -> dict[str, bytes]:
     """The two containers, named as the deck reads them.
 
     Hand this to `build_runtime(supplied_files={logo.MODULE_ID: ...})`. Both
@@ -175,5 +179,5 @@ def files(path: pathlib.Path, canvas: str = "classic", **frame) -> dict[str, byt
     light theme legible.
     """
     geometry = _canvas(canvas)
-    logo = container.encode(_open(path), geometry, **frame)
+    logo = container.encode(_open(path), geometry, invert_light=invert_light, **frame)
     return {DARK_NAME: logo.dark, LIGHT_NAME: logo.light}

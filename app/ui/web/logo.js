@@ -49,6 +49,9 @@
   var bitmap = null;
   var frame = {mode: "contain", zoom: 1, offsetX: 0, offsetY: 0};
   var theme = "dark";
+  // Whether a light screen gets the artwork's greys inverted. On by default,
+  // which is what every logo got before this was a choice.
+  var invertLight = true;
   var truth = null;        // what Python last said
   var pending = null;
   var revision = 0;
@@ -79,7 +82,7 @@
 
     // The margin the player samples to decide the pane is finished. Artwork
     // never reaches it, so the frame shows where it stops.
-    pen.strokeStyle = theme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.16)";
+    pen.strokeStyle = getComputedStyle(canvas).getPropertyValue(theme === "dark" ? "--logo-dark-guide" : "--logo-light-guide").trim();
     pen.setLineDash([4, 4]);
     pen.strokeRect(pane.inkOriginX + 0.5, pane.inkOriginY + 0.5,
                    pane.inkWidth - 1, pane.inkHeight - 1);
@@ -100,7 +103,7 @@
     pen.beginPath();
     pen.rect(pane.inkOriginX, pane.inkOriginY, pane.inkWidth, pane.inkHeight);
     pen.clip();
-    if (theme === "light") {
+    if (theme === "light" && invertLight) {
       // The deck inverts the greys of the artwork for a light screen. This is
       // the shape of that, not the pixels: Python decides what is grey.
       pen.filter = "invert(1)";
@@ -114,27 +117,48 @@
   function notes() {
     var panel = document.getElementById("logo-notes");
     panel.replaceChildren();
+    document.getElementById("logo-empty").hidden = Boolean(art);
+    document.getElementById("logo-controls").disabled = !art;
+    var pick = document.getElementById("logo-pick"); pick.className = art ? "btn" : "btn primary";
+    pick.removeAttribute("data-t"); pick.textContent = t(art ? "logo.changeImage" : "logo.choose");
     if (!art) return;
     var box = placement(art.width, art.height, ink(), frame, limits);
     if (box) {
-      panel.append(el("p", "note num", t("logo.size", {
+      var dimensions = el("details"); dimensions.append(el("summary",null,t("ui.details")));
+      dimensions.append(el("p", "dim num", t("logo.size", {
         width: box.width, height: box.height,
         canvasWidth: pane.canvasWidth, canvasHeight: pane.canvasHeight,
-      })));
+      }))); panel.append(dimensions);
     }
     if (truth && truth.faint) panel.append(el("p", "note warn", t("logo.faint")));
-    if (truth) {
-      panel.append(el("p", "note", truth.themed ? t("logo.themed") : t("logo.sameInLight")));
+    // Artwork with no grey to invert looks the same either way, so the choice
+    // is only offered when it changes something.
+    if (truth && !truth.invertible) panel.append(el("p", "note", t("logo.sameInLight")));
+
+  }
+
+  /** The two choices the framing card offers, pressed where they stand. */
+  function marks() {
+    var panesRow = document.getElementById("logo-pane").children;
+    for (var i = 0; i < panesRow.length; i++) {
+      panesRow[i].setAttribute("aria-pressed", String(pane && panesRow[i].dataset.pane === pane.name));
     }
-    if (window.rx3.logoTicked && !window.rx3.logoTicked()) {
-      panel.append(el("p", "note warn", t("logo.notTicked")));
-    }
+    var invert = document.getElementById("logo-invert");
+    invert.checked = invertLight;
+    document.getElementById("logo-invert-row").hidden = !(art && truth && truth.invertible);
+    document.getElementById("logo-invert-hint").textContent =
+      t(invertLight ? "logo.invertOnHint" : "logo.invertOffHint");
+    document.getElementById("logo-fit").setAttribute("aria-pressed", String(frame.mode === "contain"));
+    document.getElementById("logo-fill").setAttribute("aria-pressed", String(frame.mode === "cover"));
+    document.getElementById("logo-theme-dark").setAttribute("aria-pressed", String(theme === "dark"));
+    document.getElementById("logo-theme-light").setAttribute("aria-pressed", String(theme === "light"));
   }
 
   function zoomBox() {
+    marks();
     document.getElementById("logo-zoom").value = String(Math.round(
       ((frame.zoom - limits.zoomMin) / (limits.zoomMax - limits.zoomMin)) * 1000));
-    document.getElementById("logo-zoom-value").textContent = t("unit.zoom", {value:window.i18n.number(frame.zoom, {minimumFractionDigits:2, maximumFractionDigits:2})});
+    document.getElementById("logo-zoom-value").textContent = t("unit.zoom", {value:window.i18n.number(frame.zoom, {maximumFractionDigits:1})});
   }
 
   function refresh() {
@@ -152,7 +176,7 @@
     if (!art) return;
     if (pending) clearTimeout(pending);
     var requested = revision;
-    var requestFrame = Object.assign({}, frame);
+    var requestFrame = Object.assign({invertLight: invertLight}, frame);
     pending = setTimeout(async function () {
       pending = null;
       var answer = await window.rx3.ask("logo_render", art.path, pane.name, requestFrame);
@@ -167,7 +191,7 @@
         var pictures = await Promise.all([load(answer.canvas), load(answer.lightCanvas)]);
         if (requested !== revision) return;
         truth = answer; exact = {dark: pictures[0], light: pictures[1]};
-        draw(); notes();
+        draw(); notes(); marks();
       } catch (error) { window.rx3.fail(String(error)); }
     }, 200);
   }
@@ -176,13 +200,14 @@
   function publish() {
     try {
       if (art) localStorage.setItem("rx3.logo", JSON.stringify({
-        path: art.path, canvas: pane.name, frame: frame
+        path: art.path, canvas: pane.name, frame: frame, invertLight: invertLight
       }));
       else localStorage.removeItem("rx3.logo");
     } catch (_) { /* The editor still works when local storage is unavailable. */ }
     window.dispatchEvent(new CustomEvent("rx3logo", {detail: art ? {
       path: art.path, canvas: pane.name, mode: frame.mode,
       zoom: frame.zoom, offsetX: frame.offsetX, offsetY: frame.offsetY,
+      invertLight: invertLight,
     } : null}));
   }
 
@@ -228,7 +253,7 @@
     canvas.addEventListener("pointercancel", release);
 
     canvas.addEventListener("wheel", function (event) {
-      if (!bitmap) return;
+      if (!bitmap || document.activeElement !== canvas) return;
       event.preventDefault();
       var before = placement(art.width, art.height, ink(), frame, limits);
       var wanted = frame.zoom * Math.exp(-event.deltaY * 0.0012);
@@ -265,7 +290,28 @@
       document.getElementById("logo-pick").textContent = t("logo.changeImage");
       refresh();
     };
+    loaded.onerror = function () { window.rx3.fail(t("ui.imageError")); };
     loaded.src = opened.preview;
+  }
+
+  /** One button per pane, named for a DJ and sized for whoever checks. */
+  function drawPanes() {
+    var row = document.getElementById("logo-pane");
+    row.replaceChildren();
+    for (var i = 0; i < panes.length; i++) {
+      var named = t("logo.pane." + panes[i].name);
+      var button = el("button", "btn small", named === "logo.pane." + panes[i].name ? panes[i].name : named);
+      button.type = "button";
+      button.dataset.pane = panes[i].name;
+      var silhouette = el("span", "logo-zone"); silhouette.setAttribute("aria-hidden","true"); silhouette.dataset.pane=panes[i].name; button.append(silhouette);
+      button.addEventListener("click", function (event) {
+        var wanted = event.currentTarget.dataset.pane;
+        for (var j = 0; j < panes.length; j++) if (panes[j].name === wanted) pane = panes[j];
+        refresh();
+      });
+      row.append(button);
+    }
+    marks();
   }
 
   function wire() {
@@ -282,8 +328,10 @@
       refresh();
     });
     document.getElementById("logo-pick").addEventListener("click", choose);
-    document.getElementById("logo-pane").addEventListener("change", function (event) {
-      for (var i = 0; i < panes.length; i++) if (panes[i].name === event.target.value) pane = panes[i];
+    document.getElementById("logo-invert").addEventListener("change", function (event) {
+      invertLight = event.target.checked;
+      // Show what the choice does: it only shows on a light screen.
+      theme = "light";
       refresh();
     });
     document.getElementById("logo-zoom").addEventListener("input", function (event) {
@@ -308,14 +356,18 @@
     });
     document.getElementById("logo-theme-dark").addEventListener("click", function () {
       theme = "dark";
+      marks();
       draw();
     });
     document.getElementById("logo-theme-light").addEventListener("click", function () {
       theme = "light";
+      marks();
       draw();
     });
     window.addEventListener("rx3language", function () {
+      if (art) document.getElementById("logo-pick").textContent = t("logo.changeImage");
       if (art) notes();
+      if (panes.length) drawPanes();
       if (limits) zoomBox();
     });
   }
@@ -325,15 +377,7 @@
     panes = (await window.rx3.ask("logo_canvases")) || [];
     if (!limits || !panes.length) return;
     pane = panes[0];
-    var picker = document.getElementById("logo-pane");
-    picker.replaceChildren();
-    for (var i = 0; i < panes.length; i++) {
-      var option = document.createElement("option");
-      option.value = panes[i].name;
-      option.textContent = panes[i].name + " (" + panes[i].canvasWidth
-        + " x " + panes[i].canvasHeight + ")";
-      picker.append(option);
-    }
+    drawPanes();
     wire();
     draw();
     zoomBox();
@@ -344,11 +388,12 @@
       if (restored) {
         art = restored;
         pane = panes.find(function (item) { return item.name === remembered.canvas; }) || panes[0];
-        picker.value = pane.name;
         frame = remembered.frame;
+        invertLight = remembered.invertLight !== false;
         bitmap = new Image();
         bitmap.onload = function () {
-              refresh();
+          document.getElementById("logo-pick").textContent = t("logo.changeImage");
+          refresh();
         };
         bitmap.src = art.preview;
       }

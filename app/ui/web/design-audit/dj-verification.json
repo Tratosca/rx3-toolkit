@@ -1,0 +1,288 @@
+{
+  "sourceHashes": {
+    "stems-listen.js": "71f17100dd3d825b7acbb06e98756db59016c908d5dada830c589e2235e777d7",
+    "index.html": "e098b6e574f6d3aee8821427a8a5e7af5fb34df78b4f7c3160b29b92e0153249",
+    "stems-audio.js": "91218a0123377fedbbcd236892a033be0c2d67726d42ab14d3b8a505b6f80f25",
+    "stems-wave-worker.js": "3dd1c228cd1560b890c0d566df1d5911ffa883d1b92e87bff27e75613c460786",
+    "app.css": "b147ec8ce7bfb61c8a32ae5de068ddf4b14cc3ad1594daf6a89a324dee0799bf",
+    "stems.js": "6fdc4a3d9fc3c3fe39f38a1b20ea40fa82519c084b40fee33b99fe1f419281c7",
+    "components.js": "66938a41ce7a171f3e9fe00450bb00ada38ca0f5e6b2b4a5bfab8a047d4895e5",
+    "rx3-mock.js": "4921de375642f0dd36045e1a36238259c4940680c44d26442d823a0aca512dbd",
+    "samples.js": "7bac61f5a501e42f7706aaedc67be6973cfc5ff9c186e26662e08963c847d59f",
+    "logo.js": "dfd6e5c5b7627073500514c5ef7a489da0a301bd9e540a7b250891e3e5c9c1b8",
+    "i18n.js": "e63ae6c8be937feb6b324653a24f793343524520a1c5302865c635448a30aefc",
+    "app.js": "56d4fb8636bbcd4f6e6e5dad2b425466ce884ec95aacb07c0ac873078ea028b4"
+  },
+  "fixture": true,
+  "renderer": "pywebview native",
+  "page": "file://app/ui/web/index.html",
+  "matrix": [],
+  "checks": [
+    {
+      "name": "Both language catalogs are complete",
+      "passed": true
+    },
+    {
+      "name": "Modules has no install button",
+      "passed": true
+    },
+    {
+      "name": "USB history and technical details removed",
+      "passed": true
+    },
+    {
+      "name": "No encryption prompt on startup",
+      "passed": true
+    },
+    {
+      "name": "Install opens destination choice without a key",
+      "passed": true
+    },
+    {
+      "name": "Every checked module appears in recap",
+      "passed": true
+    },
+    {
+      "name": "Recap covers logo samples and stems",
+      "passed": true
+    },
+    {
+      "name": "Empty USB control keeps a readable width",
+      "passed": true
+    },
+    {
+      "name": "Logo framing disabled before choosing artwork",
+      "passed": true
+    },
+    {
+      "name": "Missing preparation tools appear before music",
+      "passed": true
+    },
+    {
+      "name": "Installation fixture returns to preparation",
+      "passed": true
+    },
+    {
+      "name": "Changing legal language resets consent",
+      "passed": true
+    },
+    {
+      "name": "Later does not fetch a key",
+      "passed": true
+    },
+    {
+      "name": "Manual key is not claimed as validated",
+      "passed": true
+    },
+    {
+      "name": "Tutorial menu removed",
+      "passed": true
+    },
+    {
+      "name": "First installation is inside installation",
+      "passed": true
+    },
+    {
+      "name": "Emergency instructions are permanent and offer renaming",
+      "passed": true
+    },
+    {
+      "name": "Associated modules section removed",
+      "passed": true
+    },
+    {
+      "name": "Module tutorial can pause",
+      "passed": true
+    },
+    {
+      "name": "Module tutorial pause survives rendering",
+      "passed": true
+    },
+    {
+      "name": "Module tutorial resumes automatically",
+      "passed": true
+    }
+  ],
+  "status": "failed",
+  "error": "Traceback (most recent call last):\n  File \"/Users/fbrille/_Dev/rx3/rx3-toolbox/app/ui/web/design-audit/verify_ui.py\", line 190, in verify\n    wait('document.querySelector(\"#module-tutorial-samples canvas\").dataset.step!=='+json.dumps(frozen))\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/fbrille/_Dev/rx3/rx3-toolbox/app/ui/web/design-audit/verify_ui.py\", line 125, in wait\n    raise AssertionError('Timed out: '+expression)\nAssertionError: Timed out: document.querySelector(\"#module-tutorial-samples canvas\").dataset.step!==\"0\"\n",
+  "calls": [
+    {
+      "operation": "localization_catalogs",
+      "args": []
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "mod_firmwares",
+      "args": []
+    },
+    {
+      "operation": "mod_modules",
+      "args": [
+        "1.19"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "decoder-sleep",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "decoder-sleep"
+        ],
+        "beatjump-32bars",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "decoder-sleep"
+        ],
+        "beatjump-no-quantize",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "decoder-sleep"
+        ],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "core",
+          "decoder-sleep",
+          "keyshift"
+        ],
+        "key-sync",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "beatjump-32bars",
+          "beatjump-no-quantize",
+          "core",
+          "decoder-sleep",
+          "key-match",
+          "key-sync",
+          "keyshift"
+        ],
+        "stems",
+        true
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "samples_defaults",
+      "args": []
+    },
+    {
+      "operation": "logo_limits",
+      "args": []
+    },
+    {
+      "operation": "logo_canvases",
+      "args": []
+    },
+    {
+      "operation": "stems_qualities",
+      "args": [
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "stems_runtime",
+      "args": []
+    },
+    {
+      "operation": "stems_library_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_install",
+      "args": [
+        "auto"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_runtime",
+      "args": []
+    },
+    {
+      "operation": "stems_qualities",
+      "args": [
+        [
+          "vocals"
+        ]
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    }
+  ],
+  "browserErrors": []
+}

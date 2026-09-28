@@ -1,0 +1,91 @@
+{
+  "checks": [
+    {
+      "name": "Complete drive has no automatic prompt",
+      "passed": true
+    },
+    {
+      "name": "USB outside Stems has no waveform prompt",
+      "passed": true
+    },
+    {
+      "name": "No format picker",
+      "passed": true
+    },
+    {
+      "name": "fr light fits",
+      "passed": true
+    },
+    {
+      "name": "fr dark fits",
+      "passed": true
+    },
+    {
+      "name": "en light fits",
+      "passed": true
+    },
+    {
+      "name": "en dark fits",
+      "passed": true
+    },
+    {
+      "name": "Completion sends only the selected drive",
+      "passed": true
+    },
+    {
+      "name": "Zero tracks shows only OK",
+      "passed": true
+    }
+  ],
+  "matrix": [
+    {
+      "width": 880,
+      "height": 528,
+      "screen": "wave-format-dialog",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 528,
+      "screen": "wave-format-dialog",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 528,
+      "screen": "wave-format-dialog",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "width": 880,
+      "height": 528,
+      "screen": "wave-format-dialog",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    }
+  ],
+  "status": "passed"
+}
