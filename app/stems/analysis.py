@@ -37,15 +37,20 @@ def tags(data):
         if offset + 12 > total:
             raise ValueError("tag header")
         tag, header, size = struct.unpack_from(">4sII", data, offset)
-        if not 12 <= header <= size <= total - offset or tag in seen:
+        if not 12 <= header <= size <= total - offset:
             raise ValueError("tag length or duplicate")
+        # Cue sections repeat for memory and hot cues in real analysis files.
+        if tag in seen and tag in (*STRIDES, b"PQTZ", b"PWAV", b"PWV2", b"PWV4"):
+            raise ValueError("duplicate analysis data")
         seen.add(tag)
         block = data[offset:offset + size]
         if tag in STRIDES:
             if header != 24:
                 raise ValueError("wave header")
             stride, count, frequency = struct.unpack_from(">III", block, 12)
-            if (stride != STRIDES[tag] or frequency != 150 << 16 or
+            # The RGB header uses 0x00960305 in observed library analyses.
+            if (stride != STRIDES[tag] or frequency not in
+                    ((150 << 16, 0x00960305) if tag == b"PWV5" else (150 << 16,)) or
                     not 0 < count <= MAX_COLUMNS or size != header + count * stride):
                 raise ValueError("wave axis")
             result[tag] = block[header:]

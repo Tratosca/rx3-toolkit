@@ -7,12 +7,14 @@ import unittest
 from unittest.mock import patch
 
 from app.localization import LocalizedError, wire
-from app.stems import safety, job, provisioning, rekordbox, stem
+from package_fixture import isolate, wave_fixture
+from app.stems import waveform, safety, job, provisioning, rekordbox, stem
 
 
 class SafetyTests(unittest.TestCase):
     def setUp(self):
         self.workspace = tempfile.TemporaryDirectory()
+        isolate(self)
         self.addCleanup(self.workspace.cleanup)
         self.root = pathlib.Path(self.workspace.name)
         self.output = self.root / "RX3_STEMS"
@@ -28,7 +30,7 @@ class SafetyTests(unittest.TestCase):
         self.addCleanup(closed.stop)
 
     def encode(self, source, target, **kwargs):
-        target.write_bytes(b"encoded" * 100)
+        target.write_bytes(stem.HEADER.pack(stem.MAGIC,44100,2,2,64,4410,b"\0"*32)+b"\0"*17640)
         return stem.StemResult(target, 175, 175 / 44100, 700)
 
     def test_full_drive_stops_before_any_separation(self):
@@ -52,6 +54,39 @@ class SafetyTests(unittest.TestCase):
                 safety.publish(local, target)
         self.assertEqual(target.read_bytes(), b"old")
         self.assertFalse(list(self.output.glob("*.partial")))
+
+    def test_interrupted_copy_preserves_old_package(self):
+        local = self.root / 'prepared'; local.write_bytes(b'new package')
+        target = self.output / 'track.rx3stem'; target.write_bytes(b'old package')
+        def interrupted(source, destination, length):
+            destination.write(b'partial')
+            raise OSError('destination disconnected')
+        with patch.object(safety.shutil, 'copyfileobj', side_effect=interrupted):
+            with self.assertRaises(OSError):
+                safety.publish(local, target)
+        self.assertEqual(target.read_bytes(), b'old package')
+        self.assertFalse(list(self.output.glob('*.partial')))
+        safety.publish(local, target)
+        self.assertEqual(target.read_bytes(), b'new package')
+
+    def test_cancelled_waveform_keeps_previous_package_and_can_resume(self):
+        self.job.playlist = dataclasses.replace(self.job.playlist, tracks=self.job.playlist.tracks[:1])
+        target = self.output / 'track.rx3stem'; target.write_bytes(b'previous package')
+        with patch.object(self.job, '_separate', return_value={'vocals': self.source}), \
+             patch.object(job, 'write_stem', side_effect=self.encode), \
+             patch.object(waveform, 'build', side_effect=job.Cancelled):
+            state = self.job.run()
+        self.assertEqual(state.state, 'cancelled')
+        self.assertEqual(target.read_bytes(), b'previous package')
+        self.assertFalse(list(self.output.glob('*.partial')))
+        resumed = job.StemJob(self.job.runtime, self.job.collection, self.job.playlist, self.root)
+        with patch.object(resumed, '_separate', return_value={'vocals': self.source}), \
+             patch.object(job, 'write_stem', side_effect=self.encode), \
+             patch.object(waveform, 'build', side_effect=wave_fixture):
+            state = resumed.run()
+        self.assertEqual(state.state, 'done')
+        self.assertEqual(state.errors, ())
+        self.assertNotEqual(target.read_bytes(), b'previous package')
 
     def test_metadata_cleanup_stays_in_our_directory_and_names(self):
         owned = ("._track.rx3stem", "._track.rx3drums", "._track.rx3bass", "._" + safety.MANIFEST_NAME)
@@ -92,7 +127,8 @@ class SafetyTests(unittest.TestCase):
 
     def test_manifest_is_published_inside_stems_only(self):
         with patch.object(self.job, "_separate", return_value={"vocals": self.source}), \
-             patch.object(job, "write_stem", side_effect=self.encode):
+             patch.object(job, "write_stem", side_effect=self.encode), \
+             patch.object(waveform, "build", side_effect=wave_fixture):
             state = self.job.run()
         self.assertEqual(state.errors, ())
         self.assertEqual(state.manifest, self.output / safety.MANIFEST_NAME)

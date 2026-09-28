@@ -6,22 +6,22 @@ from __future__ import annotations
 import json
 import pathlib
 import re
-import signal
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 from dataclasses import dataclass, field, replace
 from typing import Callable, Sequence
 
-from app.localization import Message, error_message
-from app.stems import safety, cache, waveform
+from app.localization import LocalizedError, Message, error_message
+from app.stems import audition, limits, safety, cache, waveform, package, wave_settings, migration
+from app.stems.processes import Control, Cancelled
 from app.stems.estimate import Estimator
 from app.stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from app.stems.rekordbox import Collection, Playlist, Track, export_stem
-from app.stems.separation import ROLE_STEMS, VOCAL_STEM, Settings, input_normalization
-from app.stems.stem import ROLE_ORDER, ROLE_SUFFIXES, write_stem
+from app.stems.engine import AudioSeparatorEngine, configuration, PREFIX, model_identity, runtime_identity, OutputError
+from app.stems.separation import Settings, input_normalization
+from app.stems.stem import PREPARED_ROLES, ROLE_ORDER, ROLE_SUFFIXES, count_frames, write_stem
 
 
 MANIFEST_NAME = "rx3-stems-manifest.json"
@@ -55,6 +55,11 @@ def failure_detail(transcript: str) -> str:
     return detail[-REPORTED_DETAIL:]
 
 
+def role_label(role: str) -> Message:
+    """A role as the interface names it, never its identifier."""
+    return Message({"vocals": "stems.roleVocals", "drums": "stems.roleDrums"}.get(role, "stems.listenRest"))
+
+
 @dataclass(frozen=True)
 class Stem:
     """One container written for one track, named after the role it holds."""
@@ -86,6 +91,7 @@ class TrackResult:
     source_sha256: str | None = None
     source_bytes: int | None = None
     processing: dict | None = None
+    provenance: dict | None = None
 
     @property
     def stem(self) -> str:
@@ -102,6 +108,7 @@ class TrackResult:
 
     def as_manifest_entry(self) -> dict[str, object]:
         return {
+            **(self.provenance or {}),
             "trackId": self.track_id, "artist": self.artist, "title": self.title,
             "sourceFile": self.source_file, "stem": self.stem,
             "bytes": self.size, "status": self.status,
@@ -178,10 +185,6 @@ class JobState:
         }
 
 
-class Cancelled(Exception):
-    """The operator stopped the job."""
-
-
 class StemJob:
     """Run one playlist through separation and stem encoding."""
 
@@ -194,11 +197,17 @@ class StemJob:
         *,
         settings: Settings | None = None,
         roles: Sequence[str] = ("vocals",),
+        waveforms: bool = True,
+        upgrade_existing: bool = False,
+        overcue_export=None,
         architecture: str | None = None,
         acceleration: Acceleration | None = None,
         estimator: Estimator | None = None,
         observer: Callable[[JobState], None] = lambda state: None,
     ) -> None:
+        self.upgrade_existing = upgrade_existing
+        self.overcue_export = overcue_export
+        self.waveforms = waveforms
         self.runtime = runtime
         self.collection = collection
         self.playlist = playlist
@@ -207,9 +216,7 @@ class StemJob:
         # Vocals is not optional: it is the only role every deck build reads,
         # and a run that produced drums alone would look complete while the
         # deck found nothing to load.
-        wanted = {role for role in roles if role in ROLE_SUFFIXES} | {"vocals"}
-        if "bass" in wanted:
-            wanted.add("drums")
+        wanted = {role for role in roles if role in PREPARED_ROLES} | {"vocals"}
         self.roles = tuple(role for role in ROLE_ORDER if role in wanted)
         self.architecture = architecture
         self.acceleration = acceleration or resolve_acceleration(self.settings.accelerator)
@@ -218,13 +225,16 @@ class StemJob:
         self._lock = threading.Lock()
         self._state = JobState()
         self._process: subprocess.Popen[str] | None = None
+        self._engine = AudioSeparatorEngine(runtime, configuration(self.settings, architecture, self.roles, runtime, self.acceleration))
         self._cancelled = False
+        self._control = Control()
         self._started = 0.0
         # Audio the current track carries, and audio every track after it does.
         self._current_audio = 0.0
         self._later_audio = 0.0
         self._entries, self._has_manifest = cache.read_manifest(output_root)
         self._signature = cache.signature(self.settings, architecture, self.roles)
+        self._identity_loaded = False
 
     @property
     def state(self) -> JobState:
@@ -239,14 +249,7 @@ class StemJob:
 
     def cancel(self) -> None:
         self._cancelled = True
-        process = self._process
-        if process is not None and process.poll() is None:
-            # Windows only delivers SIGINT to a dedicated process group, so the
-            # separator is terminated directly there.
-            if sys.platform == "win32":
-                process.terminate()
-            else:
-                process.send_signal(signal.SIGINT)
+        self._control.cancel()
 
     def _checkpoint(self) -> None:
         if self._cancelled:
@@ -279,52 +282,34 @@ class StemJob:
         """
         if self.acceleration.key == "cpu" or CPU_FALLBACK not in head:
             return
-        self._notice(
-            f"{self.acceleration.label} was selected but the separator found no "
-            "usable device and ran on the CPU. Install the separation runtime "
-            "again for this accelerator, which rebuilds PyTorch for it."
-        )
+        self._notice(Message("stems.cpuFallback", accelerator=Message("accelerator." + self.acceleration.key)))
 
     def _separate(
-        self, source: pathlib.Path, workspace: pathlib.Path, index: int, total: int
+        self, source: pathlib.Path, workspace: pathlib.Path, index: int, total: int, *, progress=None
     ) -> dict[str, pathlib.Path]:
         if self.runtime.separator is None:
-            raise RuntimeError("audio-separator is not installed")
-        command = [
-            str(self.runtime.separator), str(source),
-            f"--model_file_dir={self.runtime.models}",
-            f"--output_dir={workspace}",
-            "--output_format=WAV",
-            # Asking for one stem lets the separator skip reconstructing the
-            # others, so the vocal-only run stays as cheap as it ever was.
-            *([f"--single_stem={VOCAL_STEM}"] if self.roles == ("vocals",) else []),
-            *self.settings.arguments(self.architecture),
-            *self.acceleration.separation_flags,
-        ]
-        try:
-            process = subprocess.Popen(
-                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, env=self.runtime.subprocess_environment(),
-            )
-        except OSError as error:
-            # A relocated virtual environment leaves the launcher in place with
-            # a dangling interpreter, which surfaces as a bare ENOENT.
-            raise RuntimeError(
-                f"audio-separator could not be started from {self.runtime.separator}: "
-                f"{error}. Install the separation runtime again."
-            ) from error
+            raise LocalizedError("stems.engineMissing")
+        process = self._engine.submit(source, workspace)
         self._process = process
         assert process.stdout is not None
         window = ""
         transcript = ""
         head = ""
         last = -1
+        line = ""
+        completion = None
         # tqdm uses carriage returns rather than line feeds. Reading one
         # character at a time preserves live progress updates.
         while True:
             character = process.stdout.read(1)
             if not character:
                 break
+            line = (line + character)[-16384:]
+            if character == "\n":
+                if line.startswith(PREFIX):
+                    completion = json.loads(line[len(PREFIX):])
+                    break
+                line = ""
             window = (window + character)[-PERCENT_WINDOW:]
             transcript = (transcript + character)[-TRANSCRIPT_LIMIT:]
             if len(head) < HEAD_LIMIT:
@@ -335,43 +320,47 @@ class StemJob:
                     track_progress = min(int(match.group(1)), 95)
                     if track_progress != last:
                         overall = round(((index + track_progress / 100) / total) * 100)
-                        self._update(
-                            track_progress=track_progress, progress=overall,
-                            **self._timings(track_progress / 100),
-                        )
+                        if progress is not None:
+                            progress(track_progress / 100)
+                        else:
+                            self._update(
+                                track_progress=track_progress, progress=overall,
+                                **self._timings(track_progress / 100),
+                            )
                         last = track_progress
             if self._cancelled:
                 break
-        return_code = process.wait()
+        if completion is None or not completion.get("ok"):
+            self._engine.close()
         self._process = None
         self._note_inference_device(head)
         self._checkpoint()
-        if return_code:
-            raise RuntimeError(
-                f"audio-separator exited with code {return_code}: "
-                f"{failure_detail(transcript)}"
-            )
-        # The output name carries the stem and a truncated model name, so each
-        # WAV in the private workspace says which role it holds.
-        candidates = sorted(workspace.rglob("*.wav"))
-        if self.roles == ("vocals",):
-            if len(candidates) != 1:
-                raise RuntimeError(
-                    f"Expected one separated stem, found {len(candidates)}: "
-                    f"{failure_detail(transcript)}"
-                )
-            return {"vocals": candidates[0]}
-        separated: dict[str, pathlib.Path] = {}
-        for role in self.roles:
-            marker = f"({ROLE_STEMS[role]})".casefold()
-            matches = [item for item in candidates if marker in item.name.casefold()]
-            if len(matches) != 1:
-                raise RuntimeError(
-                    f"Expected one {ROLE_STEMS[role]} stem, found {len(matches)}: "
-                    f"{failure_detail(transcript)}"
-                )
-            separated[role] = matches[0]
-        return separated
+        if completion is None or not completion.get("ok"):
+            raise LocalizedError("stems.separatorFailed", code=process.returncode or 1,
+                                 detail=failure_detail(transcript + "\n" + (completion or {}).get("error", "")))
+        try:
+            return self._engine.outputs(workspace, self.roles)
+        except OutputError as error:
+            raise LocalizedError("stems.separatorOutput", role=role_label(error.role),
+                                 count=error.count, detail=failure_detail(transcript)) from error
+
+    def prepare_drum(self, track, workspace, *, index=0, total=1, progress=None, close_engine=True):
+        """Create only the new drum payload for a legacy remux; never publish."""
+        if not getattr(self, "_started", 0):
+            self._started = time.monotonic()
+        self._check_limits(track, track.location)
+        try:
+            separated = self._separate(track.location, workspace, index, total, progress=progress)
+            self._checkpoint()
+            output = workspace / "migration.rx3drums"
+            write_stem(separated["drums"], output, ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16_gain",
+                       match_full=track.location,
+                       separator_normalization=input_normalization(self.settings, self.architecture))
+            self._checkpoint()
+            return output
+        finally:
+            if close_engine:
+                self._engine.close()
 
     def _process_track(
         self,
@@ -384,16 +373,13 @@ class StemJob:
         safety.require_library_closed()
         source = track.location
         if not source.is_file():
-            raise FileNotFoundError("Source file not found")
+            raise LocalizedError("stems.sourceMissing", name=source.name)
         # The name the track carries on the exported drive, which is the only
         # name the deck ever asks for.
         base = export_stem(source.stem)
         collision = used_names.get(base.casefold())
         if collision is not None and collision != source:
-            raise ValueError(
-                f"Ambiguous filename with {collision.name}: both are exported as "
-                f"{base}, and the RX3 load interface cannot distinguish them"
-            )
+            raise LocalizedError("stems.collision", name=source.name, other=collision.name, base=base)
         used_names[base.casefold()] = source
 
         targets = {role: output / f"{base}{ROLE_SUFFIXES[role]}" for role in self.roles}
@@ -403,25 +389,69 @@ class StemJob:
         before = safety.source_stamp(source, progress=lambda done, size: (
             self._checkpoint(), self._update(track_progress=round(done * 100 / max(1, size)))))
         previous = next((entry for entry in self._entries if entry.get("stem") == targets["vocals"].name), None)
+        if self.upgrade_existing and self.roles == ("vocals", "drums"):
+            # A known changed source cannot inherit legacy PCM. Modern packages
+            # carry their own source identity, even if the outer manifest is lost.
+            legacy_changed = (previous and previous.get("source_sha256") and
+                              previous["source_sha256"] != before[2] and
+                              targets["vocals"].is_file() and not package.is_package(targets["vocals"]))
+            def report(stage, fraction):
+                self._checkpoint()
+                self._update(stage=Message("stems.migrationStage." + stage, name=track.title),
+                             track_progress=round(fraction * 100),
+                             progress=round((index + fraction) * 100 / total))
+            upgraded = None if legacy_changed else migration.ensure_three(
+                track, self.output_root, before, self.runtime.ffmpeg or "ffmpeg", self._checkpoint,
+                lambda track, work: self.prepare_drum(
+                    track, work, index=index, total=total, close_engine=False,
+                    progress=lambda fraction: report("drums", .1 + .4 * fraction)),
+                self._signature, report)
+            if upgraded:
+                status, metadata = upgraded
+                self._update(stage=Message("stems.verified"), track_progress=100)
+                safety.check_source(source, before)
+                return self._result(track, {role: targets["vocals"] for role in self.roles},
+                                    status, before, metadata, preserve_processing=True)
         known = previous is not None and previous.get("source_sha256") is not None
-        matching = known and previous.get("source_sha256") == before[2] and previous.get("processing") == self._signature
-        if matching and cache.verified_files(output, previous, self.roles):
+        matching = not self.upgrade_existing and known and previous.get("source_sha256") == before[2] and previous.get("processing") == self._signature
+        verified = cache.verified_files(output, previous, self.roles) if matching else None
+        current_waveform = (verified and package.is_package(targets["vocals"]) and
+                            (not self.waveforms or wave_settings.supports(package.read(targets["vocals"])["waveform"])))
+        if current_waveform:
             safety.check_source(source, before)
             self._update(stage=Message("stems.verified"), track_progress=100)
-            return self._result(track, targets, "existing", before, previous)
-        if not known and (not self._has_manifest or previous is not None) and all(
-                path.is_file() and path.stat().st_size > MINIMUM_STEM_BYTES for path in targets.values()):
+            return self._result(track, {r: targets["vocals"] for r in self.roles}, "existing", before, previous)
+        imported = (not self.upgrade_existing and known and previous.get("origin") == "imported" and
+                    previous.get("source_sha256") == before[2] and
+                    cache.verified_files(output, previous, self.roles))
+        if imported:
+            # Keep the operator's PCM and import identity. Only the waveform
+            # member may need rebuilding; never substitute a separator's output.
+            parsed = package.read(targets["vocals"]) if package.is_package(targets["vocals"]) else None
+            if parsed and (not self.waveforms or wave_settings.supports(parsed["waveform"])):
+                safety.check_source(source, before)
+                self._notice(Message("stems.importedKept", name=source.name))
+                return self._result(track, {r: targets["vocals"] for r in self.roles}, "existing", before, previous)
+            verified = imported
+        if not self.upgrade_existing and not known and (not self._has_manifest or previous is not None) and \
+                self._present_roles(targets["vocals"]) == self.roles:
             self._notice(Message("stems.unverified", name=source.name))
             # An old stem cannot acquire proof by merely hashing today's source.
+            paths = self._present_files(targets)
             return TrackResult(track.track_id, track.artist, track.title, source.name,
-                               tuple(Stem(role, path.name, path.stat().st_size) for role, path in targets.items()),
+                               tuple(Stem(role, path.name, path.stat().st_size) for role, path in paths.items()),
                                "existing")
-        if previous is not None or any(path.exists() for path in targets.values()):
+        if verified:
+            self._notice(Message("stems.waveUpgrade", name=source.name))
+        elif previous is not None or any(path.exists() for path in targets.values()):
             self._notice(Message("stems.regenerating", name=source.name))
-        safety.require_space(output, safety.estimated_bytes(track, len(self.roles), self.runtime.ffmpeg or "ffmpeg"))
+        frames = self._check_limits(track, source)
+        safety.require_space(output, len(self.roles) * (frames * 4 + 64) if frames else
+                             safety.estimated_bytes(track, len(self.roles), self.runtime.ffmpeg or "ffmpeg"))
         with tempfile.TemporaryDirectory(prefix="rx3-stem-") as directory:
             workspace = pathlib.Path(directory)
-            hit = cache.find(before[2], self._signature, self.roles, self.output_root, workspace)
+            hit = ((verified, previous) if verified else
+                   cache.find(before[2], self._signature, self.roles, self.output_root, workspace))
             metadata = {"gainCorrection": 1.0, "encoderDelayFrames": 0, "stems": []}
             if hit:
                 prepared, metadata = hit
@@ -431,35 +461,42 @@ class StemJob:
                 status = "created"
                 self._update(stage=Message("stems.separating"), track_progress=1)
                 separated = self._separate(source, workspace, index, total)
+                if self._identity_loaded and any(v is None for v in self._signature["model_assets"].values()):
+                    self._signature["model_assets"] = model_identity(self.runtime, self.settings)
                 prepared = {}
                 for position, role in enumerate(self.roles):
                     self._checkpoint()
-                    self._update(stage=Message("stems.encoding", role=role), track_progress=min(96 + position, 99))
+                    self._update(stage=Message("stems.encoding", role=role_label(role)), track_progress=min(96 + position, 99))
                     local = workspace / targets[role].name
                     encoded = write_stem(separated[role], local,
-                                         ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16",
+                                         ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16_gain",
                                          match_full=source, separator_normalization=input_normalization(self.settings, self.architecture))
                     prepared[role] = local
+                    # The decoded length is exact from here on; the waveforms
+                    # still to compute are not spent on a refused package.
+                    limits.require(audition.header(local), len(self.roles), waveforms=self.waveforms)
                     metadata["gainCorrection"], metadata["encoderDelayFrames"] = encoded.gain, encoded.delay
-                    metadata["stems"].append({"role": role, "clippedSamples": encoded.clipped})
+                    metadata["stems"].append({"role": role, "clippedSamples": encoded.clipped, "playbackGain": encoded.playback_gain})
                     if not encoded.aligned:
                         self._notice(Message("stems.alignmentUnknown", name=source.name))
                     if encoded.clipped:
                         self._notice(Message("stems.clipped", name=source.name, count=encoded.clipped))
             safety.check_source(source, before)
             safety.require_space(output, sum(path.stat().st_size for path in prepared.values()))
-            waveform.invalidate(track, output.parent)
-            # Optional roles from the previous source must not survive a new
-            # vocal. An interrupted publication can then only reduce the set.
-            for role in reversed(ROLE_ORDER[1:]):
-                old = output / (base + ROLE_SUFFIXES[role])
-                safety.check_target(old)
-                old.unlink(missing_ok=True)
-            safety.sync_directory(output)
-            for role in self.roles:
-                self._checkpoint()
-                safety.check_source(source, before)
-                safety.publish(prepared[role], targets[role])
+            self._update(stage=Message("stems.wavePreparing" if self.waveforms else "stems.packaging"), eta_seconds=None)
+            package_metadata = {"gainCorrection": metadata.get("gainCorrection", 1.0),
+                                "encoderDelayFrames": metadata.get("encoderDelayFrames", 0),
+                                "processing": self._signature}
+            if metadata.get("origin") == "imported":
+                package_metadata.update({key: metadata[key] for key in
+                                         ("origin", "processing", "checks", "import_sha256") if key in metadata})
+            local_package = package.build(track, output.parent, prepared, workspace, before[2],
+                                          self.runtime.ffmpeg or "ffmpeg", self._checkpoint,
+                                          package_metadata, waveforms=self.waveforms)
+            safety.check_source(source, before)
+            self._checkpoint()
+            package.publish(local_package, targets["vocals"])
+            targets = {role: targets["vocals"] for role in self.roles}
             result = self._result(track, targets, status, before, metadata)
             try:
                 cache.remember(output, result.as_manifest_entry(), self.roles)
@@ -467,14 +504,60 @@ class StemJob:
                 self._notice(Message("stems.cacheUnavailable"))
             return result
 
-    def _result(self, track, targets, status, before, metadata):
+    def _present_roles(self, container: pathlib.Path) -> tuple[str, ...] | None:
+        """The roles already on the drive for this track, whichever format holds them.
+
+        A v2 package names its roles itself; the separate files it replaced are
+        gone once it is published, and their absence says nothing about it.
+        """
+        try:
+            if container.is_file() and package.is_package(container):
+                return package.read(container)["roles"]
+        except (OSError, ValueError, LocalizedError):
+            return None
+        files = self._present_files({role: container.with_suffix(ROLE_SUFFIXES[role]) for role in ROLE_ORDER})
+        return tuple(files) or None
+
+    def _present_files(self, targets):
+        if targets["vocals"].is_file() and package.is_package(targets["vocals"]):
+            return {role: targets["vocals"] for role in self.roles}
+        present = {}
+        for role, path in targets.items():
+            if not (path.is_file() and path.stat().st_size > MINIMUM_STEM_BYTES):
+                break
+            present[role] = path
+        return present
+
+    def _check_limits(self, track, source):
+        """Refuse a track the deck would reject, before separating it.
+
+        The listed duration settles most tracks. One too close to a limit to
+        tell, or with no duration at all, is decoded once and counted exactly;
+        that count is returned, and None when the listing sufficed.
+        """
+        verdict = limits.estimate(track.duration, len(self.roles), waveforms=self.waveforms)
+        frames = None
+        if verdict.status in ("near", "unknown"):
+            self._update(stage=Message("stems.measuring"))
+            frames = count_frames(source, self.runtime.ffmpeg or "ffmpeg", self._checkpoint)
+            verdict = limits.assess(frames, len(self.roles), waveforms=self.waveforms)
+        if verdict.refused:
+            raise limits.LimitError(verdict.message(len(self.roles)))
+        if verdict.status == "shared":
+            self._notice(Message("stems.trackNotice", name=source.name,
+                                 detail=verdict.message(len(self.roles))))
+        return frames
+
+    def _result(self, track, targets, status, before, metadata, *, preserve_processing=False):
         return TrackResult(
             track.track_id, track.artist, track.title, track.location.name,
             tuple(Stem(role, path.name, path.stat().st_size,
                        next((item.get("clippedSamples", 0) for item in metadata.get("stems", []) if item.get("role") == role), 0),
                        safety.digest(path)) for role, path in targets.items()),
             status, metadata.get("gainCorrection", 1.0), metadata.get("encoderDelayFrames", 0),
-            before[2], before[0], self._signature,
+            before[2], before[0], metadata.get("processing") if preserve_processing or metadata.get("origin") == "imported" else self._signature,
+            {key: metadata[key] for key in ("origin", "checks", "import_sha256", "separation_provenance", "drum_processing") if key in metadata}
+            if preserve_processing or metadata.get("origin") == "imported" else None,
         )
 
     def _save_manifest(self, output, result):
@@ -490,28 +573,34 @@ class StemJob:
         self._update(manifest=manifest)
 
     def run(self) -> JobState:
+        with self._control.bind():
+            return self._run()
+
+    def _run(self) -> JobState:
         """Process every track, recording per-track failures without stopping."""
         try:
+            self._checkpoint()
             safety.require_library_closed()
+            self._signature["runtime"] = runtime_identity(self.runtime)
+            self._signature["model_assets"] = model_identity(self.runtime, self.settings)
+            self._identity_loaded = True
             tracks = self.playlist.tracks
             if not tracks:
-                raise ValueError("The playlist is empty")
+                raise LocalizedError("stems.playlistEmpty")
             output = self.output_root / OUTPUT_NAME
             safety.check_target(output / MANIFEST_NAME)
             try:
                 output.mkdir(parents=True, exist_ok=True)
             except OSError as error:
-                raise RuntimeError(
-                    f"{output} could not be created: {error.strerror or error}. "
-                    "Choose a writable output folder or mounted USB drive."
-                ) from error
+                raise LocalizedError("stems.outputUnavailable", path=str(output),
+                                     detail=error.strerror or str(error)) from error
             safety.clean_metadata(output)
             self._started = time.monotonic()
             durations = [float(max(0, track.duration or 0)) for track in tracks]
             self._current_audio = 0.0
             self._later_audio = sum(durations)
             self._update(
-                state="running", total=len(tracks), output=output, stage="Preparing",
+                state="running", total=len(tracks), output=output, stage=Message("stems.stagePreparing"),
                 **self._timings(0.0),
             )
 
@@ -521,16 +610,13 @@ class StemJob:
             for index, track in enumerate(tracks):
                 self._checkpoint()
                 if not output.is_dir():
-                    raise RuntimeError(
-                        f"The output directory disappeared: {output}. "
-                        "The USB drive was most likely unmounted."
-                    )
+                    raise LocalizedError("stems.outputGone", path=str(output))
                 self._current_audio = durations[index]
                 self._later_audio = sum(durations[index + 1:])
                 self._update(
                     current=track.label, completed=index, position=index + 1,
                     track_progress=0, progress=round(index / len(tracks) * 100),
-                    stage="Checking", **self._timings(0.0),
+                    stage=Message("stems.stageChecking"), **self._timings(0.0),
                 )
                 track_started = time.monotonic()
                 try:
@@ -544,14 +630,23 @@ class StemJob:
                         self.estimator.observe(
                             durations[index], time.monotonic() - track_started
                         )
-                    self._update(stage=Message("stems.wavePreparing"), eta_seconds=None)
-                    if not waveform.prepare(track, output.parent, result.source_sha256,
-                                            self.runtime.ffmpeg or "ffmpeg", self._checkpoint):
-                        self._notice(Message("stems.waveUnavailable", name=track.location.name))
                     self._update(results=tuple(results))
+                    if self.overcue_export is not None:
+                        self._checkpoint()
+                        self._update(stage=Message("stems.overcuePreparing"),
+                                     track_progress=0, eta_seconds=None)
+                        try:
+                            self.overcue_export(track, output / (export_stem(track.location.stem) + STEM_SUFFIX),
+                                                self.runtime.ffmpeg or "ffmpeg", self._checkpoint)
+                        except Cancelled:
+                            raise
+                        except Exception:
+                            self._notice(Message("stems.overcueRx3Kept", name=track.title))
+                            raise
                 except Cancelled:
                     raise
                 except Exception as error:
+                    self._engine.close()
                     errors.append(TrackError(track=track.label, error=error_message(error)))
                     self._update(errors=tuple(errors))
                     if isinstance(error, safety.SpaceError):
@@ -575,4 +670,7 @@ class StemJob:
                 state="failed", stage="Error", current="",
                 fatal=error_message(error),
             )
+        finally:
+            self._engine.close()
+            self._process = None
         return self.state

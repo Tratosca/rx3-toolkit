@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from app.stems import cache, job, provisioning, rekordbox, safety, separation, stem
+from package_fixture import wave_fixture
+from app.stems import waveform, cache, job, provisioning, rekordbox, safety, separation, stem
 
 
 class CacheTests(unittest.TestCase):
@@ -17,7 +18,8 @@ class CacheTests(unittest.TestCase):
         self.root = pathlib.Path(temporary.name)
         for patcher in (patch.dict(os.environ, {"RX3_STEM_STUDIO_HOME": str(self.root / "data")}),
                         patch.object(safety, "library_busy", return_value=False),
-                        patch.object(cache, "mounted_roots", return_value=())):
+                        patch.object(cache, "mounted_roots", return_value=()),
+                        patch.object(waveform, "build", side_effect=wave_fixture)):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.source = self.root / "track.wav"
@@ -25,14 +27,15 @@ class CacheTests(unittest.TestCase):
         self.runtime = provisioning.detect()
 
     def make_job(self, drive, settings=None):
-        track = rekordbox.Track("1", "Track", "Artist", 1, self.source, True)
+        # A listed length well inside the limits; the fixture PCM stays short.
+        track = rekordbox.Track("1", "Track", "Artist", 60, self.source, True)
         playlist = rekordbox.Playlist("1", "List", "List", (track,))
         collection = rekordbox.Collection(self.root / "library.xml", 1, (playlist,))
         return job.StemJob(self.runtime, collection, playlist, self.root / drive, settings=settings)
 
     def encode(self, source, target, **kwargs):
-        target.write_bytes(stem.HEADER.pack(stem.MAGIC, 44100, 2, 2, 64, 16, b"\0" * 32) + b"\1\0" * 32)
-        return stem.StemResult(target, 16, 16 / 44100, 64, gain=1.1, delay=37)
+        target.write_bytes(stem.HEADER.pack(stem.MAGIC, 44100, 2, 2, 64, 4410, b"\0" * 32) + b"\1\0" * 8820)
+        return stem.StemResult(target, 4410, 0.1, 17640, gain=1.1, delay=37)
 
     def prepare(self, drive="first", settings=None):
         current = self.make_job(drive, settings)
@@ -68,6 +71,14 @@ class CacheTests(unittest.TestCase):
     def test_settings_change_never_reuses_audio(self):
         self.prepare()
         state, calls = self.prepare(settings=dataclasses.replace(separation.Settings(), model="different-model"))
+        self.assertEqual(calls, 1)
+        self.assertEqual(state.results[0].status, "created")
+
+    def test_engine_version_change_never_reuses_automatic_audio(self):
+        with patch.object(job, 'runtime_identity', return_value={'audio-separator': 'first'}):
+            self.prepare()
+        with patch.object(job, 'runtime_identity', return_value={'audio-separator': 'second'}):
+            state, calls = self.prepare('second')
         self.assertEqual(calls, 1)
         self.assertEqual(state.results[0].status, "created")
 
@@ -114,14 +125,28 @@ class CacheTests(unittest.TestCase):
         cache.configure(clear=True)
         self.assertFalse(cache.directories())
 
-    def test_bass_preparation_includes_the_drums_prerequisite(self):
+    def test_bass_is_not_a_preparation_role(self):
         current = self.make_job("first")
         with_bass = job.StemJob(self.runtime, current.collection, current.playlist,
                                current.output_root, roles=("bass",))
-        self.assertEqual(with_bass.roles, ("vocals", "drums", "bass"))
+        self.assertEqual(with_bass.roles, ("vocals",))
 
     def test_manifest_paths_cannot_escape_the_stems_directory(self):
         state, _ = self.prepare()
         entry = state.results[0].as_manifest_entry()
         entry["stems"][0]["file"] = "../track.wav"
         self.assertIsNone(cache.verified_files(state.output, entry, ("vocals",)))
+
+    def test_waveform_failure_preserves_the_previous_complete_package(self):
+        state, _ = self.prepare()
+        target = state.output / state.results[0].stem
+        before = target.read_bytes()
+        self.source.write_bytes(b"changed source")
+        current = self.make_job("first")
+        with patch.object(current, "_separate", return_value={"vocals": self.source}), \
+             patch.object(job, "write_stem", side_effect=self.encode), \
+             patch.object(waveform, "build", side_effect=ValueError("waveform failure")):
+            result = current.run()
+        self.assertEqual(len(result.errors), 1)
+        self.assertEqual(target.read_bytes(), before)
+        self.assertFalse(list(state.output.glob('*.partial')))

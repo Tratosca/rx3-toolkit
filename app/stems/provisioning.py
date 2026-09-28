@@ -25,6 +25,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, replace
 from typing import Callable, Iterable, Sequence
+from app.stems import processes
 
 
 ProgressCallback = Callable[[str], None]
@@ -37,10 +38,12 @@ SEPARATOR_COMMAND = "audio-separator"
 # audio-separator still calls librosa.get_duration(filename=...) and imports
 # audioread, both removed in librosa 1.0, so the managed environment pins the
 # last release that provides them.
-LIBROSA_PIN = "librosa<1.0"
+SEPARATOR_VERSION = "0.44.5"
+LIBROSA_PIN = "librosa==0.11.0"
 # imageio-ffmpeg ships a static FFmpeg for every platform this project releases
 # on, which avoids maintaining a per-platform download and checksum matrix.
-SUPPORT_PACKAGES = (LIBROSA_PIN, "imageio-ffmpeg")
+SUPPORT_PACKAGES = (LIBROSA_PIN, "imageio-ffmpeg==0.6.0")
+MAC_ARM_INFERENCE = ("torch==2.13.0", "onnxruntime==1.28.0")
 MINIMUM_PYTHON = (3, 10)
 # audio-separator pins beartype below 0.19, whose newest declared interpreter is
 # 3.13. On 3.14 it rejects the separator's own annotations, so an interpreter
@@ -89,7 +92,7 @@ class Acceleration:
 
     @property
     def requirement(self) -> str:
-        return f"audio-separator[{self.extra}]"
+        return f"audio-separator[{self.extra}]=={SEPARATOR_VERSION}"
 
 
 AUTOMATIC = "auto"
@@ -321,7 +324,8 @@ class Runtime:
 
     @property
     def ready(self) -> bool:
-        return self.separator is not None and self.ffmpeg is not None
+        return (self.separator is not None and self.ffmpeg is not None and
+                not (self.managed and (self.environment / '.installing').exists()))
 
     @property
     def managed(self) -> bool:
@@ -336,6 +340,9 @@ class Runtime:
 
     @property
     def summary(self) -> str:
+        if self.managed and (self.environment / '.installing').exists():
+            from app.localization import Message
+            return Message('stems.needRuntime')
         notes = " ".join(
             f"{path.name} lacks the {', '.join(absent)} filter."
             for path, absent in self.ffmpeg_incomplete
@@ -566,18 +573,26 @@ def _venv_version(interpreter: pathlib.Path) -> tuple[int, int] | None:
 def _stream(command: Sequence[str], progress: ProgressCallback, label: str) -> None:
     """Run a provisioning step, forwarding its output to the interface."""
     progress(label)
-    process = subprocess.Popen(
+    process = processes.start(
         [str(item) for item in command],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     assert process.stdout is not None
     tail: list[str] = []
-    for line in process.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        tail = (tail + [line])[-12:]
-        progress(f"{label}: {line[:160]}")
+    try:
+        for line in process.stdout:
+            processes.checkpoint()
+            line = line.strip()
+            if not line:
+                continue
+            tail = (tail + [line])[-12:]
+            progress(f"{label}: {line[:160]}")
+        process.wait()
+    finally:
+        process.stdout.close()
+        if process.poll() is None:
+            processes.stop(process)
+    processes.checkpoint()
     if process.wait():
         detail = " / ".join(tail)[-500:]
         raise ProvisioningError(f"{label} failed: {detail or 'no output'}")
@@ -594,8 +609,9 @@ def install_packages(
             str(python), "-m", "pip", "install",
             "--index-url", acceleration.torch_index, "torch",
         ]
+    inference = MAC_ARM_INFERENCE if sys.platform == "darwin" and platform.machine() in ("arm64", "aarch64") else ()
     yield f"Installing audio-separator for {acceleration.label}", [
-        str(python), "-m", "pip", "install", acceleration.requirement, *SUPPORT_PACKAGES,
+        str(python), "-m", "pip", "install", acceleration.requirement, *SUPPORT_PACKAGES, *inference,
     ]
 
 
@@ -668,15 +684,19 @@ def provision(
             [str(interpreter), "-m", "venv", str(environment)],
             progress, "Creating the runtime environment",
         )
+    marker = environment / '.installing'
+    marker.touch()
     for label, command in install_packages(environment, acceleration):
         _stream(command, progress, label)
 
     runtime = detect(environment)
-    if not runtime.ready:
+    if runtime.separator is None or runtime.ffmpeg is None:
         raise ProvisioningError(
             "The runtime was installed but audio-separator or FFmpeg could not be "
             f"resolved under {environment}."
         )
+    processes.checkpoint()
+    marker.unlink()
     (data_directory() / STATE_NAME).write_text(
         json.dumps({"accelerator": acceleration.key}, indent=2) + "\n", encoding="utf-8"
     )

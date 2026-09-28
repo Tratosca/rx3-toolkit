@@ -8,6 +8,7 @@ import pathlib
 import re
 import struct
 import subprocess
+from app.stems import processes
 import tempfile
 from dataclasses import dataclass
 
@@ -21,6 +22,10 @@ ROLE_SUFFIXES = {"vocals": ".rx3stem", "drums": ".rx3drums", "bass": ".rx3bass"}
 # an interrupted run leaves the useful stem behind rather than two it cannot
 # use on its own.
 ROLE_ORDER = ("vocals", "drums", "bass")
+# What a new preparation or import writes. INST is never a file: the deck
+# rebuilds it from the original mix, and the bass stays in it. Bass remains in
+# ROLE_ORDER only so that older files and packages holding it stay readable.
+PREPARED_ROLES = ("vocals", "drums")
 # Written under this suffix and renamed once complete, so a drive pulled mid
 # write never carries a stem the deck would read as a short track.
 PARTIAL_SUFFIX = ".partial"
@@ -30,7 +35,7 @@ MAGIC = b"RX3STM1\0"
 SAMPLE_RATE = 44100
 CHANNELS = 2
 # Sample format identifier, ffmpeg raw format, and interleaved stereo frame size.
-FORMATS = {"s16": (2, "s16le", 4), "f32": (1, "f32le", 8)}
+FORMATS = {"s16": (2, "s16le", 4), "f32": (1, "f32le", 8), "s16_gain": (3, "s16le", 4)}
 # ffmpeg negotiates a filter chain backwards from the output format, so an
 # `s16le` destination would hand `astats` samples already clamped to full scale
 # and hide the very overshoot being measured. The conversion has to come after.
@@ -76,6 +81,7 @@ class StemResult:
     # the separator's own grid, which is only correct for a source without any.
     aligned: bool = True
     peak: float | None = None
+    playback_gain: float = 1.0
 
 
 def _decode(
@@ -87,11 +93,38 @@ def _decode(
     """Run one ffmpeg pass, returning its log when `report` asks for measurements."""
     level = "info" if report else "error"
     command = [str(ffmpeg), "-hide_banner", "-loglevel", level, "-y", *arguments]
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = processes.run(command, capture_output=True, text=True)
     if result.returncode:
         detail = " ".join((result.stderr or result.stdout).split())[-260:]
         raise RuntimeError(f"ffmpeg exited with code {result.returncode}: {detail}")
     return result.stderr or ""
+
+
+def count_frames(source: pathlib.Path, ffmpeg: pathlib.Path | str = "ffmpeg",
+                 checkpoint=lambda: None) -> int:
+    """Frames of the untrimmed decode, the grid every stem of `source` is cut on.
+
+    The audio streams through a pipe and is counted, never stored, so a long
+    track costs one decode and no disk space.
+    """
+    command = [str(ffmpeg), "-hide_banner", "-loglevel", "error", *UNTRIMMED,
+               "-i", str(source), "-map", "0:a:0", "-vn", "-ar", str(SAMPLE_RATE),
+               "-ac", str(CHANNELS), "-f", "f32le", "pipe:1"]
+    total = 0
+    with processes.start(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        try:
+            while block := process.stdout.read(1 << 20):
+                total += len(block)
+                checkpoint()
+        except BaseException:
+            process.kill()
+            raise
+        error = process.stderr.read().decode(errors="replace")
+    processes.checkpoint()
+    if process.returncode or total % 8:
+        detail = " ".join(error.split())[-260:]
+        raise RuntimeError(f"ffmpeg exited with code {process.returncode}: {detail}")
+    return total // 8
 
 
 def _peak_amplitude(report: str) -> float | None:
@@ -241,6 +274,22 @@ def write_stem(
             arguments.extend(["-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS)])
         chain.append(MEASURE)
         arguments.extend(["-af", ",".join(chain)])
+        playback_gain = 1.0
+        reserved = b"\0" * 32
+        if sample_format == "s16_gain":
+            floating = workspace / "aligned.f32"
+            report = _decode(ffmpeg, arguments + ["-f", "f32le", str(floating)], report=True)
+            peak = _peak_amplitude(report)
+            if peak is None or not math.isfinite(peak):
+                raise ValueError("Cannot measure separated stem headroom")
+            # Round the stored scale upward: s16 never clips on quantization.
+            playback_gain = max(1.0, peak * 32768 / 32767 * (1 + 1e-6))
+            if playback_gain > 64:
+                raise ValueError("Separated stem gain exceeds supported headroom")
+            playback_gain = struct.unpack("<f", struct.pack("<f", playback_gain))[0]
+            reserved = struct.pack("<f", playback_gain) + b"\0" * 28
+            arguments = ["-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "2",
+                         "-i", str(floating), "-af", f"volume={1/playback_gain:.12g}:precision=float,{MEASURE}"]
         arguments.extend(["-f", ffmpeg_format, str(raw)])
         measured = _decode(ffmpeg, arguments, report=bool(chain))
         # Only the samples where the vocal alone exceeds full scale are lost,
@@ -258,7 +307,7 @@ def write_stem(
                 f"vocal length mismatch after conversion: {frames} != {target_frames} frames"
             )
         header = HEADER.pack(
-            MAGIC, SAMPLE_RATE, CHANNELS, format_id, HEADER.size, frames, b"\0" * 32
+            MAGIC, SAMPLE_RATE, CHANNELS, format_id, HEADER.size, frames, reserved
         )
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("wb") as destination, raw.open("rb") as payload:
@@ -276,4 +325,5 @@ def write_stem(
         delay=delay,
         aligned=aligned,
         peak=_peak_amplitude(measured),
+        playback_gain=playback_gain,
     )

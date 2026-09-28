@@ -673,9 +673,9 @@ def input_normalization(settings: Settings, architecture: str | None) -> float |
 
     MDX and MDXC rescale the mix, so their stem is returned in that scaled
     domain and the stem encoder has to undo the factor. Demucs and VR leave
-    the mix alone; they only rescale a stem that peaks above the threshold on
-    its own, which at 1.0 means a vocal above full scale that no `s16` stem
-    could carry anyway. An unrecognised architecture is treated the same way.
+    the mix alone. The worker exports floating-point outputs without the
+    engine writer's peak normalization; the encoder stores headroom in each
+    PCM header. An unrecognised architecture is treated the same way.
     """
     if architecture not in ("MDX", "MDXC"):
         return None
@@ -686,3 +686,24 @@ def known_option_names() -> Iterable[str]:
     for options in (COMMON_OPTIONS, *ARCHITECTURE_OPTIONS.values()):
         for option in options:
             yield option.name
+
+
+def for_roles(settings: Settings, catalogue: Catalogue | None, roles, *, accelerates_torch=True) -> Settings:
+    """Resolve a preset for the requested outputs; custom models stay explicit.
+
+    Three-part preparation uses Demucs on every platform. On machines without
+    accelerated Torch it may be slower, but the drums remain available.
+    """
+    item = preset(settings.mode)
+    if item is None or catalogue is None:
+        return settings
+    if "drums" not in roles:
+        return apply_preset(settings, item, catalogue, accelerates_torch=accelerates_torch)
+    names = (("htdemucs_ft.yaml", "htdemucs.yaml", "hdemucs_mmi.yaml")
+             if settings.mode == QUALITY_MODE else ("htdemucs.yaml", "hdemucs_mmi.yaml", "htdemucs_ft.yaml"))
+    candidates = [catalogue.by_filename(name) for name in names]
+    model = next((m for m in candidates if m and {"vocals", "drums"} <= set(m.roles)), None)
+    if model is None:
+        return settings  # Capability validation provides the actionable error.
+    shifts = {QUALITY_MODE: 4, NORMAL_MODE: 2, QUICK_MODE: 1}[settings.mode]
+    return replace(settings, model=model.filename, values={"demucs_shifts": shifts})

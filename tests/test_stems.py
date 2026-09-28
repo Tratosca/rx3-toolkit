@@ -12,6 +12,7 @@ import unittest.mock
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.stems import provisioning, stem
+from package_fixture import isolate
 from app.stems.job import StemJob
 from app.stems.rekordbox import EXPORT_STEM_LIMIT, export_stem, parse_collection
 
@@ -49,6 +50,7 @@ class RekordboxTests(unittest.TestCase):
 
 class JobTests(unittest.TestCase):
     def setUp(self):
+        isolate(self)
         process = unittest.mock.patch("app.stems.safety.library_busy", return_value=False)
         process.start()
         self.addCleanup(process.stop)
@@ -114,7 +116,7 @@ class JobTests(unittest.TestCase):
             state = StemJob(self.runtime(), collection, collection.playlists[0], output).run()
             self.assertEqual(len(state.results), 1)
             self.assertEqual(len(state.errors), 1)
-            self.assertIn("Ambiguous filename", state.errors[0].error)
+            self.assertEqual(state.errors[0].error.key, "stems.collision")
 
 class StemGainTests(unittest.TestCase):
     """The deck computes `full mix − vocal`, so the stem has to come back in the

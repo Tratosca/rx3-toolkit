@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import array
 import math
+import operator
+from itertools import repeat
 import struct
 from dataclasses import dataclass, field
 
@@ -53,7 +55,7 @@ def reconstruct(mix, roles, selected, state=None, *, timeline=None):
     if any(len(role) != len(mix) for role in roles):
         raise LocalizedError("stems.auditionLength")
     output = array.array("f", mix)
-    target = [float(bool(selected & (1 << i))) for i in range(count + 1)]
+    target = [float(bool(selected & (1 << (0 if i == 3 else i)))) for i in range(count + 1)]
     changed = any(target[i] != state.target[i] for i in range(count + 1))
     if changed:
         state.start = list(state.gain)
@@ -83,4 +85,34 @@ def reconstruct(mix, roles, selected, state=None, *, timeline=None):
             output[index + channel] = value
         if state.cursor >= RAMP_FRAMES:
             state.gain[:count + 1] = state.target[:count + 1]
+    return output
+
+
+def reconstruct_static(mix, roles, selected):
+    """Exact player arithmetic for waveform masks, without volume ramps.
+
+    Each array construction rounds one addition to float32, in player order.
+    An s16 or gain-restored float32 value times 0 or +/-2**-15 is already exactly representable, so
+    it needs no struct pack/unpack. Only current one/two-file packages use it.
+    """
+    count = len(roles)
+    if (not 1 <= count <= 2 or selected < 0 or
+            selected > (3 if count == 1 else 7) or len(mix) % 2):
+        raise LocalizedError("stems.auditionSelection")
+    if any(len(role) != len(mix) for role in roles):
+        raise LocalizedError("stems.auditionLength")
+    if selected == (2 << count) - 1:
+        return array.array("f", mix)
+    residual = float(bool(selected & 1))
+    output = array.array("f", map(operator.mul, mix, repeat(residual)))
+    for index, role in enumerate(roles):
+        bit = 1 << (index + 1)
+        gain = (float(bool(selected & bit)) - residual) / 32768.0
+        # Keep even zero-gain additions: they can change the sign of zero.
+        output = array.array("f", map(operator.add, output, map(operator.mul, role, repeat(gain))))
+    # The player suppresses all stems when both original channels are zero.
+    for index in range(0, len(mix), 2):
+        if mix[index] == 0 and mix[index + 1] == 0:
+            output[index] = mix[index]
+            output[index + 1] = mix[index + 1]
     return output

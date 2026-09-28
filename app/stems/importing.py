@@ -8,12 +8,13 @@ import math
 import pathlib
 import statistics
 import subprocess
+from app.stems import processes
 import sys
 import tempfile
 import threading
 
 from app.localization import LocalizedError
-from app.stems import cache, provisioning, safety, stem
+from app.stems import cache, limits, provisioning, safety, stem
 from app.stems.rekordbox import export_stem
 
 # Correlation is evidence of a shared signal, never proof of a source role.
@@ -38,7 +39,7 @@ def assignments(library, track_id, values=None):
             data = {}
         if values is not None:
             values = {role: str(value) for role, value in values.items()
-                      if role in stem.ROLE_ORDER and value}
+                      if role in stem.PREPARED_ROLES and value}
             data[key] = values
             path.parent.mkdir(parents=True, exist_ok=True)
             partial = path.with_suffix(".partial")
@@ -50,7 +51,7 @@ def assignments(library, track_id, values=None):
 def audio_info(path, ffmpeg):
     probe = pathlib.Path(ffmpeg).with_name("ffprobe" + (".exe" if sys.platform == "win32" else ""))
     command = str(probe) if probe.is_file() else "ffprobe"
-    result = subprocess.run([command, "-v", "error", "-select_streams", "a:0",
+    result = processes.run([command, "-v", "error", "-select_streams", "a:0",
                              "-show_entries", "stream=codec_name,channels", "-of", "json", str(path)],
                             capture_output=True, text=True)
     try:
@@ -92,7 +93,7 @@ def samples(path, start, frames):
         values.frombytes(source.read(frames * 8))
     if sys.byteorder != "little":
         values.byteswap()
-    if any(not math.isfinite(value) for value in values):
+    if not all(map(math.isfinite, values)):
         raise LocalizedError("stems.importUnreadable", name=path.name)
     return values
 
@@ -192,14 +193,16 @@ def inspect_role(mix, imported, frames, imported_frames, checkpoint=lambda: None
             "gainCertified": False, "windows": results}
 
 
-def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None):
-    roles = tuple(role for role in stem.ROLE_ORDER if inputs.get(role))
-    if "vocals" not in roles or ("bass" in roles and "drums" not in roles):
+def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None, *, waveforms=True):
+    roles = tuple(role for role in stem.PREPARED_ROLES if inputs.get(role))
+    if "vocals" not in roles:
         raise LocalizedError("stems.importRoles")
     for role in roles:
         lossless(pathlib.Path(inputs[role]), ffmpeg)
     mix = workspace / "mix.f32"
     frames = decode(source, mix, ffmpeg, untrimmed=True)
+    # Exact from here: refuse before decoding and aligning every stem.
+    limits.require(frames, len(roles), waveforms=waveforms)
     raw = {}
     lengths = {}
     for role in roles:
@@ -247,10 +250,17 @@ def prepare(source, inputs, workspace, ffmpeg="ffmpeg", checkpoint=lambda: None)
                      "residualCertified": False, "frames": frames}
 
 
-def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
+def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None, *, waveforms=True):
     from app.stems import waveform
 
     safety.require_library_closed()
+    roles = [role for role in stem.PREPARED_ROLES if inputs.get(role)]
+    if "vocals" not in roles:
+        raise LocalizedError("stems.importRoles")
+    # Nothing is created on the drive for a track the deck would refuse.
+    verdict = limits.estimate(track.duration, len(roles), waveforms=waveforms)
+    if verdict.refused:
+        raise limits.LimitError(verdict.message(len(roles)))
     output = drive / "RX3_STEMS"
     safety.check_target(output / safety.MANIFEST_NAME)
     output.mkdir(exist_ok=True)
@@ -258,35 +268,31 @@ def publish(track, inputs, drive, ffmpeg="ffmpeg", checkpoint=lambda: None):
     for suffix in stem.ROLE_SUFFIXES.values():
         safety.check_target(output / (base + suffix))
     stamps = {path: safety.source_stamp(path) for path in {track.location, *(pathlib.Path(p) for p in inputs.values() if p)}}
-    safety.require_space(output, safety.estimated_bytes(track, len(inputs), ffmpeg))
+    safety.require_space(output, safety.estimated_bytes(track, len(roles), ffmpeg))
     with tempfile.TemporaryDirectory(prefix="rx3-import-") as directory:
         workspace = pathlib.Path(directory)
-        outputs, report = prepare(track.location, inputs, workspace, ffmpeg, checkpoint)
+        outputs, report = prepare(track.location, inputs, workspace, ffmpeg, checkpoint, waveforms=waveforms)
         checkpoint()
         for path, before in stamps.items():
             safety.check_source(path, before)
         safety.require_space(output, sum(path.stat().st_size for path in outputs.values()))
-        waveform.invalidate(track, drive)
-        for role in reversed(stem.ROLE_ORDER[1:]):
-            old = output / (base + stem.ROLE_SUFFIXES[role])
-            safety.check_target(old)
-            old.unlink(missing_ok=True)
-        safety.sync_directory(output)
-        entries = []
-        for role, local in outputs.items():
-            checkpoint()
-            for path, before in stamps.items():
-                safety.check_source(path, before)
-            target = output / (base + stem.ROLE_SUFFIXES[role])
-            safety.publish(local, target)
-            entries.append({"role": role, "file": target.name, "bytes": target.stat().st_size,
-                            "sha256": safety.digest(target), "clippedSamples": report["roles"][role]["clippedSamples"]})
-        report["waveform"] = waveform.prepare(track, drive, stamps[track.location][2], ffmpeg, checkpoint)
+        from app.stems import package
+        local_package = package.build(track, drive, outputs, workspace, stamps[track.location][2],
+                                      ffmpeg, checkpoint, {"origin": "imported", "checks": report}, waveforms=waveforms)
+        for path, before in stamps.items():
+            safety.check_source(path, before)
+        checkpoint()
+        target = output / (base + ".rx3stem")
+        package.publish(local_package, target)
+        report["waveform"] = waveforms
+        entries = [{"role": role, "file": target.name, "bytes": target.stat().st_size,
+                    "sha256": safety.digest(target), "clippedSamples": report["roles"][role]["clippedSamples"]}
+                   for role in outputs]
         manifest, _ = cache.read_manifest(drive)
         name = base + stem.ROLE_SUFFIXES["vocals"]
         entry = {"trackId": track.track_id, "artist": track.artist, "title": track.title,
                  "stem": name, "origin": "imported", "source_sha256": stamps[track.location][2],
-                 "source_bytes": stamps[track.location][0], "processing": {"origin": "imported", "version": 1, "sample_format": "s16", "stem_version": 1},
+                 "source_bytes": stamps[track.location][0], "processing": {"origin": "imported", "version": 1, "sample_format": "s16", "stem_version": 2},
                  "import_sha256": {role: stamps[pathlib.Path(path)][2] for role, path in inputs.items() if path},
                  "gainCorrection": 1.0, "encoderDelayFrames": 0, "checks": report, "stems": entries}
         manifest = [old for old in manifest if old.get("stem") != name] + [entry]

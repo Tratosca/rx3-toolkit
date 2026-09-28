@@ -22,7 +22,7 @@ LOCK = threading.RLock()
 def signature(settings, architecture, roles):
     return {"model": settings.model, "architecture": architecture,
             "preset": settings.mode, "arguments": settings.arguments(architecture),
-            "sample_format": "s16", "stem_version": 1, "encoder_version": 1,
+            "sample_format": "s16_gain", "stem_version": 3, "encoder_version": 2,
             "roles": list(roles)}
 
 
@@ -47,8 +47,27 @@ def read_manifest(root):
 
 
 def verified_files(directory, entry, roles):
+    from app.stems import package
     found = {}
     lengths = set()
+    # A package is validated once and then exposed as bounded PCM members.
+    try:
+        name = entry.get("stem", "")
+        if not name or pathlib.Path(name).name != name or "\\" in name:
+            return None
+        container = directory / name
+        if container.is_file() and package.is_package(container):
+            parsed = package.read(container)
+            if tuple(roles) != parsed["roles"]:
+                return None
+            digest = safety.digest(container)
+            for role in roles:
+                item = next(i for i in entry["stems"] if i["role"] == role)
+                if (item["file"], item["bytes"], item["sha256"]) != (name, container.stat().st_size, digest):
+                    return None
+            return dict(zip(roles, parsed["members"][:-2]))
+    except (OSError, ValueError, KeyError, TypeError, StopIteration, struct.error):
+        return None
     try:
         for role in roles:
             item = next(item for item in entry["stems"] if item["role"] == role)
@@ -60,7 +79,9 @@ def verified_files(directory, entry, roles):
             size = path.stat().st_size
             with path.open("rb") as source:
                 magic, rate, channels, fmt, header, frames, reserved = stem.HEADER.unpack(source.read(64))
-            if (magic, rate, channels, fmt, header, reserved) != (stem.MAGIC, 44100, 2, 2, 64, b"\0" * 32):
+            from app.stems.audition import pcm_gain
+            pcm_gain(fmt, reserved)
+            if (magic, rate, channels, header) != (stem.MAGIC, 44100, 2, 64):
                 return None
             if not frames or size != 64 + frames * 4 or size != item["bytes"]:
                 return None
@@ -166,10 +187,14 @@ def find(source_hash, processing, roles, destination, workspace):
             copies = {}
             try:
                 for role, path in files.items():
+                    expected = safety.digest(path) if hasattr(path, "crc") else next(
+                        item["sha256"] for item in entry["stems"] if item["role"] == role)
                     target = workspace / (role + stem.ROLE_SUFFIXES[role])
-                    shutil.copyfile(path, target)
-                    expected = next(item["sha256"] for item in entry["stems"] if item["role"] == role)
-                    if safety.digest(target) != expected:
+                    with path.open("rb") as source, target.open("wb") as output:
+                        shutil.copyfileobj(source, output)
+                    from app.stems import package
+                    if (hasattr(path, "crc") and package.checksum(target) != path.crc or
+                            safety.digest(target) != expected):
                         raise ValueError("cache changed")
                     copies[role] = target
                 if cached:
@@ -198,8 +223,12 @@ def remember(directory, entry, roles):
                 shutil.rmtree(target)
         with tempfile.TemporaryDirectory(prefix=".prepare-", dir=base) as temp:
             stage = pathlib.Path(temp)
-            for path in files.values():
-                shutil.copyfile(path, stage / path.name)
+            copied = set()
+            for member in files.values():
+                path = getattr(member, "path", member)
+                if path not in copied:
+                    shutil.copyfile(path, stage / path.name)
+                    copied.add(path)
             (stage / "entry.json").write_text(json.dumps(entry) + "\n")
             # The temporary directory context tolerates its renamed path.
             stage.replace(target)

@@ -17,12 +17,36 @@ from app.stems.rekordbox import export_stem
 MAX_SECONDS = 30
 
 
+def pcm_gain(fmt, reserved):
+    if fmt == 2 and reserved == b"\0" * 32:
+        return 1.0
+    if fmt == 3 and reserved[4:] == b"\0" * 28:
+        gain = struct.unpack("<f", reserved[:4])[0]
+        if math.isfinite(gain) and 1 <= gain <= 64:
+            return gain
+    raise ValueError("Invalid PCM gain")
+
+
+def read_pcm(stream, count, gain=1.0):
+    values = array.array("h", stream.read(count * 4))
+    if sys.byteorder != "little": values.byteswap()
+    # Keep the existing mixer domain, with float32 rounding matching the RX3.
+    return values if gain == 1 else array.array("f", (v * gain for v in values))
+
+
+def gain(path):
+    with path.open("rb") as stream:
+        fields = stem.HEADER.unpack(stream.read(64))
+    return pcm_gain(fields[3], fields[6])
+
+
 def header(path):
     safety.check_target(path)
     try:
         with path.open("rb") as source:
             magic, rate, channels, fmt, offset, frames, reserved = stem.HEADER.unpack(source.read(64))
-        if ((magic, rate, channels, fmt, offset, reserved) != (stem.MAGIC, 44100, 2, 2, 64, b"\0" * 32)
+        pcm_gain(fmt, reserved)
+        if ((magic, rate, channels, offset) != (stem.MAGIC, 44100, 2, 64)
                 or not 0 < frames <= 0x5000000 or path.stat().st_size != 64 + frames * 4):
             raise ValueError()
     except (OSError, ValueError, struct.error):
@@ -31,6 +55,14 @@ def header(path):
 
 
 def role_files(directory, base):
+    from app.stems import package
+    container = directory / (base + ".rx3stem")
+    if container.is_file() and package.is_package(container):
+        try:
+            parsed = package.read(container)
+            return parsed["members"][:-2], parsed["frames"], []
+        except (ValueError, OSError, struct.error):
+            raise LocalizedError("stems.auditionInvalid", name=container.name) from None
     files = []
     frames = None
     rejected = []
@@ -76,7 +108,7 @@ def excerpt(source, files, selection, start, seconds, ffmpeg="ffmpeg"):
     lengths = [header(path) for path in files]
     if len(set(lengths)) != 1:
         raise LocalizedError("stems.auditionLength")
-    available = (2 << len(files)) - 1
+    available = ((2 << len(files)) - 1) & 7
     options = selection if isinstance(selection, dict) else {"mask": selection}
     mask = options.get("mask", available)
     if mask == "original":
@@ -101,10 +133,7 @@ def excerpt(source, files, selection, start, seconds, ffmpeg="ffmpeg"):
     for path in files:
         with path.open("rb") as audio:
             audio.seek(64 + first * 4)
-            values = array.array("h")
-            values.frombytes(audio.read(count * 4))
-        if sys.byteorder != "little":
-            values.byteswap()
+            values = read_pcm(audio, count, gain(path))
         roles.append(values)
     ramp = []
     mixed = mixing.reconstruct(full, roles, mask, state, timeline=ramp)
@@ -127,7 +156,7 @@ def on_drive(source, drive, selection, start=0, seconds=30, ffmpeg="ffmpeg"):
 
 def imported(source, inputs, selection, start=0, seconds=30, ffmpeg="ffmpeg"):
     with tempfile.TemporaryDirectory(prefix="rx3-listen-import-") as directory:
-        outputs, report = importing.prepare(source, inputs, pathlib.Path(directory), ffmpeg)
+        outputs, report = importing.prepare(source, inputs, pathlib.Path(directory), ffmpeg, waveforms=False)
         result = excerpt(source, list(outputs.values()), selection, start, seconds, ffmpeg)
         result["checks"] = report
         return result

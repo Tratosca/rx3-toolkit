@@ -19,9 +19,9 @@ from app.localization import Message, LocalizedError
 import dataclasses
 import pathlib
 
-from app.stems import estimate, provisioning, separation, safety
+from app.stems import estimate, limits, provisioning, separation, safety, stem, overcue_option
 from app.stems.job import JobState, StemJob
-from app.stems.rekordbox import Collection, parse_collection, parse_drive
+from app.stems.rekordbox import Collection, Playlist, parse_collection, parse_drive
 from app.stems.rekordbox import has_export
 
 
@@ -91,34 +91,64 @@ def is_library(source: pathlib.Path) -> bool:
     return source.is_file() and source.suffix.lower() == ".xml"
 
 
-def forecast(library: Library, playlist_id: str, settings=None, roles=("vocals",)) -> dict:
+def prepared_roles(roles=None) -> tuple[str, ...]:
+    """The Toolkit always prepares vocals and drums; INST is reconstructed."""
+    return stem.PREPARED_ROLES
+
+
+def preparation_settings(current=None, catalogue=None):
+    """One preparation policy, including installations with old saved presets."""
+    current = current or separation.load_settings(settings_file())
+    fixed = separation.Settings(model="htdemucs.yaml", accelerator=current.accelerator,
+                                values={"demucs_shifts": 1}, mode=separation.QUICK_MODE)
+    return separation.for_roles(fixed, catalogue, stem.PREPARED_ROLES)
+
+
+def drums_blocked(settings, catalogue, accelerates_torch) -> Message | None:
+    """Report missing preparation capability without offering removed modes."""
+    if catalogue is None:
+        return Message("stems.drumsModelUnknown")
+    model = catalogue.by_filename(settings.model)
+    if model is not None and {"vocals", "drums"} <= set(model.roles):
+        return None
+    return Message("stems.preparationUnavailable")
+
+
+def forecast(library: Library, playlist_id: str, settings=None, roles=stem.PREPARED_ROLES, waveforms=True) -> dict:
     """What the run would cost, before anyone commits to it.
 
     Returns no estimate rather than a fabricated one when the durations are not
-    in the export, which is the case that made this worth having.
+    in the export, which is the case that made this worth having. Each track
+    also gets the loader's verdict on its package, from its listed duration.
     """
     playlist = library.collection.playlist(playlist_id)
-    settings = settings or separation.Settings()
+    catalogue = _catalogue()
+    settings = preparation_settings(settings, catalogue)
+    waveforms = True
     accelerator = provisioning.resolve_acceleration(settings.accelerator)
     estimator = estimate.estimator_for(
         provisioning.data_directory() / "rates.json", None, accelerator.key)
     result = estimate.forecast(playlist.tracks, estimator)
-    selected = set(roles) | {"vocals"}
-    if "bass" in selected:
-        selected.add("drums")
-    selected &= {"vocals", "drums", "bass"}
-    # Half the 512 MiB shared resident cap leaves the other deck equal room.
-    warning_bytes = 256 * 1024 * 1024
+    selected = prepared_roles(roles)
+    count = len(selected)
     memory = []
     for track in playlist.tracks:
-        per_role = int(track.duration * 44100) * 4 + 64 if track.duration > 0 else None
-        total = per_role * len(selected) if per_role is not None else None
+        verdict = limits.estimate(track.duration, count, waveforms=waveforms)
         memory.append({"id": track.track_id, "title": track.title, "artist": track.artist,
-                       "perRole": per_role, "total": total,
-                       "warning": total is not None and total > warning_bytes})
+                       "status": verdict.status, "reason": verdict.reason, "total": verdict.size,
+                       "message": verdict.message(count)})
+    refused = sum(item["status"] == "refused" for item in memory)
+    blocked = drums_blocked(settings, catalogue, accelerator.accelerates_torch)
     return {
         "tracks": result.tracks,
-        "memory": memory, "memoryWarningBytes": warning_bytes,
+        "overcueStorage": overcue_option.estimate(playlist.tracks),
+        "roles": list(selected),
+        "memory": memory,
+        "refused": refused,
+        "blocked": blocked,
+        "limits": {"vocals": limits.clock(limits.max_frames(1, waveforms=waveforms)),
+                   "drums": limits.clock(limits.max_frames(2, waveforms=waveforms)),
+                   "resident": limits.mib(limits.RESIDENT_BYTES)},
         "audioSeconds": result.audio_seconds,
         "seconds": result.seconds,
         "measured": result.measured,
@@ -134,8 +164,11 @@ def job(
     output: pathlib.Path,
     *,
     settings=None,
-    roles=("vocals",),
+    roles=stem.PREPARED_ROLES,
+    waveforms=True,
     observer=lambda snapshot: None,
+    tracks=None,
+    overcue_compatible=False,
 ) -> StemJob:
     """A job ready to run, not a job running.
 
@@ -144,17 +177,25 @@ def job(
     already written is renamed into place and a partial one is removed.
     """
     safety.require_library_closed()
-    playlist = library.collection.playlist(playlist_id)
+    playlist = (library.collection.playlist(playlist_id) if tracks is None else
+                Playlist("selection", "Selection", "Selection", tuple(tracks)))
     detected = provisioning.detect()
     if not detected.ready:
         raise LocalizedError("stems.engineMissing")
-    current = settings or separation.Settings()
     catalogue = _catalogue()
+    current = preparation_settings(settings, catalogue)
+    wanted = prepared_roles(roles)
+    acceleration = provisioning.resolve_acceleration(current.accelerator)
+    blocked = drums_blocked(current, catalogue, acceleration.accelerates_torch)
+    if blocked is not None:
+        raise LocalizedError(blocked.key, **blocked.params)
     architecture = catalogue.architecture_of(current.model) if catalogue else None
+    additional = overcue_option.Export(output, playlist.tracks) if overcue_compatible else None
     return StemJob(
         detected, library.collection, playlist, pathlib.Path(output),
-        settings=current, roles=roles, architecture=architecture,
-        observer=lambda state: observer(state.as_dict()),
+        settings=current, roles=wanted, architecture=architecture, waveforms=True,
+        observer=lambda state: observer(state.as_dict()), upgrade_existing=True,
+        overcue_export=additional,
     )
 
 
@@ -183,60 +224,31 @@ def _catalogue(refresh: bool = False):
         return None
 
 
-def qualities() -> dict:
-    """The speed and quality trade-offs, in the terms of this machine.
-
-    Which model expresses a preset depends on what this build accelerates, so
-    the summaries are resolved here rather than quoted from a table.
-    """
-    current = separation.load_settings(settings_file())
+def qualities(roles=None) -> dict:
+    """Compatibility response for the fixed three-stem preparation policy."""
+    catalogue = _catalogue()
+    current = preparation_settings(catalogue=catalogue)
     acceleration = provisioning.resolve_acceleration(current.accelerator)
-    torch = acceleration.accelerates_torch
     return {
-        "mode": current.mode,
-        "model": current.model,
-        "accelerator": current.accelerator,
-        "custom": current.mode == separation.CUSTOM_MODE,
-        "presets": [
-            {
-                "key": item.key,
-                "label": Message("quality." + item.key + ".name"),
-                "summary": Message("quality." + item.key + (".torch" if torch else ".light")),
-            }
-            for item in separation.PRESETS
-        ],
+        "mode": current.mode, "model": current.model,
+        "accelerator": current.accelerator, "custom": False,
+        "drumsBlocked": drums_blocked(current, catalogue, acceleration.accelerates_torch) if catalogue else None,
+        "presets": [],
+        "overcue": overcue_option.status(),
     }
 
 
-def choose(mode: str | None = None, accelerator: str | None = None) -> dict:
-    """Store a quality, an accelerator, or both, and answer with the result."""
-    path = settings_file()
-    current = separation.load_settings(path)
+def choose(mode=None, accelerator=None, roles=None) -> dict:
+    """Only acceleration remains configurable; stale clients cannot change policy."""
+    current = preparation_settings(catalogue=_catalogue())
     if accelerator is not None:
         current = current.with_accelerator(accelerator)
-    if mode is not None:
-        item = separation.preset(mode)
-        if item is None:
-            raise LocalizedError("error.quality", mode=mode)
-        catalogue = _catalogue()
-        acceleration = provisioning.resolve_acceleration(current.accelerator)
-        if catalogue is None:
-            # The model cannot be resolved yet. Recording the choice is still
-            # right: it is applied the next time the catalogue is readable,
-            # rather than being silently dropped.
-            current = dataclasses.replace(current, mode=item.key)
-        else:
-            current = separation.apply_preset(
-                current, item, catalogue,
-                accelerates_torch=acceleration.accelerates_torch,
-            )
-    separation.save_settings(path, current)
+    separation.save_settings(settings_file(), current)
     return qualities()
 
 
 def settings() -> "separation.Settings":
-    """What a run would use, as the separator takes it."""
-    return separation.load_settings(settings_file())
+    return preparation_settings(catalogue=_catalogue())
 
 
 def install(accelerator: str, progress=lambda message: None) -> Runtime:
