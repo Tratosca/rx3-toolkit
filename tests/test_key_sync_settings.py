@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: MPL-2.0
+import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -15,7 +17,8 @@ class KeySyncSettingsTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('node'), 'Node runs the UI event tests')
     def test_ui_setting_events_and_persistence(self):
         result = subprocess.run(['node', 'tests/key_sync_settings.cjs'],
-                                capture_output=True, text=True, timeout=15)
+                                capture_output=True, text=True, timeout=15,
+                                env={**os.environ, 'RX3_TEST_PYTHON': sys.executable})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_default_range_and_validation(self):

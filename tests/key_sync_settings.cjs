@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const {execFileSync}=require('node:child_process');
+const python = process.env.RX3_TEST_PYTHON || 'python3';
 class Element {
   constructor(tag='div') { this.tagName=tag; this.children=[]; this.dataset={}; this.events={}; this.attributes={}; }
   append(...items) { this.children.push(...items); for(const item of items)if(item && typeof item==='object')item.parentNode=this; }
@@ -32,7 +33,7 @@ function load() {
   vm.runInContext(fs.readFileSync('app/ui/web/app.js','utf8'),context);
   context.ask=async (name,...args)=>{
     assert.equal(name,'keyshift_preview');
-    return JSON.parse(execFileSync('.venv/bin/python',['-c',
+    return JSON.parse(execFileSync(python,['-c',
       'import json,sys;from app.services.keyshift import preview;print(json.dumps(preview(*json.loads(sys.argv[1]))))',JSON.stringify(args)],{encoding:'utf8'}));
   };
   return context;
@@ -139,7 +140,7 @@ for (const language of ['en', 'fr']) {
 
 // Real manifests and the bridge drive categories and both UI languages.
 {
-  const data=JSON.parse(execFileSync('.venv/bin/python',['-c',
+  const data=JSON.parse(execFileSync(python,['-c',
     "import json;from app.localization import catalogs;from app.ui.bridge import Bridge;print(json.dumps({'catalogs':catalogs(),'modules':Bridge().mod_modules('1.19')['value']}))"],{encoding:'utf8'}));
   for (const language of ['en','fr']) {
     ui=load();ui.renderSummary=()=>{};ui.state.modules=data.modules;
