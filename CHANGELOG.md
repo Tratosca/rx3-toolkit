@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Fix pad-preview asset lookup after the core directory reorganization.
+
 - Keep full-sized KEY and STEMS tabs aligned with the modules that actually registered: either missing tab is blank and inert. Keep STATUS visible and touchable without Samples; retain native ZOOM/GRID when neither KEY nor STEMS is active. Document the ZOOM/GRID replacement beside module selection in the Toolkit. Emulator captures cover isolated KEY, isolated STEMS, isolated Samples and all three enabled; hardware is pending.
 
 - Read Key Shift keys from native deck metadata updates, independently of visible text and of the order relative to decoder loading. Keep deck identities separate, clear absent keys, and publish updates atomically. Tested with DECK 2 loaded alone in the machine emulator; not yet run on hardware.
