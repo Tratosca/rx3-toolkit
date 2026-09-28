@@ -31,6 +31,11 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Set up Node for UI regression tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -146,7 +151,7 @@ jobs:
         run: python -m unittest discover -s tests -p test_mod_generator.py
 
       - name: Test separation engine
-        run: python -m unittest discover -s tests -p test_stems.py
+        run: python -m unittest discover -s tests -p 'test_stems*.py'
 
       - name: Test the window's sources
         # This imports the webview backend. A backend that reaches for a display

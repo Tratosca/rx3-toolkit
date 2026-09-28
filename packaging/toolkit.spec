@@ -12,9 +12,15 @@ repository = pathlib.Path(SPECPATH).parent
 # half provisions audio-separator, PyTorch, and FFmpeg into a per-user
 # environment on first launch, so it contributes only its notices.
 resources = [
+    (str(repository / "app/stems/data/overcue-44100-96000.f32"), "stems"),
+    (str(repository / "app/stems/worker.py"), "."),
+    (str(repository / "app/stems/wave_worker.py"), "."),
+    (str(repository / "app/stems/wave_memory.py"), "."),
+    (str(repository / "app/stems/wave_encoding.py"), "."),
     (str(repository / "LICENSE"), "."),
     (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
     (str(repository / "mod/autoexec.sh"), "resources/mod"),
+    (str(repository / "mod/categories.json"), "resources/mod"),
     (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
     (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
@@ -49,14 +55,29 @@ for page in sorted((repository / "app/ui/web").iterdir()):
 for catalog in sorted((repository / "app/localization").glob("*.json")):
     resources.append((str(catalog), "localization"))
 
+# Where the manufacturer's source package is and what it must hash to;
+# key_source.source_path() reads it from here when frozen.
+resources.append((str(repository / "app/firmware/key_source.json"), "firmware"))
+
 prebuilt_hook = pathlib.Path(os.environ["RX3_PREBUILT_HOOK"])
+if not prebuilt_hook.is_absolute():
+    prebuilt_hook = repository / prebuilt_hook
 resources.append((str(prebuilt_hook), "resources/prebuilt"))
+
+# Include the optional desktop helper when built for this platform. A build
+# without it keeps native RX3 preparation and reports OverCue as unavailable.
+native_name = "rx3-overcue-audio" + (".exe" if sys.platform == "win32" else "")
+native_helper = pathlib.Path(os.environ.get("RX3_OVERCUE_HELPER", str(
+    repository / "build/overcue-audio/release" / native_name)))
+if "RX3_OVERCUE_HELPER" in os.environ and not native_helper.is_file():
+    raise FileNotFoundError(native_helper)
+native_binaries = [(str(native_helper), "overcue")] if native_helper.is_file() else []
 
 analysis = Analysis(
     [str(repository / "app/ui/shell.py")],
     # Everything is imported as `app.*`, so the repository root is the one path.
     pathex=[str(repository)],
-    binaries=[],
+    binaries=native_binaries,
     datas=resources,
     hiddenimports=[
         "cryptography",
@@ -88,6 +109,7 @@ if sys.platform == "darwin":
         strip=False,
         upx=False,
         console=False,
+        codesign_identity=os.environ.get("RX3_CODESIGN_IDENTITY"),
     )
     collected = COLLECT(
         executable,
@@ -101,7 +123,7 @@ if sys.platform == "darwin":
         collected,
         name="XDJ-RX3 Toolkit.app",
         icon=None,
-        bundle_identifier="org.xdjrx3.toolkit",
+        bundle_identifier="fr.francois-brille.rx3-toolkit",
     )
 else:
     executable = EXE(
