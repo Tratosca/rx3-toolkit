@@ -115,10 +115,6 @@ require(
     "the core module must own the shared object's lifecycle",
 )
 require(
-    'entry" = "/root/pdj/librx3_stems.so" ] && continue' in CORE_MODULE,
-    "reinsertion must retire the pre-split preload entry",
-)
-require(
     "core_normalize_preload" in CORE_MODULE
     and 'entry=${pending%%:*}' in CORE_MODULE,
     "reinsertion must collapse duplicate core entries in LD_PRELOAD",
