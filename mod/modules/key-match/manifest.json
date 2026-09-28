@@ -1,0 +1,67 @@
+{
+  "id": "key-match",
+  "name": {
+    "en": "Enhanced Key Match",
+    "fr": "Key Match amélioré"
+  },
+  "description": {
+    "en": "Add harmonic matches in BROWSE alongside the RX3’s existing matches.",
+    "fr": "Ajouter des compatibilités harmoniques dans BROWSE, en complément de celles déjà proposées par le RX3."
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 34,
+  "category": "harmonic-mixing",
+  "runtime_directory": "key-match",
+  "namespace": "key_match",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_key_match_module.c"
+  ],
+  "selectable": true,
+  "messages": {
+    "en": {
+      "keyMatch.rules": "Audition Energy Boost transitions before your set.",
+      "keyMatch.diagonal": "Diagonals (8A ↔ 7B, 8B ↔ 9A)",
+      "keyMatch.boostTwo": "Energy Boost · +2 Camelot",
+      "keyMatch.boostSeven": "Energy Boost · +7 Camelot",
+      "keyMatch.four": "Experimental · +4 Camelot",
+      "keyMatch.help": "+4 may sound dissonant. Keep these transitions short.",
+      "keyMatch.guide": "Mixed In Key guide ↗",
+      "keyMatch.native": "Native RX3 matches (green, reference only)",
+      "keyMatch.browserLabel": "BROWSE: key matches with MASTER deck 1, 8A",
+      "keyMatch.match.green": "Native RX3 match",
+      "keyMatch.match.yellow": "Energy Boost · +2 Camelot",
+      "keyMatch.match.orange": "Energy Boost · +7 Camelot",
+      "keyMatch.match.red": "Experimental · +4 Camelot"
+    },
+    "fr": {
+      "keyMatch.rules": "Écoutez les transitions Energy Boost avant le set.",
+      "keyMatch.diagonal": "Diagonales (8A ↔ 7B, 8B ↔ 9A)",
+      "keyMatch.boostTwo": "Energy Boost · +2 Camelot",
+      "keyMatch.boostSeven": "Energy Boost · +7 Camelot",
+      "keyMatch.four": "Expérimental · +4 Camelot",
+      "keyMatch.help": "Le +4 peut être dissonant. Privilégiez les transitions courtes.",
+      "keyMatch.guide": "Guide Mixed In Key ↗",
+      "keyMatch.native": "Compatibilité harmonique par défaut (Rekordbox Traffic Light).",
+      "keyMatch.browserLabel": "BROWSE : correspondances avec le deck MASTER 1, en 8A",
+      "keyMatch.match.green": "Correspondance native RX3",
+      "keyMatch.match.yellow": "Energy Boost · +2 Camelot",
+      "keyMatch.match.orange": "Energy Boost · +7 Camelot",
+      "keyMatch.match.red": "Expérimental · +4 Camelot"
+    }
+  }
+}

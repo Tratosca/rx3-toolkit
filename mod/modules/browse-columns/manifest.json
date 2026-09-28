@@ -1,0 +1,52 @@
+{
+  "id": "browse-columns",
+  "name": {
+    "en": "Third BROWSE column",
+    "fr": "3ème colonne BROWSE"
+  },
+  "description": {
+    "en": "Adds a third column to BROWSE: BPM, key, artist or duration.",
+    "fr": "Ajoute une troisième colonne dans BROWSE : BPM, tonalité, artiste ou durée."
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 37,
+  "category": "screen",
+  "runtime_directory": "browse-columns",
+  "namespace": "browse_columns",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_browse_columns_module.c"
+  ],
+  "messages": {
+    "en": {
+      "browseColumn.field": "Third column",
+      "browseColumn.bpm": "BPM",
+      "browseColumn.key": "Key (Camelot)",
+      "browseColumn.artist": "Artist",
+      "browseColumn.time": "Duration",
+      "browseColumn.help": "The first two columns follow your rekordbox My Settings."
+    },
+    "fr": {
+      "browseColumn.field": "Troisième colonne",
+      "browseColumn.bpm": "BPM",
+      "browseColumn.key": "Tonalité (Camelot)",
+      "browseColumn.artist": "Artiste",
+      "browseColumn.time": "Durée",
+      "browseColumn.help": "Les deux premières colonnes suivent vos paramètres My Settings de rekordbox."
+    }
+  }
+}

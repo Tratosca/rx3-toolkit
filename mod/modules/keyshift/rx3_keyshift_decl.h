@@ -2,9 +2,7 @@
  *
  * Key shift for the RX3 performance runtime: declarations.
  *
- * Included by the core hook before it defines its shared machinery. The code
- * itself is in rx3_keyshift.h, which the core includes once its logging, hook
- * installer and deck table exist.
+ * Private to rx3_keyshift_module.c. Shared facilities use rx3_services.
  *
  * The XDJ-RX3 has no key shift. Two engines provide it here, and they are
  * selected by direction because each is measured to fail where the other
@@ -14,7 +12,11 @@
 #ifndef RX3_KEYSHIFT_DECL_H
 #define RX3_KEYSHIFT_DECL_H
 
-#define TIMESTRETCH_STREAM ((unsigned long)0x000c292c)
+static unsigned int keyshift_sync_enabled;
+static unsigned int keyshift_sync_range = 1u;
+static unsigned int keyshift_sync_harmonic;
+static unsigned int keyshift_match_rules;
+
 #define TIMESTRETCH_MANAGER ((unsigned long)0x000a0e54)
 
 #define PITCH_CTOR       ((unsigned long)0x0008b700)
@@ -74,7 +76,6 @@ struct rx3_keyshift_deck {
 static struct rx3_keyshift_deck keyshift_decks[2] = {
     {.request = 12u}, {.request = 12u}
 };
-static int keyshift_enabled;
 static volatile unsigned int keyshift_callbacks_active;
 static volatile unsigned int keyshift_callbacks_enabled;
 
@@ -87,14 +88,11 @@ typedef void (*pitch_initialize_fn)(void *);
 typedef void (*pitch_adjust_fn)(void *, int, float);
 typedef void (*pitch_execute_fn)(void *, const Float2 *, Float2 *, int);
 
-static const uint8_t timestretch_stream_guard[8] = {
-    0xf8, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
-};
 static const uint8_t timestretch_manager_guard[8] = {
     0xf0, 0x41, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
 };
 
-/* What the core may call. Everything else here is private to the module. */
+/* Private functions used by this module's lifecycle and panel. */
 static void rx3_keyshift_install(void);
 static int rx3_keyshift_ready(void);
 static void rx3_keyshift_remove(void);
@@ -103,6 +101,5 @@ static void rx3_keyshift_start_audio(unsigned int sample_rate);
 static int rx3_keyshift_semitones(unsigned int deck);
 static void rx3_keyshift_change(unsigned int deck, int delta);
 static void rx3_keyshift_reload(unsigned int deck);
-static void rx3_keyshift_destroy_deck(unsigned int deck);
 
 #endif /* RX3_KEYSHIFT_DECL_H */

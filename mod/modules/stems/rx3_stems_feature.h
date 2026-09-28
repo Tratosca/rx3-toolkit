@@ -50,13 +50,9 @@ static int stems_on_key_pad(void *player_innards, const void *key_input)
     return original_on_key_pad(player_innards, key_input);
 }
 
-struct stems_rgb { uint8_t red, green, blue; };
-
 static void hooked_check_slip_led(void *player, void *led_stat)
 {
-    static const struct stems_rgb colour[4] = {
-        {120u,200u,255u}, {255u,255u,0u}, {255u,0u,0u}, {0u,255u,0u}
-    };
+    const struct stems_rgb *colour = stems_pad_colour;
     __sync_add_and_fetch(&pad_callbacks_active, 1u);
     original_check_slip_led(player, led_stat);
     struct stems_deck_context *context = context_for_player(player);
@@ -66,7 +62,7 @@ static void hooked_check_slip_led(void *player, void *led_stat)
     uint8_t *entries = *(uint8_t **)((uint8_t *)led_stat + 8u);
     if (!entries || count > 256u) goto done;
     unsigned int available = stems_available(context);
-    unsigned int selected = __atomic_load_n(&context->selection, __ATOMIC_SEQ_CST) & 15u;
+    unsigned int selected = stems_selected(context);
     unsigned int deck_channel = (unsigned int)(context - stems_decks) + 1u;
     int loading = !context->payloads[0].data;
     unsigned int origin = blink_origin_ms();
@@ -94,8 +90,75 @@ static int stems_feature_configured(void)
     return stems_dir != 0;
 }
 
+/* Publish values through the sharing framework, never the PCM context. */
+static struct rx3_mix_state stems_mix_state(unsigned int deck)
+{
+    const struct stems_deck_context *context = &stems_decks[deck];
+    struct rx3_mix_state state = {
+        stems_selected(context), stems_available(context),
+        __atomic_load_n(&context->reader, __ATOMIC_SEQ_CST) &&
+        __atomic_load_n(&context->armed, __ATOMIC_SEQ_CST) &&
+        __atomic_load_n(&context->payloads[0].data, __ATOMIC_SEQ_CST)
+    };
+    return state;
+}
+
+/* Copy under the same reader barrier as PCM. Loading/unloading never exposes
+   stale package pointers to the separate Stemwave module. */
+static unsigned int stems_waveform(unsigned int deck, unsigned int mask,
+                                    unsigned int format, uint8_t *out, unsigned int count)
+{
+    if(deck>=2u || format>3u || !out) return 0;
+    struct stems_deck_context *context=&stems_decks[deck];
+    unsigned int copied=0, stride=format>=2u?3u:format+1u;
+    __sync_add_and_fetch(&context->readers_active,1u);
+    if (!__atomic_load_n(&context->reader,__ATOMIC_SEQ_CST) ||
+        !context->armed) goto done;
+    /* Audio without prepared waveforms must retain the native display. */
+    if(context->payloads[0].data && !context->payloads[0].wave) {
+        copied=0xfffffffeu; goto done;
+    }
+    if(!context->payloads[0].wave) goto done;
+    const uint8_t *wave=context->payloads[0].wave;
+    const struct rx3_wave_header *header=(const void *)wave;
+    if(header->version==4u && (stride!=header->stride || format==2u)) {
+        copied=0xfffffffeu; goto done;
+    }
+    if(count!=header->count) { copied=0xffffffffu; goto done; }
+    if(mask & ~stems_available(context)) goto done;
+    if(!mask) { memset(out,0,count*stride); copied=count; goto done; }
+    const struct rx3_wave_entry *entries=(const void *)(wave+128u);
+    if(header->version==4u) {
+        if(mask>header->roles) goto done;
+        memcpy(out,wave+(unsigned int)entries[mask-1u].offset,count*stride);
+        copied=count;
+    } else if(header->version>=2u) {
+        if((format==3u && header->version!=3u) || (format==2u && header->version!=2u)) goto done;
+        if(mask>header->roles) goto done;
+        const uint8_t *data=wave+(unsigned int)entries[mask-1u].offset;
+        unsigned int offset=format==0u?0u:format==1u?1u:3u;
+        for(unsigned int i=0;i<count;i++)
+            memcpy(out+i*stride,data+i*6u+offset,stride);
+        copied=count;
+    } else {
+        /* Old files only contain single-role curves in one display format.
+           Never pass an envelope sum off as the waveform of a mixed signal. */
+        if(stride!=header->stride || format>=2u || (mask & (mask-1u))) goto done;
+        unsigned int role=mask==2u?0u:mask==1u?1u:2u;
+        if(role>=header->roles || (mask==1u && header->roles==4u)) goto done;
+        memcpy(out,wave+(unsigned int)entries[role].offset,count*stride);
+        copied=count;
+    }
+done:
+    __sync_sub_and_fetch(&context->readers_active,1u);
+    return copied;
+}
+
 static int stems_feature_install(void)
 {
+#ifdef RX3_OVERCUE_PROTOTYPE
+    if(getenv("RX3_OVERCUE_ROOT")&&!rx3_overcue_start())return 0;
+#endif
     original_get_stream = (get_stream_fn)install_hook(&get_stream_hook,
         TIMESTRETCH_STREAM, timestretch_stream_guard, (void *)hooked_get_stream);
     original_on_key_pad = (on_key_pad_fn)install_hook(&pad_hook, ON_KEY_PAD,
@@ -109,17 +172,20 @@ static int stems_feature_install(void)
         return 0;
     }
     stems_loader_started = 1;
+    if (!rx3_mix_claim(stems_mix_state) || !rx3_wave_claim(stems_waveform)) return 0;
     __atomic_store_n(&stems_callbacks_enabled, 1u, __ATOMIC_SEQ_CST);
     return 1;
 }
 
 static void stems_feature_remove(void)
 {
+    rx3_wave_release(stems_waveform);
+    rx3_mix_release(stems_mix_state);
     __atomic_store_n(&stems_callbacks_enabled, 0u, __ATOMIC_SEQ_CST);
     struct installed_hook *hooks[3] = {&slip_led_hook, &pad_hook, &get_stream_hook};
     int detached[3];
     for (unsigned int i = 0; i < 3u; i++)
-        detached[i] = !hooks[i]->address || !write_code(hooks[i]->address, hooks[i]->original, 8u);
+        detached[i] = detach_hook(hooks[i]);
     for (;;) {
         while (__atomic_load_n(&stems_callbacks_active, __ATOMIC_SEQ_CST) ||
                __atomic_load_n(&pad_callbacks_active, __ATOMIC_SEQ_CST)) usleep(10000u);
@@ -144,9 +210,11 @@ static void stems_feature_remove(void)
         }
         stems_decks[deck].payload_count = 0u;
     }
+#ifdef RX3_OVERCUE_PROTOTYPE
+    rx3_overcue_stop();
+#endif
     for (unsigned int i = 0; i < 3u; i++) if (detached[i]) {
-        if (hooks[i]->trampoline) munmap(hooks[i]->trampoline, 4096u);
-        memset(hooks[i], 0, sizeof(*hooks[i]));
+        (void)release_hook(hooks[i]);
     }
     if (detached[0]) original_check_slip_led = 0;
     if (detached[1]) original_on_key_pad = 0;

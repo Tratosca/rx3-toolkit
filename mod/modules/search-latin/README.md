@@ -9,9 +9,9 @@ Off by default.
 
 ## What it covers
 
-The accented letters of the western European alphabet: the marked A, E, I, O, U, Y, N and C, in both cases. Letters that are not a marked vowel keep their own identity: the eth, the thorn and the sharp s are left as they are, because dropping their marks would spell a different word rather than the same one.
+The accented letters of the western European alphabet: the marked A, E, I, O, U, Y, N and C, in both cases. The eth, the thorn and the sharp s fold too, to D, T and S, because the deck's keyboard has none of them: without the fold, a title spelled with one could not be found at all.
 
-A few letters cannot be folded at all without changing the length of what you typed, so they are left alone.
+The sharp s becomes one S, not two, so what you type keeps its length. For the same reason, letters that would need two characters, such as the ligatures, are left alone.
 
 ## If it gets in the way
 

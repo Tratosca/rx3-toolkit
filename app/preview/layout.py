@@ -2,7 +2,7 @@
 """Where the controls of the pad row sit, in the computer's copy.
 
 This is the same arithmetic as the block between the markers in
-`mod/modules/core/1.19/rx3_pad_layout.h`, and it exists because the preview has
+`mod/modules/core/ui/rx3_pad_layout.h`, and it exists because the preview has
 to place a control exactly where a deck would. `tests/test_module_consistency.py`
 compiles that block and runs it against this one, so the two cannot drift.
 
@@ -69,13 +69,14 @@ def solve(weights, origin: int = DECK_ORIGIN, span: int = DECK_SPAN) -> list[Cel
     spare = free_width - unit * shares
 
     cells: list[Cell] = []
+    remaining = shares
     x = origin
     for index, weight in enumerate(weights):
         width = unit * (weight or 1)
         # The pixels that did not divide go to the last cells, so the row ends
         # on origin + span - 1 whatever the count.
-        if index >= count - spare:
-            width += 1
+        remaining -= weight or 1
+        width += min(weight or 1, max(0, spare - remaining))
         cells.append(Cell(x, x + width - 1))
         x += width + gap
     return cells

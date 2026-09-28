@@ -2,6 +2,8 @@
 #ifndef RX3_STEMS_LOADER_H
 #define RX3_STEMS_LOADER_H
 
+#include "rx3_stems_package.h"
+
 static pthread_t stems_loader_thread;
 static int stems_loader_started;
 static volatile unsigned int stems_loader_running;
@@ -41,16 +43,16 @@ static int stems_load_payload(int fd, struct stem_payload *destination,
     off_t size = lseek(fd, 0, SEEK_END);
     if (size < (off_t)sizeof(header) || lseek(fd, 0, SEEK_SET) != 0 ||
         read_exactly(fd, &header, sizeof(header))) return 0;
-    if (header.format != FORMAT_S16 || memcmp(header.magic, "RX3STM1\0", 8u) ||
+    if (!stems_pcm_gain(&header) || memcmp(header.magic, "RX3STM1\0", 8u) ||
         header.sample_rate != 44100u || header.channels != 2u || header.header_size != 64u ||
-        !header.frames || header.frames > 0x5000000u ||
+        !header.frames || header.frames > RX3_STEMS_MAX_FRAMES ||
         header.frames * 4u + 64u != (uint64_t)size) return 0;
-    for (unsigned int i = 0; i < sizeof(header.reserved); i++)
-        if (header.reserved[i]) return 0;
     size_t bytes = (size_t)header.frames * 4u;
-    if (other_bytes >= 0x20000000u || bytes > 0x20000000u - other_bytes) return 0;
+    if (other_bytes >= RX3_STEMS_RESIDENT_BYTES || bytes > RX3_STEMS_RESIDENT_BYTES - other_bytes)
+        return 0;
     unsigned long available = memory_available_kb();
-    if (available <= 0x4b000u || (bytes + 1023u) / 1024u > available - 0x4b000u) return 0;
+    if (available <= RX3_STEMS_PLAYER_RESERVE_KIB ||
+        (bytes + 1023u) / 1024u > available - RX3_STEMS_PLAYER_RESERVE_KIB) return 0;
     void *block = mmap(0, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (block == MAP_FAILED) return 0;
     if (read_exactly(fd, block, bytes) || mprotect(block, bytes, PROT_READ)) {
@@ -58,7 +60,8 @@ static int stems_load_payload(int fd, struct stem_payload *destination,
         return 0;
     }
     destination->data = block;
-    destination->format = FORMAT_S16;
+    destination->format = header.format;
+    destination->pcm_gain = stems_pcm_gain(&header);
     destination->frames = header.frames;
     destination->block = block;
     destination->block_size = bytes;
@@ -111,7 +114,12 @@ static void *stems_loader_loop(void *unused)
         for (unsigned int j = 0; j < other->payload_count; j++)
             other_bytes += other->payloads[j].block_size;
         stems_unlock();
-        count = stems_load_set(request->fds, next, other_bytes);
+        char magic[8];
+        int packaged = lseek(request->fds[0], 0, SEEK_SET) == 0 &&
+            !read_exactly(request->fds[0], magic, 8u) && !memcmp(magic, "RX3PKG2\0", 8u);
+        count = packaged ? stems_package_load(request->fds[0], next, other_bytes)
+                         : stems_load_set(request->fds, next, other_bytes);
+        if (packaged && count) log_line("stems package: package verified");
         stems_lock();
         if (stems_loader_running && context->generation == request->generation &&
             context->reader == request->reader) {
@@ -126,6 +134,7 @@ static void *stems_loader_loop(void *unused)
                 unsigned int old = __atomic_load_n(&context->selection, __ATOMIC_SEQ_CST);
                 __atomic_store_n(&context->selection,
                                   ((old & ~255u) + 256u) | available * 17u, __ATOMIC_SEQ_CST);
+                stems_set_mask(context, available);
                 __atomic_store_n(&context->reader, request->reader, __ATOMIC_SEQ_CST);
                 __atomic_store_n(&context->status, 2u, __ATOMIC_SEQ_CST);
                 log_number("stems ready, available roles = ", count + 1u);
@@ -184,11 +193,28 @@ static void stems_feature_track_did_load(unsigned int deck, void *reader,
     context->payload_count = 0u;
     stems_reset_mix(context);
     captured_pad_mask[deck] = 0u;
+#ifdef RX3_OVERCUE_PROTOTYPE
+    if(getenv("RX3_OVERCUE_ROOT")) {
+        for(unsigned int i=0;i<3u;i++) {
+            if(context->pending_fds[i]>=0)close(context->pending_fds[i]);
+            context->pending_fds[i]=-1;
+        }
+        context->overcue=1u;
+        rx3_overcue_track(deck,(const char *)track_info);
+        __atomic_store_n(&context->selection,0x77u,__ATOMIC_SEQ_CST);
+        stems_set_mask(context,7u);
+        __atomic_store_n(&context->armed,1u,__ATOMIC_SEQ_CST);
+        __atomic_store_n(&context->status,1u,__ATOMIC_SEQ_CST);
+        __atomic_store_n(&context->reader,reader,__ATOMIC_SEQ_CST);
+        stems_unlock();return;
+    }
+#endif
     unsigned int count = 0u;
     while (count < 3u && context->pending_fds[count] >= 0) count++;
     unsigned int available = count ? (2u << count) - 1u : 0u;
     unsigned int old = __atomic_load_n(&context->selection, __ATOMIC_SEQ_CST);
     __atomic_store_n(&context->selection, ((old & ~255u) + 256u) | available * 17u, __ATOMIC_SEQ_CST);
+    stems_set_mask(context, available);
     __atomic_store_n(&context->armed, count != 0u, __ATOMIC_SEQ_CST);
     __atomic_store_n(&context->status, count ? 1u : 0u, __ATOMIC_SEQ_CST);
     __atomic_store_n(&context->reader, reader, __ATOMIC_SEQ_CST);

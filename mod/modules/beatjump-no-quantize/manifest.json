@@ -1,13 +1,20 @@
 {
   "id": "beatjump-no-quantize",
-  "name": "Immediate Beat Jump",
-  "description": "Remove the half-bar wait between repeated Beat Jumps.",
+  "name": {
+    "en": "Immediate Beat Jump",
+    "fr": "Beat Jump immédiat"
+  },
+  "description": {
+    "en": "Trigger consecutive Beat Jumps without the half-bar wait.",
+    "fr": "Enchaînez les Beat Jumps sans attendre une demi-mesure."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": true,
   "order": 20,
+  "category": "beatjump",
   "runtime_directory": "beatjump-no-quantize",
   "namespace": "beatjump_no_quantize",
   "requires": [

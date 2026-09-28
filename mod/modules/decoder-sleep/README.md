@@ -1,25 +1,12 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
-# ⚡ No more wait between beatjumps
+# Decoder wait
 
-The helper module. Nothing to see, nothing to press — it just makes the two Beat Jump modules feel right.
+The Toolkit exposes this setting under Modules > Advanced. It is enabled by default and required by both Beat Jump modules. The control is locked while either module needs it; otherwise it can be switched independently.
 
-The player checks for freshly decoded audio on a timer. Stock, that timer ticks every millisecond, which is fine when you are playing forwards and noticeable when you have just thrown the track thirty-two beats. This makes it tick ten times more often, so audio turns up sooner after a big jump or a seek.
+After rbp starts, `apply.sh` waits up to 20 seconds for the internal UDP console on port 20000. It sends `bufsleep 0 100000` and `bufsleep 1 100000` over loopback, setting each deck's decoder sleep interval to 100,000 nanoseconds (100 microseconds), versus the documented stock interval of 1 millisecond. `DECODER_SLEEP_NS` can override that value.
 
-On by default, and the app ticks it automatically whenever you pick either Beat Jump module. You can also select it on its own if that is all you want.
+This reduces the wait between decoder retries. It does not change Beat Jump distances or the delay between successive Beat Jump commands. More frequent retries can improve audio recovery after a jump or seek, at the cost of more CPU wakeups. The end-to-end improvement has not been measured here.
 
-## Being honest about it
+The setting is volatile and resets at power-off. It does not modify flash or executable bytes. The script logs console responses but does not validate their content or read the configured value back; its success log is not confirmation that rbp accepted the value. If the console or Bash is unavailable, it logs a failure and leaves the runtime running.
 
-This is a real improvement in one specific place and not a magic latency fix. It does **not**:
-
-- make the buffer bigger;
-- change jump distances, Quantize, or the grid;
-- preload the track;
-- promise you a fixed number of milliseconds back.
-
-Whether you notice it depends on whether that timer was the thing holding you up. Waking up more often also costs the player a little CPU. It is a trade, chosen deliberately, not a free win.
-
-Nothing is patched here at all — it is a setting sent to the running player, and a power cycle puts it back. If it fails, it says so and the player carries on with the stock timing.
-
----
-
-How the setting is sent, and why it is not a binary patch: [Reference → Faster decoder polling](../../../../REFERENCES.md#8-faster-decoder-polling).
+See [Faster decoder polling](../../../../REFERENCES.md#8-faster-decoder-polling).

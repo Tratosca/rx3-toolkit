@@ -1,13 +1,20 @@
 {
   "id": "decoder-sleep",
-  "name": "Infinite beatjumping",
-  "description": "Drastically reduces wait time between beatjumps, allowing for almost indefinitely instant beatjumping.",
+  "name": {
+    "en": "Audio recovery after a Beat Jump",
+    "fr": "Reprise audio après un Beat Jump"
+  },
+  "description": {
+    "en": "Sets the decoder wait to 100 µs on both decks, down from 1 ms. May shorten audio recovery after jumps, with more frequent CPU wakeups. Resets at power-off.",
+    "fr": "Règle l’attente du décodeur à 100 µs sur les deux decks, contre 1 ms d’origine. Peut accélérer la reprise audio après un saut, avec davantage de réveils CPU. Réinitialisé à l’extinction."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": true,
   "order": 8,
+  "category": "beatjump",
   "runtime_directory": "decoder-sleep",
   "namespace": "decoder_sleep",
   "requires": [],
@@ -23,5 +30,6 @@
       "target": "apply.sh",
       "executable": true
     }
-  ]
+  ],
+  "advanced": true
 }

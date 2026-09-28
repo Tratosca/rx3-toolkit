@@ -1,13 +1,20 @@
 {
   "id": "beatjump-32bars",
-  "name": "32-beat Beat Jump",
-  "description": "Beat Jump pads 7 and 8 become -32 and +32 beats instead of -8 and +8.",
+  "name": {
+    "en": "32-beat Beat Jump",
+    "fr": "Beat Jump de 32 temps"
+  },
+  "description": {
+    "en": "Jump back or forward 32 beats with Beat Jump pads 7 and 8, replacing the −8/+8 jumps.",
+    "fr": "Reculez ou avancez de 32 temps avec les pads 7 et 8 de Beat Jump, à la place des sauts de −8/+8."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": true,
   "order": 10,
+  "category": "beatjump",
   "runtime_directory": "beatjump-32bars",
   "namespace": "beatjump_32bars",
   "requires": [

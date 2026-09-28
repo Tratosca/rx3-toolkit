@@ -332,14 +332,14 @@ static void now_playing_feature_remove(void)
         pthread_join(now_playing_thread, 0);
         now_playing_thread_started = 0;
     }
-    uninstall_hook(&now_playing_mixer_hook);
-    uninstall_hook(&now_playing_unload_hook);
-    uninstall_hook(&now_playing_load_hook);
-    uninstall_hook(&now_playing_status_hook);
-    original_now_playing_mixer = 0;
-    original_now_playing_unload = 0;
-    original_now_playing_load = 0;
-    original_now_playing_status = 0;
+    if (framework->uninstall_hook(&now_playing_mixer_hook))
+        original_now_playing_mixer = 0;
+    if (framework->uninstall_hook(&now_playing_unload_hook))
+        original_now_playing_unload = 0;
+    if (framework->uninstall_hook(&now_playing_load_hook))
+        original_now_playing_load = 0;
+    if (framework->uninstall_hook(&now_playing_status_hook))
+        original_now_playing_status = 0;
     for (unsigned int i = 0; i < 2u; i++) {
         if (now_playing_wake[i] >= 0)
             close(now_playing_wake[i]);
@@ -359,13 +359,13 @@ static int now_playing_feature_install(void)
         memcmp((const void *)NOW_PLAYING_PLAY_BPM, now_playing_play_bpm_guard, 8) ||
         memcmp((const void *)NOW_PLAYING_PLAY_TEMPO, now_playing_play_tempo_guard, 8) ||
         memcmp((const void *)NOW_PLAYING_ON_AIR, now_playing_on_air_guard, 8)) {
-        log_line("now playing refused: an accessor prologue differs");
+        framework->log_line("now playing refused: an accessor prologue differs");
         return 0;
     }
     if (socketpair(NOW_PLAYING_AF_UNIX, NOW_PLAYING_DGRAM | NOW_PLAYING_NONBLOCK, 0,
                    now_playing_wake)) {
         now_playing_wake[0] = now_playing_wake[1] = -1;
-        log_line("now playing refused: no wake-up socket");
+        framework->log_line("now playing refused: no wake-up socket");
         return 0;
     }
     now_playing_socket = socket(NOW_PLAYING_AF_INET, NOW_PLAYING_DGRAM, 0);
@@ -373,35 +373,35 @@ static int now_playing_feature_install(void)
     if (now_playing_socket < 0 ||
         setsockopt(now_playing_socket, NOW_PLAYING_SOL_SOCKET, NOW_PLAYING_SO_BROADCAST,
                    &on, sizeof(on))) {
-        log_line("now playing refused: no broadcast socket");
+        framework->log_line("now playing refused: no broadcast socket");
         return 0;
     }
 
-    original_now_playing_status = (now_playing_status_fn)install_hook(
+    original_now_playing_status = (now_playing_status_fn)framework->install_hook(
         &now_playing_status_hook, NOW_PLAYING_STATUS_UPDATED,
         now_playing_status_guard, (void *)hooked_now_playing_status);
-    original_now_playing_load = (now_playing_load_fn)install_hook(
+    original_now_playing_load = (now_playing_load_fn)framework->install_hook(
         &now_playing_load_hook, NOW_PLAYING_LOAD_TRACK,
         now_playing_load_guard, (void *)hooked_now_playing_load);
-    original_now_playing_unload = (now_playing_unload_fn)install_hook(
+    original_now_playing_unload = (now_playing_unload_fn)framework->install_hook(
         &now_playing_unload_hook, NOW_PLAYING_UNLOAD_RESULT,
         now_playing_unload_guard, (void *)hooked_now_playing_unload);
-    original_now_playing_mixer = (now_playing_mixer_fn)install_hook(
+    original_now_playing_mixer = (now_playing_mixer_fn)framework->install_hook(
         &now_playing_mixer_hook, NOW_PLAYING_MIXER_ON_AIR_UPDATE,
         now_playing_mixer_guard, (void *)hooked_now_playing_mixer);
     if (!original_now_playing_status || !original_now_playing_load ||
         !original_now_playing_unload || !original_now_playing_mixer) {
-        log_line("now playing refused: a player event prologue differs");
+        framework->log_line("now playing refused: a player event prologue differs");
         return 0;
     }
 
     __atomic_store_n(&now_playing_running, 1, __ATOMIC_SEQ_CST);
     if (pthread_create(&now_playing_thread, 0, now_playing_worker, 0)) {
-        log_line("now playing refused: the worker did not start");
+        framework->log_line("now playing refused: the worker did not start");
         return 0;
     }
     now_playing_thread_started = 1;
-    log_line("now playing: deck state broadcast on UDP 50123 over the USB link");
+    framework->log_line("now playing: deck state broadcast on UDP 50123 over the USB link");
     return 1;
 }
 

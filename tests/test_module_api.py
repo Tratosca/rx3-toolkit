@@ -137,6 +137,37 @@ run_hooks "$PREPARE_HOOKS" || exit 14
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_reapplying_browse_settings_succeeds_without_restart(self):
+        for module in ("key-match", "browse-columns"):
+            with self.subTest(module=module):
+                result = run_shell(
+                    'module=' + module + '\n' + r'''
+CORE_OBJECT=$1
+module_disabled_by_switch() { return 1; }
+. "${1%/lib/module-api.sh}/modules/$module/module.sh"
+already_running=0
+rbp_environment_value() {
+    [ "$already_running" = 1 ] || return 0
+    case "$1" in
+        RX3_KEY_MATCH) printf '%s' "$RX3_KEY_MATCH" ;;
+        RX3_KEY_MATCH_RULES) printf '%s' "$RX3_KEY_MATCH_RULES" ;;
+        RX3_BROWSE_COLUMNS) printf '%s' "$RX3_BROWSE_COLUMNS" ;;
+        RX3_BROWSE_FIELD) printf '%s' "$RX3_BROWSE_FIELD" ;;
+    esac
+}
+run_hooks "$PREPARE_HOOKS" || exit 10
+[ "$NEED_RBP_RESTART" = 1 ] || exit 11
+already_running=1
+NEED_RBP_RESTART=0
+run_hooks "$PREPARE_HOOKS" || exit 12
+[ "$NEED_RBP_RESTART" = 0 ] || exit 13
+CORE_OBJECT=/nonexistent/rx3-missing-core.so
+run_hooks "$PREPARE_HOOKS" && exit 14
+exit 0
+'''
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_stepping_aside_does_not_stop_the_session(self):
         # A prepare hook that returns non-zero stops the whole run and no
         # guarded word is written. So a module with nothing to do, or one the

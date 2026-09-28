@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #ifndef RX3_SAMPLES_AUDIO_H
 #define RX3_SAMPLES_AUDIO_H
+#include "../core/api/rx3_dsp.h"
 
 static uint32_t samples_le32(const uint8_t *bytes)
 {
@@ -106,12 +107,7 @@ static void samples_mix(struct sample_slot voices[SAMPLES_PAD_COUNT],
         for (unsigned int i = 0; i < count; i++) {
             /* A 32-frame edge ramp reduces the discontinuity at a loop's
                splice. Very short buffers stay unshaped; one-shots are intact. */
-            float edge = 1.0f;
-            if (mode == SAMPLE_MODE_LOOP && length >= 128u) {
-                if (at < 32u) edge = (float)(at + 1u) * (1.0f / 32.0f);
-                else if (at >= length - 32u)
-                    edge = (float)(length - at) * (1.0f / 32.0f);
-            }
+            float edge = mode == SAMPLE_MODE_LOOP ? rx3_dsp_loop_edge(at, length) : 1.0f;
             output[i].left += (float)data[at * 2u] * level * edge;
             output[i].right += (float)data[at * 2u + 1u] * level * edge;
             if (++at >= length)

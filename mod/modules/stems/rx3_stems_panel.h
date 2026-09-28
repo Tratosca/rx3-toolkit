@@ -8,10 +8,19 @@ static const uint16_t stems_text_instrumental[] = {'I','N','S','T','R','U','M','
 static const uint16_t stems_text_inst[] = {'I','N','S','T',0};
 static const uint16_t stems_text_vocal[] = {'V','O','C','A','L',0};
 static const uint16_t stems_text_drums[] = {'D','R','U','M','S',0};
-static const uint16_t stems_text_bass[] = {'B','A','S','S',0};
 static const uint16_t stems_text_none[] = {'N','O',' ','S','T','E','M','S',0};
 static const uint16_t stems_text_failed[] = {'S','T','E','M','S',' ','E','R','R',0};
-static const unsigned int stems_display_order[4] = {4u,8u,1u,2u};
+/* Last committed full-volume adjustment, in the core's millisecond clock. */
+static unsigned int stems_slider_until[2][4];
+
+/* SLIP LOOP pads 5 to 8 and the touch controls, left to right: INST, VOCAL,
+   DRUMS. Pad 8 has no role and keeps its native loop. A legacy bass payload
+   has no bit here: it plays at the INST level. */
+static const unsigned int stems_display_order[4] = {1u,2u,4u,0u};
+struct stems_rgb { uint8_t red, green, blue; };
+static const struct stems_rgb stems_pad_colour[4] = {
+    {255u,0u,0u}, {0u,255u,0u}, {120u,200u,255u}, {0u,0u,0u}
+};
 
 static unsigned int stems_control_count(unsigned int available)
 {
@@ -51,7 +60,6 @@ static const uint16_t *stems_caption(unsigned int deck, unsigned int widget,
     unsigned int available = stems_available(context);
     switch (stems_control_bit(available, widget)) {
     case 4u: return stems_text_drums;
-    case 8u: return stems_text_bass;
     case 2u: return stems_text_vocal;
     /* The long name only when there is room for it. */
     default: return stems_control_count(available) > 2u ? stems_text_inst
@@ -69,8 +77,13 @@ static int stems_is_on(unsigned int deck, unsigned int widget, unsigned int part
     if (status != 1u && status != 2u) return 0;
     if (!context->reader || !context->armed) return 0;
     unsigned int available = stems_available(context);
-    unsigned int selected = __atomic_load_n(&context->selection, __ATOMIC_SEQ_CST) & 15u;
-    if (!context->payloads[0].data) return blink_phase_is_on();
+    unsigned int selected = stems_selected(context);
+    if (!context->payloads[0].data) {
+#ifdef RX3_OVERCUE_PROTOTYPE
+        if(!context->overcue)
+#endif
+        return blink_phase_is_on();
+    }
     return (selected & stems_control_bit(available, widget)) != 0u;
 }
 
@@ -80,34 +93,87 @@ static void stems_fire(unsigned int deck, unsigned int widget, unsigned int part
     struct stems_deck_context *context = &stems_decks[deck];
     if (__atomic_load_n(&context->status, __ATOMIC_SEQ_CST) != 2u ||
         !context->reader || !context->armed) return;
+    __atomic_store_n(&stems_slider_until[deck][widget], 0u, __ATOMIC_SEQ_CST);
     stems_toggle(context, stems_control_bit(stems_available(context), widget));
+}
+
+static int stems_slider_visible(unsigned int deck, unsigned int widget)
+{
+    struct stems_deck_context *context = &stems_decks[deck];
+    if (context->status != 2u) return 0;
+    unsigned int value = stems_level(context, stems_control_bit(stems_available(context), widget));
+    unsigned int until = __atomic_load_n(&stems_slider_until[deck][widget], __ATOMIC_SEQ_CST);
+    return value && (value < 100u || (until && (int)(until - now_ms()) > 0));
 }
 
 static int stems_panel_needs_refresh(void)
 {
-    static unsigned int seen[2][2];
+    static unsigned int seen[2][4];
     int changed = 0;
     for (unsigned int deck = 0; deck < 2u; deck++) {
+#ifdef RX3_OVERCUE_PROTOTYPE
+        if(stems_decks[deck].overcue)
+            __atomic_store_n(&stems_decks[deck].status,rx3_overcue_status(deck),__ATOMIC_SEQ_CST);
+#endif
         unsigned int status = __atomic_load_n(&stems_decks[deck].status, __ATOMIC_SEQ_CST);
         unsigned int selection = __atomic_load_n(&stems_decks[deck].selection, __ATOMIC_SEQ_CST);
+        unsigned int levels = __atomic_load_n(&stems_decks[deck].levels, __ATOMIC_SEQ_CST);
+        unsigned int mode = 0u;
+        for (unsigned int w = 0; w < 4u; w++)
+            if (stems_slider_visible(deck, w)) mode |= 1u << w;
+        if (seen[deck][2] != levels || seen[deck][3] != mode) changed = 1;
+        seen[deck][2] = levels; seen[deck][3] = mode;
         if (seen[deck][0] != status || seen[deck][1] != selection || status == 1u) changed = 1;
         seen[deck][0] = status; seen[deck][1] = selection;
     }
     return changed;
 }
 
-/* Four toggles declared, as many drawn as the track actually carries. The strip
-   used to lay itself out from a table of widths and gaps per count, and then
-   work out what a finger had hit by repeating the same arithmetic. */
+static unsigned int stems_widget_kind(unsigned int deck, unsigned int widget)
+{
+    (void)widget;
+#ifdef RX3_OVERCUE_PROTOTYPE
+    if(stems_decks[deck].overcue)return RX3_PAD_BUTTON;
+#endif
+    return stems_decks[deck].status == 2u ? RX3_PAD_TOGGLE_SLIDER : RX3_PAD_BUTTON;
+}
+static uint16_t stems_widget_colour(unsigned int deck, unsigned int widget)
+{
+    switch(stems_control_bit(stems_available(&stems_decks[deck]),widget)) {
+    case 4u: return 0x001fu;
+    case 1u: return 0xf800u;
+    case 2u: return 0x07e0u;
+    default: return 0x8410u;
+    }
+}
+static unsigned int stems_slider_max(unsigned int deck, unsigned int widget)
+{
+    (void)deck; (void)widget; return 100u;
+}
+static unsigned int stems_slider_get(unsigned int deck, unsigned int widget)
+{
+    struct stems_deck_context *context=&stems_decks[deck];
+    return stems_level(context,stems_control_bit(stems_available(context),widget));
+}
+static void stems_slider_set(unsigned int deck, unsigned int widget,
+                             unsigned int value, unsigned int committed)
+{
+    struct stems_deck_context *context=&stems_decks[deck];
+    if(context->status!=2u || !context->reader || !context->armed) return;
+    stems_set_level(context,stems_control_bit(stems_available(context),widget),value);
+    __atomic_store_n(&stems_slider_until[deck][widget],
+                     committed && value >= 100u ? now_ms() + 2000u : 0u, __ATOMIC_SEQ_CST);
+}
 static const struct rx3_pad_widget stems_widgets[4] = {
-    { RX3_PAD_TOGGLE, 1 }, { RX3_PAD_TOGGLE, 1 },
-    { RX3_PAD_TOGGLE, 1 }, { RX3_PAD_TOGGLE, 1 }
+    {RX3_PAD_TOGGLE_SLIDER,1}, {RX3_PAD_TOGGLE_SLIDER,1},
+    {RX3_PAD_TOGGLE_SLIDER,1}, {RX3_PAD_TOGGLE_SLIDER,1}
 };
-
 static const struct rx3_pad_row stems_row = {
-    2u, TAB_IMAGE_STEMS, RX3_PAD_SCOPE_DECK, 4u, stems_widgets,
-    stems_live_count, stems_caption, stems_is_on, stems_fire,
-    0, 0, 0, stems_panel_needs_refresh
+    .panel_id=2u, .tab_image=TAB_IMAGE_STEMS, .scope=RX3_PAD_SCOPE_DECK,
+    .count=4u, .widgets=stems_widgets, .live_count=stems_live_count,
+    .caption=stems_caption, .is_on=stems_is_on, .fire=stems_fire,
+    .slider_max=stems_slider_max, .slider_get=stems_slider_get, .slider_set=stems_slider_set,
+    .needs_refresh=stems_panel_needs_refresh, .kind=stems_widget_kind, .colour=stems_widget_colour,
+    .slider_visible=stems_slider_visible
 };
-
 #endif /* RX3_STEMS_PANEL_H */

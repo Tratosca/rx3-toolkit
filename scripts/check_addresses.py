@@ -55,7 +55,7 @@ def sources() -> str:
     directory = REPOSITORY / "mod/modules"
     parts = [
         path.read_text(encoding="utf-8", errors="replace")
-        for path in sorted(directory.glob("*/*.h")) + sorted(directory.glob("*/*.c"))
+        for path in sorted(directory.rglob("*.h")) + sorted(directory.rglob("*.c"))
     ]
     if not parts:
         raise SystemExit("no module sources found under mod/modules")

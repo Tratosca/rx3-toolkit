@@ -1,13 +1,20 @@
 {
   "id": "now-playing",
-  "name": "Now playing",
-  "description": "Sends what each deck is playing to a computer on the rear USB port: title, BPM, tempo and whether the channel is on air.",
+  "name": {
+    "en": "Now playing",
+    "fr": "Morceau en cours"
+  },
+  "description": {
+    "en": "Sends titles and BPM to compatible streaming software, which you configure separately. Title display is not included.",
+    "fr": "Transmet les titres et BPM à un logiciel de diffusion compatible, à configurer séparément. L’affichage des titres n’est pas inclus."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 101,
+  "category": "streaming",
   "runtime_directory": "now-playing",
   "namespace": "now_playing",
   "requires": [
@@ -23,6 +30,23 @@
   ],
   "build_files": [
     "rx3_now_playing_decl.h",
-    "rx3_now_playing_feature.h"
-  ]
+    "rx3_now_playing_feature.h",
+    "rx3_now_playing_module.c"
+  ],
+  "messages": {
+    "en": {
+      "nowPlaying.usage": "Technical setup for your streaming software",
+      "nowPlaying.connect": "Activate this module, create the mod and load it on the RX3. Connect the rear USB-B port to your computer.",
+      "nowPlaying.receive": "With Python 3 installed, open a terminal in the rx3-toolbox source folder and run:",
+      "nowPlaying.overlay": "Allow incoming UDP port 50123 in your firewall. The terminal displays both decks as JSON, updating when track information changes.",
+      "nowPlaying.integration": "To display titles in your stream or record a set list, connect this data to a tool that can read it. This module supplies the data; it does not create an overlay or save a set list."
+    },
+    "fr": {
+      "nowPlaying.usage": "Configuration technique pour votre logiciel de diffusion",
+      "nowPlaying.connect": "Activez ce module, créez le mod et chargez-le sur le RX3. Reliez le port USB-B arrière à votre ordinateur.",
+      "nowPlaying.receive": "Avec Python 3 installé, ouvrez un terminal dans le dossier source rx3-toolbox et lancez :",
+      "nowPlaying.overlay": "Autorisez le port UDP 50123 entrant dans votre pare-feu. Le terminal affiche les deux decks en JSON et se met à jour lorsque leurs informations changent.",
+      "nowPlaying.integration": "Pour afficher les titres dans votre stream ou enregistrer votre sélection, utilisez un outil capable de lire ces données. Ce module transmet les informations, sans créer d’overlay ni enregistrer de liste de morceaux."
+    }
+  }
 }

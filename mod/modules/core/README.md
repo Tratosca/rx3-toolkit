@@ -1,33 +1,34 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
-# ⚙️ Performance core
+# Shared runtime core
 
-You never tick this one. It has no controls, does nothing on its own, and the app adds it for you whenever you pick **Key shift** or **Stems**.
+The application selects this dependency when a module needs shared in-process services. It builds one `librx3_core.so`, preloaded into rbp. Modules use the public service contract; the core owns shared mechanisms and firmware integration. Separate compilation does not isolate a module crash from the player.
 
-It is the part that draws things on the player's screen: the **KEY** and **STEMS** tabs, the buttons inside them, the blinking, and the touch handling that makes tapping them work. Both features need it; neither works without it.
+## Source layout
 
-## What that means for you
+| Directory | Responsibility |
+| --- | --- |
+| `api/` | Public module and service contracts, opaque handle types, DSP kernels and ARM ABI declarations. `rx3_feature_api.h` is the legacy panel contract pending migration. |
+| `runtime/` | Module composition, startup, shutdown and lifecycle dispatch. |
+| `services/` | Hook ownership, logging, notification queue, mix observations and reusable DSP implementations. |
+| `firmware/` | ARM code patching and the adapter to rbp's native caution messages. |
+| `ui/` | Panel layout, atlas, widgets and translated notice text. |
+| `diagnostics/` | Render probe record format. |
+| `assets/` | Artwork shipped to the player. `build_labels.py` builds it on the computer. |
 
-**There is no badge.** The mod does not announce itself anywhere. The way you know it loaded is that the **KEY** and **STEMS** tabs are there at all, if you see them, it is running.
+`rx3_core_hook.c` remains at the root as the legacy performance integration entry point. It still contains native draw/input/audio coordination and includes the features awaiting migration. Moving its helpers into directories does not complete that migration.
 
-**The two features are independent.** Key shift works without any stem files, and stems work without key shift. Pick either, both, or neither.
+`manifest.json` declares every packaged build input and additional compilation unit. Both the Makefile and application builder use it. Header rebuild dependencies and firmware-address inspection recurse into the service directories. `module.sh` owns the shell-side installation and launch contract.
 
-**A failure is contained.** If something is not as expected when stems try to attach, stems switch themselves off and key shift carries on. It is not all-or-nothing.
+## Native messages
 
-**It looks like the player's own screen** because it is. Everything drawn goes through the player's own renderer, reusing its fonts and its artwork, rather than being painted over the top. That is deliberate: a panel that looked bolted on would also *behave* bolted on.
+rbp already renders notices such as EMERGENCY LOOP through `ui::Caution`. The adapter in `firmware/rx3_message.h` uses `ui::Caution::set` and the player's B051 caution object for toolkit messages. It does not overwrite the Emergency Loop message or introduce a separate text renderer.
 
-Nothing is written to the player. Power off, pull the stick, and every trace of it is gone.
+`services/rx3_notice.c` only arbitrates toolkit requests: copied text, ownership, queue order, priority, duration and cancellation. Native placement and rendering stay with rbp, and calls run on its render thread. Toolkit queue priority does not override the player's own caution priority. The adapter's hardware behaviour is still awaiting acceptance on the RX3.
 
----
+New modules call `services->notices->post(...)`. The legacy translated startup notice uses the same queue through a local adapter. `RX3_MESSAGES=0` or `/tmp/rx3-messages.off` disables toolkit notifications. This switch does not disable rbp's own warnings.
 
+## Building and extending
 
----
+Run `make hook test preflight PYTHON=.venv/bin/python`. The symbol test rejects imports outside the known player set; the framework tests compile modules without the performance implementation and rebuild from packaged manifest inputs.
 
-# For whoever builds this
-
-`rx3_core_hook.c` compiles into one library, `librx3_core.so`, with `make hook`. The variant that stood in for an emulator's front panel and screen left with the emulator; what is compiled is what a deck runs.
-
-`tests/test_hook_symbols.py` reads the `.dynsym` of that library, so a change that pulls in a new import fails the build before it can fail on a deck.
-
----
-
-How the on-screen additions are rendered, how the image table is extended, and the palette question that is still open: [Reference: the display](../../../../REFERENCES.md#4-the-display).
+New runtime modules include `api/rx3_module_api.h`, register a descriptor in `runtime/rx3_composition.c` and list their unit in the manifest. Do not add their implementation headers to the legacy entry point. See [the framework contract and migration status](../../../docs/runtime-framework.md) for ownership, calling rules, examples and pending services.

@@ -67,7 +67,7 @@ samples_prepare()
 samples_after_launch()
 {
     [ "$SAMPLES_READY" = "1" ] || return 0
-    say "SAMPLE: press SLIP LOOP past its own pages to reach the pads; playback hardware validation pending"
+    say "SAMPLE: touch SAMPLES to use the pads; touch it again to return to STATUS; playback hardware validation pending"
     # What this build of the pads can do, so the computer can offer exactly
     # that rather than offering a setting a deck would ignore. Read back from
     # the session file the player leaves on the drive.

@@ -7,6 +7,7 @@ CC := clang
 endif
 
 PYTHON ?= python3
+CARGO ?= cargo
 BUILD_DIR ?= build
 # The version an operator reads in the deck's menu. Each module says which
 # versions it is built for; this picks which of them a drive carries.
@@ -18,8 +19,9 @@ KEY ?= $(RX3_KEY)
 CORE_DIR := mod/modules/core
 # One directory per module, so a new module is picked up without editing this
 # file: its headers become hook prerequisites.
-MODULE_HEADERS := $(wildcard mod/modules/*/*.h)
+MODULE_HEADERS := $(shell find mod/modules -type f -name '*.h')
 HOOK := $(BUILD_DIR)/librx3_core.so
+HOOK_UNITS := $(shell $(PYTHON) -c 'import json; print(" ".join("mod/modules/" + p for p in json.load(open("$(CORE_DIR)/manifest.json"))["arm_hook"].get("sources", [])))')
 AUTOEXEC := $(BUILD_DIR)/autoexec.bin
 PATCH_ARGS := $(foreach patch,$(MODULES),--patch $(patch))
 
@@ -30,14 +32,20 @@ PATCH_ARGS := $(foreach patch,$(MODULES),--patch $(patch))
 # front end. tests/test_hook_symbols.py pins the resulting symbol set.
 CFLAGS := --target=arm-linux-gnueabi -march=armv7-a -marm \
 	-mfloat-abi=softfp -mfpu=neon -fPIC -fno-stack-protector \
-	-fno-builtin-memcmp -fno-builtin-bcmp \
+	-fno-builtin-memcmp -fno-builtin-bcmp -fvisibility=hidden \
 	-O2 -Wall -Wextra -Werror
 LDFLAGS := -fuse-ld=lld -shared -nostdlib \
 	-Wl,--hash-style=sysv -Wl,--build-id=none
 
+# Experimental reader; ordinary builds have no new runtime imports.
+ifeq ($(OVERCUE),1)
+CFLAGS += -DRX3_OVERCUE_PROTOTYPE
+HOOK_UNITS += mod/modules/stems/overcue/overcue.c
+endif
+
 .DEFAULT_GOAL := help
 
-.PHONY: help hook autoexec app new-module test preflight clean
+.PHONY: help hook autoexec app new-module test preflight clean overcue-audio
 
 help:
 	@printf '%s\n' \
@@ -45,17 +53,21 @@ help:
 	  'make autoexec KEY=/path/key       build the runtime for firmware $(FIRMWARE)' \
 	  'make autoexec KEY=... MODULES="beatjump-32bars decoder-sleep"' \
 	  'make app                          open the XDJ-RX3 Toolkit' \
-	  'make new-module ID=browse-lock    write the files a new module is made of' \
-	  'make new-module ID=x CORE=1       ... one that reacts while a track plays' \
+	  'make new-module ID=browse-lock CATEGORY=screen    write the files a new module is made of' \
+	  'make new-module ID=x CATEGORY=screen CORE=1       ... one that reacts while a track plays' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
 
 hook: $(HOOK)
 
-$(HOOK): $(CORE_DIR)/rx3_core_hook.c $(MODULE_HEADERS)
+# Offline prototype only; neither the firmware nor the default app needs Rust.
+overcue-audio:
+	CARGO_TARGET_DIR="$(abspath $(BUILD_DIR))/overcue-audio" $(CARGO) build --locked --release --manifest-path native/overcue-audio/Cargo.toml
+
+$(HOOK): $(CORE_DIR)/rx3_core_hook.c $(HOOK_UNITS) $(MODULE_HEADERS) $(CORE_DIR)/manifest.json
 	@mkdir -p "$(BUILD_DIR)"
-	$(CC) $(CFLAGS) $(LDFLAGS) -o "$@" "$(CORE_DIR)/rx3_core_hook.c"
+	$(CC) $(CFLAGS) $(LDFLAGS) -o "$@" "$(CORE_DIR)/rx3_core_hook.c" $(HOOK_UNITS)
 	@file "$@" | grep -q 'ELF 32-bit LSB shared object, ARM, EABI5'
 
 autoexec:
@@ -72,8 +84,8 @@ app:
 # conventions. Guessing them from a neighbouring module is how one of them ends
 # up wrong.
 new-module:
-	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock' >&2; exit 2; }
-	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" \
+	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock CATEGORY=screen' >&2; exit 2; }
+	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" --category "$(CATEGORY)" \
 	  $(if $(CORE),--core,)
 
 test:

@@ -29,9 +29,12 @@ MODULE_ID = re.compile(r"[a-z][a-z0-9-]*")
 
 MANIFEST_TEMPLATE = {
     "id": "@ID@",
-    "name": "@NAME@",
-    "description": "TODO: one sentence, read in the module list, by a DJ.",
-    "firmwares": @FIRMWARES@,
+    "name": {"en": "@NAME@", "fr": "@NAME@"},
+    "description": {
+        "en": "TODO: one sentence explaining what this module does.",
+        "fr": "TODO: une phrase expliquant ce que fait ce module.",
+    },
+    "firmwares": [],
     "default": False,
     "order": 0,
     "runtime_directory": "@ID@",
@@ -70,7 +73,7 @@ module_begin @ID@ @NS@
 {
     [ -r "$CORE_OBJECT" ] || {
         say "@NAME@ disabled: the performance core is not selected"
-        return 1
+        return 0
     }
     export RX3_@NS_UPPER@=1
     @NS_UPPER@_READY=1
@@ -92,32 +95,28 @@ register_prepare_hook @NS@_prepare
 register_after_launch_hook @NS@_after_launch
 """
 
-FEATURE_HEADER = """/* SPDX-License-Identifier: MPL-2.0
- * @NAME@ implementation of the core runtime-feature lifecycle.
- */
+MODULE_SOURCE = """/* SPDX-License-Identifier: MPL-2.0 */
+#include "../core/api/rx3_module_api.h"
 
-#ifndef RX3_@NS_UPPER@_FEATURE_H
-#define RX3_@NS_UPPER@_FEATURE_H
-
-static int @NS@_feature_configured(void)
+static int configured(void)
 {
-    return getenv("RX3_@NS_UPPER@") != 0;
+    const char *value = getenv("RX3_@NS_UPPER@");
+    return value && value[0] == '1';
 }
-
-static int @NS@_feature_install(void)
+static int start(const struct rx3_services *services)
 {
-    /* Return 0 to refuse. The core then logs the refusal and leaves the
-       feature inactive rather than running it half-installed. */
+    (void)services;
+    /* Request shared services here; return 0 on partial failure. */
     return 1;
 }
-
-static void @NS@_feature_remove(void)
+static void stop(void)
 {
-    /* Undo exactly what install() did, and nothing another feature owns. A
-       thread started above is stopped here, not left running. */
+    /* Must also accept a partially completed start. No hot unload. */
 }
-
-#endif /* RX3_@NS_UPPER@_FEATURE_H */
+const struct rx3_module rx3_@NS@_module = {
+    .version = RX3_MODULE_API_VERSION, .size = sizeof(struct rx3_module),
+    .name = "@ID@", .configured = configured, .start = start, .stop = stop
+};
 """
 
 README = """<!-- SPDX-License-Identifier: MPL-2.0 -->
@@ -151,7 +150,7 @@ def next_order(root: pathlib.Path) -> int:
 
 
 def scaffold(
-    root: pathlib.Path, module_id: str, name: str, firmwares: list[str], core: bool
+    root: pathlib.Path, module_id: str, name: str, firmwares: list[str], core: bool, category: str
 ) -> list[pathlib.Path]:
     if not MODULE_ID.fullmatch(module_id):
         raise ValueError(
@@ -164,10 +163,16 @@ def scaffold(
 
     namespace = module_id.replace("-", "_")
     manifest = dict(MANIFEST_TEMPLATE)
+    from app.runtime.metadata import categories
+    definitions = categories(root)
+    if not MODULE_ID.fullmatch(category) or (definitions and category not in definitions):
+        raise ValueError(f"Unknown category: {category}")
+    manifest["category"] = category
     manifest["order"] = next_order(root)
+    manifest["firmwares"] = firmwares
     if core:
         manifest["requires"] = ["core"]
-        manifest["build_files"] = [f"rx3_{namespace}_feature.h"]
+        manifest["build_files"] = [f"rx3_{namespace}_module.c"]
 
     written = {
         "manifest.json": render(
@@ -180,8 +185,8 @@ def scaffold(
         "README.md": render(README, module_id, name, firmwares),
     }
     if core:
-        written[f"rx3_{namespace}_feature.h"] = render(
-            FEATURE_HEADER, module_id, name, firmwares
+        written[f"rx3_{namespace}_module.c"] = render(
+            MODULE_SOURCE, module_id, name, firmwares
         )
 
     directory.mkdir(parents=True)
@@ -193,6 +198,7 @@ def scaffold(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--id", required=True, help="module id, e.g. browse-lock")
+    parser.add_argument("--category", required=True, help="category identifier from mod/categories.json")
     parser.add_argument("--name", default="", help="module name shown in the app")
     # Which firmware versions the module is built against. Several can share
     # one module when the addresses it touches are the same in each.
@@ -211,7 +217,7 @@ def main() -> int:
     name = args.name or args.id.replace("-", " ").capitalize()
     try:
         firmwares = args.firmwares or available_versions(root)
-        written = scaffold(root, args.id, name, firmwares, args.core)
+        written = scaffold(root, args.id, name, firmwares, args.core, args.category)
     except ValueError as failure:
         print(failure, file=sys.stderr)
         return 2
@@ -224,10 +230,10 @@ def main() -> int:
     steps = ["fill in the TODOs: the manifest description, module.sh, the README"]
     if args.core:
         steps.append(
-            "declare the feature in mod/modules/core/"
-            f"rx3_core_hook.c: forward-declare the three {namespace}_feature_* "
-            f"functions, raise RUNTIME_FEATURE_COUNT, add the runtime_features "
-            f"entry, and include the header beside the other features"
+            f"add {args.id}/rx3_{namespace}_module.c to arm_hook.sources in "
+            "mod/modules/core/manifest.json and register the descriptor "
+            f"rx3_{namespace}_module in core/runtime/rx3_composition.c; never include a module "
+            "implementation in rx3_core_hook.c"
         )
         steps.append(
             "every libc name the header calls must be in ALLOWED in "

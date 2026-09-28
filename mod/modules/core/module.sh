@@ -33,7 +33,7 @@ register_runtime_preload /root/pdj/librx3_stems.so
 
 # NS_GetImageInfoByID: movw r3,#0x15cc -> movw r3,#0x16a5. This guarded
 # pre-launch word admits the private IDs in the secondary table without
-# hot-patching the renderer function: four for the tab strip and a reserve for
+# hot-patching the renderer function: seven for the tab strip and a reserve for
 # the pad row's glyph atlas. The stock word is left as it is, because the
 # orchestrator accepts only the stock or the patched value here and stops the
 # session on anything else, so a drive carrying an older mod is refused loudly.
@@ -95,6 +95,20 @@ core_prepare()
         return 1
     }
 
+    for tab in samples-selected samples-none-selected samples-beatfx-selected; do
+        core_install_asset "/mnt/iso/modules/core/$tab.rgb565" "/root/pdj/rx3-$tab.rgb565" || {
+            say "Performance core disabled: sample tab assets cannot be installed"
+            return 1
+        }
+    done
+    for tab in single-key-none single-key-selected single-stems-none single-stems-selected; do
+        core_install_asset "/mnt/iso/modules/core/$tab.rgb565" "/root/pdj/rx3-$tab.rgb565" || {
+            say "Performance core disabled: single-module tab asset cannot be installed"
+            return 1
+        }
+    done
+
+
     # The pad row letters its controls from this, one image per character. The
     # core keeps its stock text if it is missing, so the row is legible rather
     # than blank, but it will be lettered in the wrong face and size.
@@ -108,7 +122,7 @@ core_prepare()
         rm -f "$target"
 
     # Light tabs are optional; the core uses the dark set if any file is absent.
-    for tab_asset in key-selected stems-selected status-none-selected none-selected; do
+    for tab_asset in key-selected stems-selected status-none-selected none-selected samples-selected samples-none-selected samples-beatfx-selected single-key-none single-key-selected single-stems-none single-stems-selected; do
         target=/root/pdj/rx3-$tab_asset-light.rgb565
         core_install_asset /mnt/iso/modules/core/$tab_asset-light.rgb565 "$target" ||
             rm -f "$target"

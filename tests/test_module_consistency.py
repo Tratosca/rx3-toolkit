@@ -227,7 +227,7 @@ class PadRowLayoutTests(unittest.TestCase):
 
     def block(self):
         source = (
-            modules_by_id()["core"].directory / "rx3_pad_layout.h"
+            modules_by_id()["core"].directory / "ui/rx3_pad_layout.h"
         ).read_text(encoding="utf-8")
         begin, end = self.MARKERS
         self.assertIn(begin, source, "the layout is no longer marked for lifting")
@@ -239,7 +239,7 @@ class PadRowLayoutTests(unittest.TestCase):
         weights = (
             [1], [1, 1], [1, 1, 1], [1, 1, 1, 1],
             [1] * 5, [1] * 6, [1] * 7, [1] * 8,
-            [9, 1], [1, 9], [3, 1, 1], [2, 1, 2], [1, 2, 3, 4],
+            [9, 1], [1, 9], [1, 2, 2, 2, 2], [3, 1, 1], [2, 1, 2], [1, 2, 3, 4],
         )
         for origin, span in spans:
             for weight in weights:
@@ -406,7 +406,7 @@ class ImageTableBoundTests(unittest.TestCase):
         bound in the hook, the glyph ids beside the artwork that uses them."""
         return "\n".join(
             (self.core() / name).read_text(encoding="utf-8")
-            for name in ("rx3_core_hook.c", "rx3_pad_atlas.h")
+            for name in ("rx3_core_hook.c", "ui/rx3_pad_atlas.h")
         )
 
     def patch_words(self):
@@ -511,7 +511,7 @@ class GlyphAtlasTests(unittest.TestCase):
         # Where each of these comes from, so the list can be checked against the
         # panels by reading rather than by trusting a regex over C.
         spellable = set(
-            "0123456789"          # keys, shifts and volumes
+            "0123456789%"         # keys, shifts and volume percentages
             "ABCDEFG"             # Camelot letters and note names
             "<>*+- "              # the KEY row's arrows, match mark and signs
             "DRUMSBASVOCLINTE"    # DRUMS BASS VOCAL INST INSTRUMENTAL
@@ -633,7 +633,7 @@ class MessageLanguageTests(unittest.TestCase):
 
     def block(self):
         source = (
-            modules_by_id()["core"].directory / "rx3_message.h"
+            modules_by_id()["core"].directory / "firmware/rx3_message.h"
         ).read_text(encoding="utf-8")
         begin, end = self.MARKERS
         self.assertIn(begin, source, "the selection is no longer marked for lifting")
@@ -739,14 +739,14 @@ class MessageTranslationTests(unittest.TestCase):
 
     def table(self):
         source = (
-            modules_by_id()["core"].directory / "rx3_messages.h"
+            modules_by_id()["core"].directory / "ui/rx3_messages.h"
         ).read_text(encoding="utf-8")
         return source, re.findall(r'RX3_TEXT\("((?:[^"\\]|\\.)*)"\)', source)
 
     def test_every_language_has_its_own_line(self):
         source, entries = self.table()
         found = re.search(r"#define RX3_LANGUAGE_COUNT (\d+)u", (
-            modules_by_id()["core"].directory / "rx3_message.h"
+            modules_by_id()["core"].directory / "firmware/rx3_message.h"
         ).read_text(encoding="utf-8"))
         self.assertIsNotNone(found, "the language count is gone")
         languages = int(found.group(1))

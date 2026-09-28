@@ -143,8 +143,7 @@ static void hooked_mic_talkover_attenuate(void *self, void *state,
     __sync_sub_and_fetch(&samples_audio_active, 1u);
 }
 
-/* Leaving the page ends sounds that need a later pad action to stop. A
-   one-shot may finish naturally. Keep this independent of the overlay state. */
+/* Explicit silence is independent of panel and pad-mode navigation. */
 static void samples_stop(int all)
 {
     for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++) {
@@ -158,8 +157,7 @@ static void samples_stop(int all)
 
 static void samples_leave_mode(void)
 {
-    if (__atomic_exchange_n(&samples_mode, 0u, __ATOMIC_SEQ_CST))
-        samples_stop(0);
+    __atomic_store_n(&samples_mode, 0u, __ATOMIC_SEQ_CST);
 }
 
 static void samples_shift_pressed(void)
@@ -185,8 +183,10 @@ static int hooked_on_key_pad(void *self, const void *input)
     unsigned int code = event[8] | ((unsigned int)event[9] << 8u);
     int result;
     if (__atomic_load_n(&samples_callbacks_enabled, __ATOMIC_SEQ_CST) &&
-        __atomic_load_n(&samples_mode, __ATOMIC_SEQ_CST) &&
-        code >= 0x4117u && code <= 0x411eu) {
+        code >= 0x4117u && code <= 0x411eu &&
+        (__atomic_load_n(&samples_mode, __ATOMIC_SEQ_CST) ||
+         ((event[11] & 0x0eu) == 2u &&
+          (samples_pad_hold[code - 0x4117u] & (1u << (event[10] & 7u)))))) {
         unsigned int pad = code - 0x4117u;
         if (!(event[11] & 0x0fu)) {
             if (__atomic_load_n(&samples_config.shift_silence, __ATOMIC_SEQ_CST) &&
@@ -275,9 +275,7 @@ done:
     __sync_sub_and_fetch(&pad_callbacks_active, 1u);
 }
 
-/* Entered from the pads' own mode button, not from a chord. Holding SHIFT is
-   what this used to want, and it cost the DJ their hot cues for as long as a
-   bed was looping. */
+/* Entered by the SAMPLES touchscreen tab. Existing voices keep playing. */
 static int samples_enter_mode(void)
 {
     if (!__atomic_load_n(&samples_callbacks_enabled, __ATOMIC_SEQ_CST)) return 0;
@@ -295,13 +293,12 @@ static int samples_enter_mode(void)
    restore retains its trampoline because the replacement remains reachable. */
 static int samples_detach_hook(struct installed_hook *hook)
 {
-    return !hook->address || !write_code(hook->address, hook->original, 8u);
+    return detach_hook(hook);
 }
 
 static void samples_free_hook(struct installed_hook *hook)
 {
-    if (hook->trampoline) munmap(hook->trampoline, 4096u);
-    memset(hook, 0, sizeof(*hook));
+    (void)release_hook(hook);
 }
 
 static void samples_feature_remove(void)
@@ -339,7 +336,7 @@ static void samples_feature_remove(void)
     }
     if (samples_owns_send_key) {
         uninstall_hook(&send_key_hook);
-        if (!send_key_hook.address) {
+        if (!hook_is_installed(&send_key_hook)) {
             original_send_key = 0;
             samples_owns_send_key = 0;
         }

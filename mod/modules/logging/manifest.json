@@ -1,13 +1,20 @@
 {
   "id": "logging",
-  "name": "Session logging",
-  "description": "Writes session and module diagnostics to USB, closing each line. Continuous player output stays in RAM.",
+  "name": {
+    "en": "Troubleshooting report",
+    "fr": "Rapport de dépannage"
+  },
+  "description": {
+    "en": "Saves module diagnostics to the USB drive to help investigate a problem.",
+    "fr": "Enregistre les diagnostics des modules sur la clé USB pour rechercher la cause d’un problème."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 95,
+  "category": "diagnostics",
   "runtime_directory": "logging",
   "namespace": "logging",
   "requires": [],

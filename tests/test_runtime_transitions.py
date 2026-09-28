@@ -16,7 +16,7 @@ def function(path, name):
     source = path.read_text()
     # The caller names a definition, not a prototype or a call site.
     start = re.search(r"(?m)^.*\bstatic\b[^\n]*\b" + name + r"\s*\(", source).start()
-    opening = source.index("{", source.index(name))
+    opening = source.index("{", start)
     depth = 1
     end = opening + 1
     while depth:
@@ -32,7 +32,7 @@ class RuntimeTransitionTests(unittest.TestCase):
             self.skipTest("a native C compiler is required")
         with tempfile.TemporaryDirectory() as directory:
             source = pathlib.Path(directory) / "transitions.c"
-            source.write_text('#include <stdint.h>\n#include <stddef.h>\n#include <string.h>\n'
+            source.write_text('#define RX3_PLATFORM_H\n#include <stdint.h>\n#include <stddef.h>\n#include <string.h>\n'
                               '#include <assert.h>\n#include <pthread.h>\n' + body)
             binary = source.with_suffix("")
             subprocess.run([compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
@@ -78,7 +78,7 @@ int main(void) {
         for index, part in enumerate(pcm):
             vectors += "Short2 role%d[700]={" % index + ",".join("{%d,%d}" % tuple(part[i:i + 2]) for i in range(0, 1400, 2)) + "};\n"
         setup = "".join("c->payloads[%d].data=role%d;c->payloads[%d].frames=700;" % (i, i, i) for i in range(3))
-        calls = "".join("c->selection=%du;stems_mix(c,%d,output+%d,%d);" % (selection, start, start, count) for start, count, selection in segments)
+        calls = "".join("stems_set_mask(c,%du);stems_mix(c,%d,output+%d,%d);" % (selection, start, start, count) for start, count, selection in segments)
         self.run_c('''
 #pragma STDC FP_CONTRACT OFF
 typedef struct { float left, right; } Float2;
@@ -92,7 +92,7 @@ return 0;
 }
 ''')
 
-    def test_four_stem_mix_and_concurrent_selection(self):
+    def test_legacy_bass_follows_inst_and_concurrent_selection(self):
         self.run_c(r'''
 typedef struct { float left, right; } Float2;
 typedef struct { int16_t left, right; } Short2;
@@ -114,10 +114,10 @@ int main(void) {
     c->payloads[0].data=vocals; c->payloads[1].data=drums; c->payloads[2].data=bass;
     for(unsigned i=0;i<3;i++) c->payloads[i].frames=300;
     stems_mix(c,0,output,300); assert(output[299].left==1);
-    /* Residual alone subtracts all three separated roles from the original. */
+    /* INST retains legacy bass and subtracts vocals and drums. */
     stems_toggle(c,14); stems_mix(c,0,output,128);
     assert(c->transition_cursor==128 && c->gain[1]==0.5f);
-    assert(output[127].left==0.78125f);
+    assert(output[127].left==0.8125f);
     /* A toggle halfway through starts at the audible gains, not at the old mask. */
     stems_toggle(c,2); stems_mix(c,128,output+128,1);
     assert(c->from[1]==0.5f && c->gain[1]==0.5f+0.5f/256);
@@ -130,22 +130,22 @@ int main(void) {
     c->selection=0xf2; stems_reset_mix(c);
     for(unsigned i=0;i<300;i++) output[i]=(Float2){1,-1};
     stems_mix(c,0,output,300); assert(output[299].left==0.25f && output[299].right==-0.25f);
-    c->selection=0xf0; stems_mix(c,0,output,300); assert(output[299].left==0);
+    stems_set_mask(c,0); stems_mix(c,0,output,300); assert(output[299].left==0);
     for(unsigned count=1;count<=3;count++) {
         c->payload_count=count; c->selection=1u; stems_reset_mix(c);
         for(unsigned i=0;i<300;i++) output[i]=(Float2){1,-1};
         stems_mix(c,0,output,255);
         assert(c->transition_cursor==255 && c->gain[1]==1.0f/256.0f);
         stems_mix(c,255,output+255,1);
-        float rest=1.0f-0.25f-(count>=2?0.125f:0)-(count==3?0.0625f:0);
+        float rest=1.0f-0.25f-(count>=2?0.125f:0);
         assert(c->transition_cursor==256 && c->gain[1]==0);
         assert(output[255].left==rest && output[255].right==-rest);
     }
-    c->selection=0xff; pthread_t a,b;
+    c->selection=0xff; stems_set_mask(c,15); pthread_t a,b;
     assert(!pthread_create(&a,0,toggle_many,(void *)2));
     assert(!pthread_create(&b,0,toggle_many,(void *)4));
     pthread_join(a,0); pthread_join(b,0);
-    assert((c->selection&255)==0xf9 && c->selection>>8==40002);
+    assert(stems_selected(c)==1);
     c->selection=0x33; stems_toggle(c,4); assert(c->selection==0x33);
     assert(stems_available(c)==3);
     return 0;
@@ -176,7 +176,7 @@ int main(void) {
             text[n]=(uint16_t)rx3_camelot_classic[key][n]; n++;
         }
         assert(rx3_camelot_index_from_text(text,n)==(int)key);
-        keyshift_format_labels(labels,(int)key,0,0);
+        keyshift_format_labels(labels,(int)key,0);
         assert(rx3_camelot_index_from_text(labels[1],key>=18?3:2)==(int)key);
     }
     const uint16_t padded[]={'\t',' ','1','2','b',' ',0};
@@ -184,13 +184,13 @@ int main(void) {
     const uint16_t invalid[]={'1','3','A',0};
     assert(rx3_camelot_index_from_text(invalid,3)==-1);
     assert(rx3_camelot_index_from_text(0,2)==-1);
-    keyshift_format_labels(labels,14,1,0); equal(labels[0],"< 8A"); equal(labels[1],"*3A"); equal(labels[2],"10A >");
-    /* The match the other deck is asking for rides on the middle label. */
-    keyshift_format_labels(labels,14,1,2); equal(labels[1],"*3A +2");
-    keyshift_format_labels(labels,14,0,-3); equal(labels[1],"8A -3");
-    keyshift_format_labels(labels,-1,0,0); equal(labels[0],"< -1"); equal(labels[1],"KEY --"); equal(labels[2],"+1 >");
-    keyshift_format_labels(labels,14,-12,0); equal(labels[0],"< --"); equal(labels[1],"*8A");
-    keyshift_format_labels(labels,-1,12,0); equal(labels[1],"KEY +12"); equal(labels[2],"-- >");
+    keyshift_format_labels(labels,14,1); equal(labels[0],"-1"); equal(labels[1],"3A (+1)"); equal(labels[2],"+1");
+    keyshift_format_labels(labels,18,-2); equal(labels[1],"8A (-2)");
+    keyshift_format_labels(labels,14,0); equal(labels[1],"8A");
+    keyshift_format_labels(labels,23,12); equal(labels[1],"12B (+12)");
+    keyshift_format_labels(labels,-1,0); equal(labels[0],"-1"); equal(labels[1],"KEY --"); equal(labels[2],"+1");
+    keyshift_format_labels(labels,14,-12); equal(labels[0],"-1"); equal(labels[1],"8A (-12)");
+    keyshift_format_labels(labels,-1,12); equal(labels[1],"KEY +12"); equal(labels[2],"+1");
     assert(keyshift_text_deck(0x1101,10,78,122,104)==0);
     assert(keyshift_text_deck(0x1101,10,339,138,375)==1);
     assert(keyshift_text_deck(0x1102,10,78,122,104)==-1);
@@ -346,8 +346,14 @@ int main(void) {
     }
     samples_leave_mode();
     assert(!samples_mode && samples_slots[0].position==0);
-    for(unsigned i=1;i<4;i++) assert(samples_slots[i].position==SAMPLE_SLOT_IDLE);
-    for(unsigned i=0;i<8;i++) assert(!samples_pad_hold[i]);
+    for(unsigned i=0;i<4;i++) assert(samples_slots[i].position==0 && samples_pad_hold[i]==6);
+    /* Both deck releases remain owned after leaving; loops/latches keep playing. */
+    press(event,1,1); event[11]=2; assert(hooked_on_key_pad((void *)1,event)==1);
+    assert(samples_slots[1].position==0 && samples_pad_hold[1]==4);
+    event[10]=2; assert(hooked_on_key_pad((void *)1,event)==1);
+    assert(samples_slots[1].position==SAMPLE_SLOT_IDLE && !samples_pad_hold[1]);
+    assert(samples_slots[2].position==0 && samples_slots[3].position==0);
+    press(event,0,1);
     assert(hooked_on_key_pad((void *)1,event)==42);
     assert(stock_calls==2 && !pad_callbacks_active);
 
@@ -393,75 +399,150 @@ int main(void) {
 }
 """)
 
-    def test_the_key_button_offers_the_shift_that_puts_two_decks_in_key(self):
-        """What the KEY button promises a DJ mid-blend.
-
-        The wheel arithmetic is the part nobody wants to do at 2am, so the deck
-        does it. A wrong answer here is not a cosmetic slip: it moves a playing
-        track into a key that clashes, which is the failure the feature exists
-        to prevent.
-        """
-        text = MODULES / "keyshift/rx3_keyshift_text.h"
+    def test_key_sync_is_bounded_and_tracks_both_transposed_decks(self):
         panel = MODULES / "keyshift/rx3_keyshift_panel.h"
-        self.run_c(
-            "static int keyshift_track_key[2] = {-1, -1};\n"
-            "static int stub_semitones[2];\n"
-            "static int rx3_keyshift_semitones(unsigned int d) { return stub_semitones[d]; }\n"
-            + function(text, "rx3_camelot_compatible")
-            + function(text, "rx3_camelot_shifted")
-            + function(panel, "keyshift_current_key")
-            + function(panel, "keyshift_match_delta")
-            + r"""
-/* Camelot index: (number - 1) * 2, plus one for the B side. */
-#define K(number, letter) (((number) - 1) * 2 + (letter))
-#define A 0
-#define B 1
+        self.run_c(r"""
+#include "keyshift/rx3_keyshift_text.h"
+
+#include "core/api/rx3_module_api.h"
+static int keyshift_current_key(unsigned int deck);
+static unsigned int master_deck=1;
+static struct rx3_harmonic_reference reference(void) {
+    int key=keyshift_current_key(master_deck);unsigned mask=0;
+    for(int i=0;i<24;i++)if(rx3_camelot_compatible(key,i))mask|=1u<<i;
+    return (struct rx3_harmonic_reference){(int)master_deck,key,mask};
+}
+static const struct rx3_browse_service browse={.reference=reference};
+static const struct rx3_services services={.browse=&browse};
+static const struct rx3_services *framework=&services;
+#include "core/api/rx3_panel_api.h"
+static uint16_t keyshift_labels[2][3][12];
+static int keyshift_track_key[2], shifts[2];
+static unsigned int keyshift_sync_enabled=1;
+static unsigned int keyshift_sync_range=1;
+static unsigned int keyshift_sync_harmonic;
+static unsigned int keyshift_match_rules;
+static int rx3_keyshift_semitones(unsigned d){return shifts[d];}
+static void rx3_keyshift_change(unsigned d,int delta){shifts[d]+=delta;}
+""" + function(panel,"keyshift_base_key") + function(panel,"keyshift_current_key")
+            + function(panel,"keyshift_reference")
+            + function(panel,"keyshift_sync_compatible")
+            + function(panel,"keyshift_match_delta")
+            + function(panel,"keyshift_live_count")
+            + function(panel,"keyshift_widget_kind")
+            + function(panel,"keyshift_caption")
+            + function(panel,"keyshift_fire") + r"""
 int main(void) {
-    /* The rule itself. */
-    assert(rx3_camelot_compatible(K(8,A), K(8,A)));   /* the same key */
-    assert(rx3_camelot_compatible(K(8,A), K(9,A)));   /* a step round */
-    assert(rx3_camelot_compatible(K(8,A), K(7,A)));
-    assert(rx3_camelot_compatible(K(8,A), K(8,B)));   /* relative major */
-    assert(rx3_camelot_compatible(K(12,A), K(1,A)));  /* the wheel wraps */
-    assert(rx3_camelot_compatible(K(1,A), K(12,A)));
-    assert(!rx3_camelot_compatible(K(8,A), K(10,A))); /* two steps is not */
-    assert(!rx3_camelot_compatible(K(8,A), K(9,B)));
-    assert(!rx3_camelot_compatible(-1, K(8,A)));      /* no key on screen */
-
-    /* A semitone is seven steps round the wheel: 8A up one is 3A. */
-    assert(rx3_camelot_shifted(K(8,A), 1) == K(3,A));
-    assert(rx3_camelot_shifted(K(8,A), -1) == K(1,A));
-    assert(rx3_camelot_shifted(K(8,A), 0) == K(8,A));
-    assert(rx3_camelot_shifted(-1, 3) == -1);
-
-    /* Deck 1 plays 11A, deck 0 is cueing 8A. Those clash, and +2 is the
-       nearest shift that does not: 8A up two semitones is 10A, which sits
-       beside 11A on the wheel. */
-    keyshift_track_key[0] = K(8,A);
-    keyshift_track_key[1] = K(11,A);
-    assert(keyshift_match_delta(0) == 2);
-
-    /* Take it, and there is nothing left to offer. */
-    stub_semitones[0] = 2;
-    assert(keyshift_match_delta(0) == 0);
-
-    /* The answer is measured from where the deck is now, not from zero: a DJ
-       mid-blend wants the nearest key rather than the tidiest one. */
-    stub_semitones[0] = 5;
-    assert(keyshift_match_delta(0) + 5 >= -12 && keyshift_match_delta(0) + 5 <= 12);
-    assert(rx3_camelot_compatible(
-        rx3_camelot_shifted(K(8,A), 5 + keyshift_match_delta(0)), K(11,A)));
-
-    /* Tracks that already mix are left alone, whatever the shift. */
-    stub_semitones[0] = 0;
-    keyshift_track_key[1] = K(9,A);
-    assert(keyshift_match_delta(0) == 0);
-
-    /* One key on screen is nothing to be in key with. */
-    keyshift_track_key[1] = -1;
-    keyshift_track_key[0] = K(8,A);
-    assert(keyshift_match_delta(0) == 0);
-    assert(keyshift_match_delta(1) == 0);
+    assert(keyshift_parse_sync_range(0)==1);
+    assert(keyshift_parse_sync_range("12")==12);
+    assert(keyshift_parse_sync_range("2")==2);
+    const char *bad[]={"","0","13","-1","1.5","1x","999"," 2"};
+    for(unsigned i=0;i<sizeof(bad)/sizeof(bad[0]);i++) assert(keyshift_parse_sync_range(bad[i])==1);
+    /* Same source, but the other deck is already shifted. */
+    keyshift_track_key[0]=keyshift_track_key[1]=0;
+    shifts[1]=1;
+    keyshift_sync_enabled=0;
+    assert(keyshift_live_count(0)==1 && keyshift_match_delta(0)==0);
+    keyshift_fire(0,1,0);assert(shifts[0]==0);
+    keyshift_fire(0,0,2);assert(shifts[0]==1);
+    keyshift_fire(0,0,1);assert(shifts[0]==0);
+    keyshift_sync_enabled=1;
+    assert(keyshift_match_delta(0)==1 && keyshift_match_delta(1)==0);
+    assert(keyshift_live_count(0)==2);
+    keyshift_fire(0,1,0);assert(shifts[0]==1 && shifts[1]==1);
+    assert(keyshift_live_count(0)==2 && keyshift_live_count(1)==1);
+    assert(keyshift_caption(1,1,0)[0]==0); /* no MASTER caption on the reference deck */
+    assert(keyshift_widget_kind(0,1)==RX3_PAD_STATUS);
+    assert(keyshift_caption(0,1,0)[0]=='I'); /* IDENTIQUE */
+    /* The centre is reset only, even while a sync offer exists. */
+    shifts[1]=2;keyshift_fire(0,0,1);assert(shifts[0]==0);
+    assert(!keyshift_match_delta(0));
+    assert(keyshift_live_count(0)==2 && keyshift_widget_kind(0,1)==RX3_PAD_STATUS);
+    assert(keyshift_caption(0,1,0)[0]=='P'); /* PAS DE SYNC */
+    keyshift_sync_range=2;assert(keyshift_match_delta(0)==2);
+    /* Releasing after the target has moved beyond the threshold does nothing. */
+    shifts[1]=3;keyshift_fire(0,1,0);assert(shifts[0]==0);
+    shifts[1]=-2;assert(keyshift_match_delta(0)==-2);
+    keyshift_fire(0,1,0);assert(shifts[0]==-2);
+    keyshift_track_key[1]=-1;assert(!keyshift_match_delta(0));
+    keyshift_track_key[1]=1;assert(!keyshift_match_delta(0)); /* different A/B mode */
+    /* Every offered action obeys the configured distance and absolute range. */
+    for(int k=0;k<24;k++) for(int j=0;j<24;j++) for(int n=-12;n<=12;n++) {
+        keyshift_track_key[0]=k;keyshift_track_key[1]=j;shifts[0]=n;shifts[1]=2;
+        int delta=keyshift_match_delta(0);
+        if(delta) {
+            assert(delta>=-2 && delta<=2 && n+delta>=-12 && n+delta<=12);
+            assert(rx3_camelot_shifted(k,n+delta)==keyshift_current_key(1));
+        }
+    }
+    keyshift_sync_harmonic=1; keyshift_sync_range=1;
+    shifts[0]=shifts[1]=0;
+    keyshift_track_key[0]=16;keyshift_track_key[1]=14; /* 9A / 8A */
+    assert(keyshift_sync_compatible(0) && keyshift_live_count(0)==2);
+    assert(keyshift_widget_kind(0,1)==RX3_PAD_STATUS);
+    assert(keyshift_caption(0,1,0)[0]=='K' && keyshift_caption(0,1,0)[4]=='M'); /* KEY MATCH */
+    keyshift_fire(0,1,0);assert(shifts[0]==0);
+    keyshift_track_key[0]=18; /* 10A */
+    assert(!keyshift_sync_compatible(0) && !keyshift_match_delta(0));
+    keyshift_sync_range=2;assert(keyshift_match_delta(0)==-2);
+    assert(keyshift_widget_kind(0,1)==RX3_PAD_OUTLINE_BUTTON);
+    assert(keyshift_caption(0,1,0)[0]=='K'); /* KEY SYNC */
+    keyshift_fire(0,1,0);assert(shifts[0]==-2 && keyshift_sync_compatible(0));
+    shifts[0]=0;keyshift_track_key[0]=15; /* relative 8B / 8A */
+    assert(keyshift_sync_compatible(0) && !keyshift_match_delta(0));
+    keyshift_track_key[0]=-1;assert(!keyshift_sync_compatible(0) && !keyshift_match_delta(0));
+    /* Exhaustive compatibility, minimality and pitch bounds, both decks shifted. */
+    for(int k=0;k<24;k++) for(int j=0;j<24;j++) for(int n=-12;n<=12;n++)
+    for(int other=-2;other<=2;other++) {
+        keyshift_track_key[0]=k;keyshift_track_key[1]=j;shifts[0]=n;shifts[1]=other;
+        int delta=keyshift_match_delta(0), best=99;
+        for(int move=-2;move<=2;move++) {
+            if(n+move < -12 || n+move > 12) continue;
+            if(rx3_camelot_compatible(rx3_camelot_shifted(k,n+move),keyshift_current_key(1))) {
+                int distance=move<0?-move:move;if(distance<best)best=distance;
+            }
+        }
+        if(best==0 || best==99) assert(delta==0);
+        else {
+            assert((delta<0?-delta:delta)==best);
+            assert(rx3_camelot_compatible(rx3_camelot_shifted(k,n+delta),keyshift_current_key(1)));
+        }
+    }
+    /* The other deck is the reference: 8A -> 10A is +2, not the reverse. */
+    shifts[0]=shifts[1]=0;keyshift_track_key[0]=18;keyshift_track_key[1]=14;
+    keyshift_match_rules=RX3_MATCH_BOOST_TWO;
+    assert(keyshift_sync_compatible(0) && !keyshift_sync_compatible(1));
+    assert(!keyshift_match_delta(0));
+    keyshift_sync_harmonic=0;assert(!keyshift_sync_compatible(0));
+    assert(keyshift_match_delta(0)==-2);
+    /* All rule combinations, both modes, pitch edges and transposed references. */
+    for(unsigned mask=0;mask<16;mask+=2) for(unsigned mode=0;mode<2;mode++)
+    for(int k=0;k<24;k++) for(int j=0;j<24;j++) for(int n=-12;n<=12;n+=3)
+    for(int other=-1;other<=1;other++) {
+        keyshift_match_rules=mask;keyshift_sync_harmonic=mode;keyshift_sync_range=3;
+        keyshift_track_key[0]=k;keyshift_track_key[1]=j;shifts[0]=n;shifts[1]=other;
+        int reference=keyshift_current_key(1),best=99;
+        int delta=keyshift_match_delta(0);
+        for(int move=-3;move<=3;move++) {
+            if(n+move < -12 || n+move > 12) continue;
+            int candidate=rx3_camelot_shifted(k,n+move);
+            int accepted=candidate==reference || (mode &&
+                (rx3_camelot_compatible(reference,candidate) ||
+                 rx3_camelot_extended(reference,candidate,mask)));
+            if(accepted) {int distance=move<0?-move:move;if(distance<best)best=distance;}
+        }
+        if(best==0 || best==99) assert(delta==0);
+        else {
+            assert((delta<0?-delta:delta)==best);
+            int target=rx3_camelot_shifted(k,n+delta);
+            assert(target==reference || (mode && rx3_camelot_matches(reference,target,mask)));
+        }
+    }
+    /* Switching MASTER swaps the single-key and match/sync layouts. */
+    master_deck=0;keyshift_sync_harmonic=1;keyshift_match_rules=0;
+    shifts[0]=shifts[1]=0;keyshift_track_key[0]=14;keyshift_track_key[1]=16;
+    assert(keyshift_live_count(0)==1 && keyshift_caption(0,1,0)[0]==0);
+    assert(keyshift_live_count(1)==2 && keyshift_caption(1,1,0)[0]=='K');
     return 0;
 }
 """)
@@ -567,8 +648,8 @@ int main(void) {
         slider and the core maps the finger to a value.
         """
         self.run_c(r"""
-#include "core/rx3_feature_api.h"
-#include "core/rx3_pad_layout.h"
+#include "core/api/rx3_feature_api.h"
+#include "core/ui/rx3_pad_layout.h"
 #include "samples/rx3_samples_decl.h"
 #include "samples/rx3_samples_state.h"
 #define TAB_IMAGE_KEY_NONE 0x1603
@@ -583,6 +664,7 @@ static void log_number(const char *s, unsigned n) { (void)s; (void)n; }
 
 /* The atlas is artwork, and this test is about arithmetic: stand it down and
    the captions draw nothing, which is what a deck with no artwork does too. */
+static int theme_light_active;
 static unsigned int pad_atlas_ready;
 static struct { uint16_t cell_height, ink_left; } pad_atlas;
 static unsigned int pad_atlas_cell_width(unsigned int c) { (void)c; return 0; }
@@ -610,8 +692,14 @@ static void draw_native_image_local(void *r, const void *m, uint8_t w,
     int x1, int y1, int x2, int y2, uint32_t id) {
     (void)r; (void)m; (void)w; (void)x1; (void)y1; (void)x2; (void)y2; (void)id;
 }
-#include "core/rx3_pad_widgets.h"
+static unsigned int tick;
+static unsigned int now_ms(void) { return tick; }
+#include "core/ui/rx3_pad_widgets.h"
 #include "samples/rx3_samples_panel.h"
+static void hybrid_fire(unsigned d,unsigned w,unsigned p) { (void)w; samples_fire(d,1,p); }
+
+static unsigned int status_kind=RX3_PAD_STATUS;
+static unsigned int status_test_kind(unsigned d,unsigned w){(void)d;(void)w;return status_kind;}
 
 static int touch(unsigned int deck, int x, unsigned int phase) {
     return pad_row_touch(&samples_row, deck, x - (int)deck * 640, phase);
@@ -636,7 +724,8 @@ int main(void) {
     assert(touch(0, track_right, 2u) && samples_volume==100);
     assert(samples_volume_touched);
     /* The release commits, and nothing follows the finger afterwards. */
-    assert(touch(0, track_right + 40, 0u));
+    /* The firmware clears coordinates on release; preserve the last drag. */
+    assert(touch(0, 0, 0u));
     assert(!touch(0, track_left + 10, 2u) && samples_volume==100);
 
     /* The readout is on deck two's half, and tapping it restores the bank. */
@@ -663,9 +752,207 @@ int main(void) {
            into one window would be caught rather than merely not crashing. */
         assert(boxes_drawn >= 4);
     }
+    /* Hybrid: tap fires, a held drag changes volume without a release toggle.
+       Dragging is relative to the initial gain, never jumps to the touch point. */
+    struct rx3_pad_widget hybrid_widget={RX3_PAD_TOGGLE_SLIDER,1};
+    struct rx3_pad_row hybrid=samples_row;
+    hybrid.fire=hybrid_fire;hybrid.widgets=&hybrid_widget;hybrid.count=1;hybrid.scope=RX3_PAD_SCOPE_DECK;
+    samples_volume=100;tick=0;
+    pad_row_touch(&hybrid,0,200,1);
+    tick=100;pad_row_touch(&hybrid,0,200,0);
+    assert(samples_volume==37); /* sample fire resets to the configured volume */
+    samples_volume=100;tick=1000;
+    pad_row_touch(&hybrid,0,300,1);
+    tick=1200;pad_row_touch(&hybrid,0,299,2);assert(samples_volume==100);
+    tick=1400;pad_row_touch(&hybrid,0,150,2);
+    assert(samples_volume>70 && samples_volume<80);
+    unsigned held=samples_volume;
+    pad_row_touch(&hybrid,0,0,0);assert(samples_volume==held);
+    tick=2000;pad_row_touch(&hybrid,0,300,1);
+    tick=2400;pad_row_touch(&hybrid,0,-600,2);assert(samples_volume==0);
+    pad_row_touch(&hybrid,0,0,0);assert(samples_volume==0);
+    tick=3000;pad_row_touch(&hybrid,0,100,1);
+    tick=3400;pad_row_touch(&hybrid,0,1000,2);assert(samples_volume==100);
+    pad_row_touch(&hybrid,0,0,0);assert(samples_volume==100);
+    /* Passive statuses consume complete gestures without action or repaint,
+       even when the underlying state changes while the finger is down. */
+    struct rx3_pad_row status=hybrid;
+    struct rx3_pad_widget status_widget={RX3_PAD_STATUS,1};
+    status.widgets=&status_widget;status.kind=status_test_kind;
+    samples_volume=80;performance_refresh_pending=0;
+    assert(pad_row_touch(&status,0,200,1));
+    assert(pad_row_touch(&status,0,220,2));
+    assert(pad_row_touch(&status,0,0,0));
+    assert(samples_volume==80 && !performance_refresh_pending);
+    assert(pad_press_deck==-1);
+    assert(pad_row_touch(&status,0,200,1));status_kind=RX3_PAD_BUTTON;
+    assert(pad_row_touch(&status,0,0,0));assert(samples_volume==80);
+    assert(pad_row_touch(&status,0,200,1));status_kind=RX3_PAD_STATUS;
+    assert(pad_row_touch(&status,0,0,0));assert(samples_volume==80);
     return 0;
 }
 """)
+
+    def test_physical_modes_close_panels_before_native_dispatch(self):
+        core = MODULES / "core/rx3_core_hook.c"
+        functions = "\n".join(function(core, name) for name in (
+            "restore_status", "leave_performance_panel", "pad_mode_key_pressed",
+            "hooked_on_key_hot_cue", "hooked_on_key_beat_loop", "hooked_on_key_slip_loop",
+            "hooked_on_key_beat_jump", "hooked_on_physical_key"))
+        self.run_c(r'''
+static unsigned samples_mode, calls, overlay_panel, native_beatfx_selected;
+static unsigned beatfx_reselect_pending,beatfx_reselect_generation,refreshes,parked;
+static unsigned playing_loop=1,muted_vocal=1,held_sample=1,must_be_closed;
+static void samples_leave_mode(void){samples_mode=0;}
+static void pad_row_clear_press(void){}
+static void park_native_performance_touches(int p){parked=p;}
+static void set_native(int p){native_beatfx_selected=p;}
+static void (*original_set_beatfx_selected)(int)=set_native;
+static void refresh_performance_ui(void){refreshes++;}
+static int native(void *p,const void *i) {
+ assert(p && i);calls++;
+ if(must_be_closed) assert(!overlay_panel&&!native_beatfx_selected&&!beatfx_reselect_pending&&!samples_mode&&!parked);
+ assert(playing_loop && muted_vocal && held_sample);
+ return 7;
+}
+static int (*original_on_key_hot_cue)(void *,const void *)=native;
+static int (*original_on_key_beat_loop)(void *,const void *)=native;
+static int (*original_on_key_slip_loop)(void *,const void *)=native;
+static int (*original_on_key_beat_jump)(void *,const void *)=native;
+static int (*original_on_physical_key)(void *,const void *)=native;
+''' + functions + r'''
+int main(void) {
+ uint32_t players[2][64]={{0}};uint8_t event[12]={0};event[9]=0x41;
+ int (*hooks[4])(void *,const void *)={hooked_on_key_hot_cue,hooked_on_key_beat_loop,hooked_on_key_slip_loop,hooked_on_key_beat_jump};
+ for(unsigned deck=0;deck<2;deck++) for(unsigned panel=1;panel<=5;panel++)
+ for(unsigned key=0;key<4;key++) for(unsigned dispatch=0;dispatch<2;dispatch++) {
+   overlay_panel=panel<4?panel:0;native_beatfx_selected=panel==4;
+   beatfx_reselect_pending=panel==5;samples_mode=1;parked=1;
+   event[8]=0x13+key;event[11]=2;must_be_closed=0;
+   int (*hook)(void *,const void *)=dispatch?hooked_on_physical_key:hooks[key];
+   unsigned before=refreshes,gen=beatfx_reselect_generation;
+   assert(hook(players[deck],event)==7 && samples_mode);
+   assert(overlay_panel==(panel<4?panel:0) && native_beatfx_selected==(panel==4));
+   assert(beatfx_reselect_pending==(panel==5) && refreshes==before);
+   event[11]=0;must_be_closed=1;
+   assert(hook(players[deck],event)==7);
+   assert(refreshes==before+1 && beatfx_reselect_generation==gen+1);
+   /* Nested native dispatch must not clear and refresh a second time. */
+   assert(hooks[key](players[deck],event)==7 && refreshes==before+1);
+ }
+ overlay_panel=3;samples_mode=1;event[8]=0x17;must_be_closed=0;
+ assert(hooked_on_physical_key(players[0],event)==7 && samples_mode && overlay_panel==3);
+ assert(calls==2*5*4*2*3+1);
+ return 0;
+}
+''')
+
+    def test_touchscreen_tabs_toggle_to_status_without_resetting_audio(self):
+        core = MODULES / "core/rx3_core_hook.c"
+        self.run_c(r'''
+#define CUSTOM_TAB_OFFSET_Y 21u
+#define CUSTOM_TAB_TOUCH_BOTTOM 431
+static unsigned overlay_panel, native_beatfx_selected, beatfx_reselect_pending;
+static unsigned samples_callbacks_enabled=1,tab_assets_ready=1,samples_mode;
+static unsigned beatfx_reselect_generation,refreshes,parked;
+static unsigned playing_loop=1,muted_vocal=1;
+struct rx3_pad_row {unsigned panel_id;};
+static struct rx3_pad_row rows[2]={{1},{2}};
+static unsigned available=3;
+static const struct rx3_pad_row *row_for_slot(unsigned i){return available&(1u<<i)?&rows[i]:0;}
+static int point_in_rect(int x,int y,int l,int t,int r,int b){return x>=l&&x<=r&&y>=t&&y<=b;}
+static void samples_leave_mode(void){samples_mode=0;}
+static void pad_row_clear_press(void){}
+static void park_native_performance_touches(int p){parked=p;}
+static void set_native(int p){native_beatfx_selected=p;}
+static void (*original_set_beatfx_selected)(int)=set_native;
+static void refresh_performance_ui(void){refreshes++;}
+static void log_line(const char *s){(void)s;}
+static void select_custom_panel(unsigned p){overlay_panel=p;samples_mode=p==3;}
+static int samples_enter_mode(void){select_custom_panel(3);return 1;}
+static void hooked_set_beatfx_selected(int p){overlay_panel=0;samples_mode=0;native_beatfx_selected=p;}
+''' + function(core, "restore_status") + function(core, "performance_tab_touch") + r'''
+int main(void){
+ int x[]={1135,1225,1135,1225},y[]={409,409,457,457};
+ for(unsigned i=0;i<4;i++){
+   assert(performance_tab_touch(x[i],y[i]));
+   assert(i==3?native_beatfx_selected:overlay_panel==i+1);
+   unsigned gen=beatfx_reselect_generation;
+   assert(performance_tab_touch(x[i],y[i]));
+   assert(!overlay_panel&&!native_beatfx_selected&&!samples_mode&&!parked);
+   assert(beatfx_reselect_generation==gen+1 && playing_loop && muted_vocal);
+ }
+ assert(!performance_tab_touch(1135,383)); /* gap below QUANTIZE */
+ assert(performance_tab_touch(1135,431)&&overlay_panel==1);
+ assert(performance_tab_touch(1135,431)&&!overlay_panel);
+ assert(performance_tab_touch(1135,409)&&overlay_panel==1);
+ assert(performance_tab_touch(1225,409)&&overlay_panel==2);
+ assert(performance_tab_touch(1135,457)&&overlay_panel==3);
+ assert(performance_tab_touch(1225,457)&&!overlay_panel&&native_beatfx_selected);
+ beatfx_reselect_pending=1;assert(performance_tab_touch(1225,457));
+ assert(!beatfx_reselect_pending&&!native_beatfx_selected);
+ samples_callbacks_enabled=0;assert(performance_tab_touch(1135,457));
+ assert(!overlay_panel && !native_beatfx_selected);
+ samples_callbacks_enabled=1;tab_assets_ready=0;assert(!performance_tab_touch(1135,457));
+ available=1;
+ assert(performance_tab_touch(1135,409)&&overlay_panel==1);
+ assert(performance_tab_touch(1225,409)&&!overlay_panel);
+ assert(performance_tab_touch(1180,409)&&overlay_panel==1);
+ available=2;
+ assert(performance_tab_touch(1135,409)&&overlay_panel==2);
+ assert(performance_tab_touch(1225,409)&&!overlay_panel);
+ assert(performance_tab_touch(1180,409)&&overlay_panel==2);
+ available=0;
+ assert(!performance_tab_touch(1135,409));
+ assert(!performance_tab_touch(1180,457));assert(!performance_tab_touch(10,10));
+ return 0;
+}
+''')
+
+    def test_all_feature_selection_tab_combinations(self):
+        core = MODULES / "core/rx3_core_hook.c"
+        self.run_c(r'''
+#include <stdint.h>
+#define TAB_IMAGE_KEY 0x1600u
+#define TAB_IMAGE_STEMS 0x1601u
+#define TAB_IMAGE_STATUS_NONE 0x1602u
+#define TAB_IMAGE_KEY_NONE 0x1603u
+#define TAB_IMAGE_SAMPLES 0x1604u
+#define TAB_IMAGE_SAMPLES_NONE 0x1605u
+#define TAB_IMAGE_SAMPLES_BEATFX 0x1606u
+#define TAB_IMAGE_SINGLE_KEY_NONE 0x1607u
+#define TAB_IMAGE_SINGLE_KEY_SELECTED 0x1608u
+#define TAB_IMAGE_SINGLE_STEMS_NONE 0x1609u
+#define TAB_IMAGE_SINGLE_STEMS_SELECTED 0x160au
+struct rx3_pad_row {unsigned panel_id,tab_image;};
+''' + function(core, "performance_tab_image") +
+            function(core, "performance_status_image") + r'''
+int main(void) {
+    struct rx3_pad_row key={1,TAB_IMAGE_KEY},stems={2,TAB_IMAGE_STEMS};
+    const unsigned none[]={0,TAB_IMAGE_SINGLE_KEY_NONE,
+                            TAB_IMAGE_SINGLE_STEMS_NONE,TAB_IMAGE_KEY_NONE};
+    for(unsigned key_on=0;key_on<2;key_on++)
+      for(unsigned stems_on=0;stems_on<2;stems_on++)
+        for(unsigned samples_on=0;samples_on<2;samples_on++) {
+          unsigned mask=key_on|stems_on<<1;
+          const struct rx3_pad_row *left=key_on?&key:0,*right=stems_on?&stems:0;
+          assert(performance_tab_image(left,right,0)==none[mask]);
+          if(key_on)assert(performance_tab_image(left,right,1)==
+                            (stems_on?TAB_IMAGE_KEY:TAB_IMAGE_SINGLE_KEY_SELECTED));
+          if(stems_on)assert(performance_tab_image(left,right,2)==
+                              (key_on?TAB_IMAGE_STEMS:TAB_IMAGE_SINGLE_STEMS_SELECTED));
+          assert(performance_status_image(samples_on,0,0x1599u)==
+                 (samples_on?TAB_IMAGE_SAMPLES_NONE:0x1599u));
+          assert(performance_status_image(samples_on,1,0x1599u)==
+                 (samples_on?TAB_IMAGE_SAMPLES_NONE:TAB_IMAGE_STATUS_NONE));
+          if(samples_on) {
+            assert(performance_status_image(1,3,0x1599u)==TAB_IMAGE_SAMPLES);
+            assert(performance_status_image(1,0,0x1598u)==TAB_IMAGE_SAMPLES_BEATFX);
+          }
+        }
+    return 0;
+}
+''')
 
     def test_stem_loader_rejects_bad_headers_and_keeps_memory_reserve(self):
         loader = MODULES / "stems/rx3_stems_loader.h"
@@ -779,6 +1066,8 @@ static uint64_t monotonic_enough_us(void) { return 100; }
 static void refresh_performance_ui(void) {}
 static void log_line(const char *s) { (void)s; }
 static void rx3_message_run_pending(void) {}
+static unsigned int rx3_panel_take_open(void) { return 0; }
+static void select_custom_panel(unsigned int id) { (void)id; }
 static void theme_run_pending_toggle(void) {
     assert(!drawing);
     if(pending) { theme_light_active=!theme_light_active; pending=0; switches++; }
@@ -855,24 +1144,6 @@ int main(void) {
 }
 ''')
 
-    def test_failed_hook_restoration_retains_trampoline(self):
-        core = MODULES / "core/rx3_core_hook.c"
-        self.run_c(r'''
-struct installed_hook { unsigned long address; uint8_t original[8]; void *trampoline; };
-static int failed=1, freed;
-static int write_code(unsigned long a, const void *p, size_t n) {
-    assert(a==1234 && p && n==8); return failed?-1:0;
-}
-static int munmap(void *p, size_t n) { assert(p==(void *)5678 && n==4096); freed++; return 0; }
-''' + function(core, "uninstall_hook") + r'''
-int main(void) {
-    struct installed_hook hook={.address=1234,.trampoline=(void *)5678};
-    uninstall_hook(&hook); assert(hook.address==1234 && hook.trampoline==(void *)5678 && !freed);
-    failed=0; uninstall_hook(&hook); assert(!hook.address && !hook.trampoline && freed==1);
-    uninstall_hook(&hook); assert(freed==1); return 0;
-}
-''')
-
     def test_image_lookup_retries_only_after_table_exists(self):
         core = MODULES / "core/rx3_core_hook.c"
         self.run_c(r'''
@@ -880,6 +1151,7 @@ static uint8_t *table;
 #define IMAGE_TABLE_POINTER ((uintptr_t)&table)
 static unsigned tab_assets_ready, tab_asset_attempts, installs, succeeds, lookups;
 static void install_tab_assets(const char *route) { assert(route); installs++; if(succeeds) tab_assets_ready=1; }
+static void *rx3_image_resolve(unsigned id,void *(*lookup)(unsigned),const void *base) {(void)id;(void)lookup;(void)base;return 0;}
 static void *original_image_info(unsigned id) { assert(id==0x1600); lookups++; return (void *)123; }
 ''' + function(core, "hooked_image_info") + r'''
 int main(void) {
@@ -910,6 +1182,7 @@ int main(void) {
         finalizer = function(core, "finalize").replace('__attribute__((destructor)) ', '')
         self.run_c(r'''
 #include <sched.h>
+static int player_process_initialized=1;
 static volatile int state_thread_running=1;
 static pthread_t state_thread;
 static int state_thread_started=1, stopped, removed, destroyed;
@@ -919,6 +1192,7 @@ static void *watcher(void *unused) {
     while(__atomic_load_n(&state_thread_running,__ATOMIC_SEQ_CST)) sched_yield();
     stopped=1; return 0;
 }
+static void rx3_modules_stop(void) {}
 static void uninstall_performance_hooks(void) { assert(stopped && !state_thread_started); removed=1; }
 static void destroy(unsigned deck) { assert(removed && deck<2); destroyed++; }
 static struct {void (*destroy_deck)(unsigned);} runtime_features[1]={{destroy}};

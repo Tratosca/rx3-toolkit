@@ -1,0 +1,81 @@
+[
+  {
+    "id": "beatjump",
+    "order": 10,
+    "collapsed": false,
+    "name": {
+      "en": "Beat Jump",
+      "fr": "Beat Jump (sauts de mesure)"
+    }
+  },
+  {
+    "id": "harmonic-mixing",
+    "order": 20,
+    "collapsed": false,
+    "name": {
+      "en": "Harmonic mixing",
+      "fr": "Mixage harmonique"
+    }
+  },
+  {
+    "id": "samples",
+    "order": 30,
+    "collapsed": false,
+    "name": {
+      "en": "Samples",
+      "fr": "Samples"
+    }
+  },
+  {
+    "id": "stems",
+    "order": 40,
+    "collapsed": false,
+    "name": {
+      "en": "Stems",
+      "fr": "Stems"
+    },
+    "description": {
+      "en": "Drop the vocal or the drums live, from files prepared on the Stems screen.",
+      "fr": "Isolez la voix ou la batterie en direct, à partir des fichiers préparés dans le menu Stems."
+    }
+  },
+  {
+    "id": "screen",
+    "order": 50,
+    "collapsed": false,
+    "name": {
+      "en": "Display",
+      "fr": "Affichage"
+    },
+    "description": {
+      "en": "Display and menus settings ",
+      "fr": "Réglages de l'affichage et des menus"
+    }
+  },
+  {
+    "id": "streaming",
+    "order": 60,
+    "collapsed": false,
+    "name": {
+      "en": "Now playing",
+      "fr": "Diffusion"
+    },
+    "description": {
+      "en": "Share informations about what is playing with a computer, for a stream or a set list.",
+      "fr": "Partagez des informations sur le contenu en cours de lecture avec un ordinateur."
+    }
+  },
+  {
+    "id": "diagnostics",
+    "order": 70,
+    "collapsed": true,
+    "name": {
+      "en": "Diagnostics",
+      "fr": "Diagnostic"
+    },
+    "description": {
+      "en": "For troubleshooting purposes.",
+      "fr": "Pour le dépannage."
+    }
+  }
+]

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from app.localization import Message
+from app.runtime.metadata import categories, category_metadata, localized
 
 import hashlib
 import importlib.util
@@ -67,6 +68,12 @@ class RuntimeFile:
 class ArmHook:
     source: str
     target: str
+    sources: tuple[str, ...] = ()
+
+
+# Where a module sits in the app's module list, in the order the list shows
+# them. It says what a DJ uses the module for and nothing about how it is built:
+# the load order is `order`, not this.
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,9 @@ class PatchDefinition:
     build_files: tuple[str, ...]
     arm_hook: ArmHook | None
     directory: pathlib.Path
+    category: str | None = None
+    category_ui: dict | None = None
+    advanced: bool = False
 
 
 @dataclass(frozen=True)
@@ -201,6 +211,7 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
     patches = []
     seen = set()
     runtime_directories = set()
+    category_definitions = categories(root)
     for manifest_path in sorted((root / "mod/modules").glob("**/manifest.json")):
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         required = {
@@ -244,12 +255,22 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
         build_files = tuple(data.get("build_files", []))
         if not all(isinstance(item, str) for item in build_files):
             raise ValueError(f"{manifest_path}: build_files must be a list of paths")
+        category = data.get("category")
+        if category is not None and not isinstance(category, str):
+            raise ValueError(f"{manifest_path}: category must be an identifier")
+        if category is None and data.get("selectable", True):
+            raise ValueError(f"{manifest_path}: selectable modules require a category")
+        if category is not None and category_definitions and category not in category_definitions:
+            raise ValueError(f"{manifest_path}: unknown category {category}")
+        category_ui = (category_definitions.get(category) or category_metadata(category)) if category else None
+        if type(data.get("advanced", False)) is not bool:
+            raise ValueError(f"{manifest_path}: advanced must be a boolean")
         hook_data = data.get("arm_hook")
-        hook = ArmHook(hook_data["source"], hook_data["target"]) if hook_data else None
+        hook = ArmHook(hook_data["source"], hook_data["target"], tuple(hook_data.get("sources", ()))) if hook_data else None
         patch = PatchDefinition(
             patch_id=data["id"],
-            name=data["name"],
-            description=data["description"],
+            name=localized(data["name"], "name")["en"] if isinstance(data["name"], dict) else data["name"],
+            description=localized(data["description"], "description")["en"] if isinstance(data["description"], dict) else data["description"],
             firmwares=tuple(firmwares),
             default=bool(data.get("default", False)),
             selectable=bool(data.get("selectable", True)),
@@ -262,6 +283,9 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
             build_files=build_files,
             arm_hook=hook,
             directory=manifest_path.parent,
+            category=category,
+            category_ui=category_ui,
+            advanced=data.get("advanced", False),
         )
         if patch.default and not patch.selectable:
             raise ValueError(f"{patch.patch_id}: an internal module cannot be default")
@@ -301,6 +325,14 @@ def _validate_patch_files(patch: PatchDefinition) -> None:
         if target_path.is_absolute() or ".." in target_path.parts:
             raise ValueError(f"{patch.patch_id}: unsafe target {runtime_file.target!r}")
     if patch.arm_hook:
+        for unit in patch.arm_hook.sources:
+            if not isinstance(unit, str):
+                raise ValueError(f"{patch.patch_id}: invalid compilation unit")
+            unit_path = pathlib.PurePosixPath(unit)
+            if unit_path.is_absolute() or ".." in unit_path.parts or unit_path.suffix != ".c":
+                raise ValueError(f"{patch.patch_id}: unsafe compilation unit {unit!r}")
+            if not (patch.directory.parent / unit).is_file():
+                raise ValueError(f"{patch.patch_id}: missing compilation unit {unit}")
         source_path = pathlib.PurePosixPath(patch.arm_hook.source)
         target_path = pathlib.PurePosixPath(patch.arm_hook.target)
         if source_path.is_absolute() or ".." in source_path.parts:
@@ -503,7 +535,8 @@ def validate_arm_hook(path: pathlib.Path) -> None:
         raise ValueError(f"{path}: hook must target ARM EABI5")
 
 
-def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str | None = None) -> None:
+def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str | None = None,
+                     sources: tuple[pathlib.Path, ...] = ()) -> None:
     compiler = compiler or os.environ.get("CC") or shutil.which("clang")
     if not compiler:
         raise ValueError("Clang is required to compile the performance core from source")
@@ -516,6 +549,9 @@ def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str |
         "-mfpu=neon",
         "-fPIC",
         "-fno-stack-protector",
+        "-fno-builtin-memcmp",
+        "-fno-builtin-bcmp",
+        "-fvisibility=hidden",
         "-O2",
         "-Wall",
         "-Wextra",
@@ -528,6 +564,7 @@ def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str |
         "-o",
         str(output),
         str(source),
+        *(str(unit) for unit in sources),
     ]
     try:
         subprocess.run(command, check=True, capture_output=True, text=True)
@@ -688,7 +725,9 @@ def build_runtime(
                     validate_arm_hook(hook_path)
                 else:
                     notify(Message("job.compile"))
-                    compile_arm_hook(patch.directory / patch.arm_hook.source, hook_path)
+                    compile_arm_hook(patch.directory / patch.arm_hook.source, hook_path,
+                                     sources=tuple(patch.directory.parent / unit
+                                                   for unit in patch.arm_hook.sources))
         module_index = ["compatibility"] + [patch.runtime_directory for patch in selected]
         # newline="" keeps Python from translating these \n to os.linesep. The
         # index is read by /bin/sh on the player, where a trailing CR is part of

@@ -1,13 +1,20 @@
 {
   "id": "telnet",
-  "name": "Telnet access",
-  "description": "Enables Telnet access to the device (through the USB to computer port on 169.254.X.Y network). Only use this if you know 1) what you are doing 2) the root password.",
+  "name": {
+    "fr": "Accès technique de dépannage (Telnet)",
+    "en": "Technical troubleshooting access (Telnet)"
+  },
+  "description": {
+    "en": "Opens a diagnostic terminal through the rear USB computer port. Requires the root password; use a direct, isolated USB connection.",
+    "fr": "Ouvre un terminal de diagnostic via le port USB arrière pour ordinateur. Mot de passe root requis ; utilisez une connexion USB directe et isolée."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 90,
+  "category": "diagnostics",
   "runtime_directory": "telnet",
   "namespace": "telnet",
   "requires": [],

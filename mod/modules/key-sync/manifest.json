@@ -1,0 +1,54 @@
+{
+  "id": "key-sync",
+  "name": {
+    "en": "Key Sync",
+    "fr": "Key Sync"
+  },
+  "description": {
+    "en": "Sync one deck’s key to another.",
+    "fr": "Synchronisez la tonalité d’un deck par rapport à un autre."
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": true,
+  "order": 36,
+  "category": "harmonic-mixing",
+  "runtime_directory": "key-sync",
+  "namespace": "key_sync",
+  "requires": [
+    "keyshift",
+    "key-match"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "messages": {
+    "en": {
+      "keyshift.syncRange": "Maximum key shift",
+      "keyshift.oneSemitone": "±1 semitone",
+      "keyshift.semitones": "±{count} semitones",
+      "keyshift.syncHelp": "Matches the MASTER key if the destination key is within the maximum key shift limit set below.",
+      "keyshift.syncMode": "KEY SYNC mode",
+      "keyshift.mode.identical": "Match the MASTER key",
+      "keyshift.mode.harmonic": "Nearest compatible key",
+      "keyshift.modeHelp": "Uses the nearest key accepted by KEY MATCH, including the checked rules, if the destination key is within the maximum key shift limit set below."
+    },
+    "fr": {
+      "keyshift.syncRange": "Transposition maximale",
+      "keyshift.oneSemitone": "±1 demi-ton",
+      "keyshift.semitones": "±{count} demi-tons",
+      "keyshift.syncHelp": "Adapte la tonalité à celle du MASTER si la tonalité cible peut être atteinte dans la limite de transposition maximale définie ci-dessous.",
+      "keyshift.syncMode": "Mode KEY SYNC",
+      "keyshift.mode.identical": "Même tonalité que le MASTER",
+      "keyshift.mode.harmonic": "Tonalité compatible la plus proche",
+      "keyshift.modeHelp": "Utilise la tonalité compatible KEY MATCH la plus proche, selon les règles cochées, si la tonalité cible peut être atteinte dans la limite de transposition maximale définie ci-dessous."
+    }
+  }
+}

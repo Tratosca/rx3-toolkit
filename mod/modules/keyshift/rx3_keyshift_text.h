@@ -8,6 +8,38 @@ static const char *const rx3_camelot_classic[24] = {
     "Em", "G", "Bm", "D", "F#m", "A", "Dbm", "E"
 };
 
+/* Colours sampled from Mixed In Key's published Camelot wheel, A then B.
+   https://mixedinkey.com/camelot-wheel/ — quantized to the panel's RGB565. */
+static uint16_t rx3_camelot_colour(int key)
+{
+    static const uint16_t colours[24] = {
+        0xb7fcu,0x8ffau, 0xc7f8u,0xa7f3u, 0xd7d4u,0xb7aeu,
+        0xe734u,0xd68eu, 0xf635u,0xf50fu, 0xfd77u,0xfbf1u,
+        0xf579u,0xf3f6u, 0xe57du,0xd3fbu, 0xd57fu,0xb3ffu,
+        0xc61fu,0x9d3fu, 0xb73fu,0x8edfu, 0xafffu,0x7fffu
+    };
+    return key >= 0 && key < 24 ? colours[key] : 0u;
+}
+
+/* Missing or invalid configuration uses the conservative one-semitone limit. */
+static unsigned int keyshift_parse_sync_range(const char *value)
+{
+    if (!value || !value[0]) return 1u;
+    if (value[0] >= '1' && value[0] <= '9' && !value[1]) return (unsigned int)(value[0]-'0');
+    if (value[0]=='1' && value[1]>='0' && value[1]<='2' && !value[2])
+        return 10u+(unsigned int)(value[1]-'0');
+    return 1u;
+}
+
+static unsigned int keyshift_parse_sync_mode(const char *value)
+{
+    static const char expected[]="harmonic";
+    if (!value) return 0u;
+    for (unsigned int i=0u;i<sizeof(expected);i++)
+        if (value[i]!=expected[i]) return 0u;
+    return 1u;
+}
+
 static unsigned int keyshift_ascii_lower(unsigned int c)
 {
     return c >= 'A' && c <= 'Z' ? c | 32u : c;
@@ -56,15 +88,7 @@ static uint16_t *keyshift_put_camelot(uint16_t *out, int index)
    same letter, or the relative major and minor of one number. That is the
    whole of the rule a DJ works from, and the wheel exists to make it this
    short. */
-static int rx3_camelot_compatible(int a, int b)
-{
-    if (a < 0 || b < 0 || a >= 24 || b >= 24) return 0;
-    unsigned int an = (unsigned int)a / 2u, bn = (unsigned int)b / 2u;
-    unsigned int al = (unsigned int)a & 1u, bl = (unsigned int)b & 1u;
-    if (an == bn) return 1;
-    if (al != bl) return 0;
-    return (an + 1u) % 12u == bn || (bn + 1u) % 12u == an;
-}
+#include "../core/api/rx3_harmony.h"
 
 /* Where a track sits on the wheel once its shift is applied. */
 static int rx3_camelot_shifted(int track_key, int semitones)
@@ -75,34 +99,26 @@ static int rx3_camelot_shifted(int track_key, int semitones)
 }
 
 static void keyshift_format_labels(uint16_t labels[3][12], int track_key,
-                                   int semitones, int match)
+                                   int semitones)
 {
     int current = (track_key + semitones * 14) % 24;
     if (current < 0) current += 24;
     for (unsigned int control = 0; control < 3u; control++) {
         uint16_t *out = labels[control];
-        if (control == 0u) { *out++ = '<'; *out++ = ' '; }
-        if ((control == 0u && semitones == -12) || (control == 2u && semitones == 12)) {
-            *out++ = '-'; *out++ = '-';
+        if (control != 1u) {
+            out=keyshift_put_signed(out,control == 0u ? -1 : 1);
         } else if (track_key >= 0 && track_key < 24) {
-            if (control == 1u && semitones) *out++ = '*';
-            int key = (current + (control == 0u ? 10 : control == 2u ? 14 : 0)) % 24;
-            out = keyshift_put_camelot(out, key);
-            /* The move that would put this deck in key with the other one.
-               Reading it off the button is the whole point: the arithmetic is
-               the part nobody wants to do at 2am. */
-            if (control == 1u && match) {
-                *out++ = ' ';
-                out = keyshift_put_signed(out, match);
+            out=keyshift_put_camelot(out,current);
+            if (semitones) {
+                *out++=' '; *out++='(';
+                out=keyshift_put_signed(out,semitones);
+                *out++=')';
             }
-        } else if (control == 1u) {
-            *out++ = 'K'; *out++ = 'E'; *out++ = 'Y'; *out++ = ' ';
-            if (!semitones) { *out++ = '-'; *out++ = '-'; }
-            else out = keyshift_put_signed(out, semitones);
         } else {
-            out = keyshift_put_signed(out, semitones + (control == 0u ? -1 : 1));
+            *out++='K';*out++='E';*out++='Y';*out++=' ';
+            if (!semitones) { *out++='-';*out++='-'; }
+            else out=keyshift_put_signed(out,semitones);
         }
-        if (control == 2u) { *out++ = ' '; *out++ = '>'; }
         *out = 0;
     }
 }

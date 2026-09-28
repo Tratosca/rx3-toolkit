@@ -24,3 +24,5 @@ Very dark artwork disappears against the screen behind it. The toolbox says so b
 The player reads the artwork once, when it starts. Replacing the file on a stick that is already plugged in changes nothing until it restarts, and the mod asks for that restart on its own.
 
 If the screen still shows the stock wordmark, the artwork was refused. The reason is in the session log on the stick, in plain words.
+
+Logo can start with Core alone. The loader checks the native position and image ID before centering custom artwork, and restores the position on teardown without overwriting a later change by another owner. A rejected artwork or placement check prevents the selected runtime from reporting ready. This startup and placement correction has not yet run on hardware.

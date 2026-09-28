@@ -122,7 +122,7 @@ def load_font(path: str | None, size: int, index: int = 0):
 # The glyph atlas.
 #
 # One image per caption cannot spell what the row now says. The KEY centre
-# carries a Camelot key and a move, `*3A +2`, which is twenty-four keys times
+# carries a Camelot key and a move, `3A (+1)`, which is twenty-four keys times
 # twenty-five shifts; the sample row shows a volume. So the artwork becomes one
 # image per character and the deck composes the string, which is the same thing
 # the firmware's own font file does one level lower.
@@ -150,7 +150,7 @@ COLOUR_KEY = (248, 0, 248)          # 0xf81f in RGB565: the deck skips it
 # than the strings the three panels spell today, so a label added later renders
 # a character rather than a hole. There are no lower case letters: the row is
 # upper case and the composer folds what it is given.
-ATLAS_REPERTOIRE = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-*<>.:/%#"
+ATLAS_REPERTOIRE = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-*<>.:/%#()"
 ATLAS_SPACE = " "
 
 # The ground each set of glyphs is drawn on, in the order the deck indexes them.

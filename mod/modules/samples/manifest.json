@@ -1,13 +1,20 @@
 {
   "id": "samples",
-  "name": "Sample pads",
-  "description": "Fire your own one-shots from the performance pads, prepared on the computer.",
+  "name": {
+    "en": "Samples",
+    "fr": "Samples"
+  },
+  "description": {
+    "en": "Play samples from the pads. Prepare your bank on the app’s Samples screen, then tap SAMPLES on the player.",
+    "fr": "Jouez des samples avec les pads. Préparez votre banque dans l’écran Samples de l’application, puis touchez SAMPLES sur la platine."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 42,
+  "category": "samples",
   "runtime_directory": "samples",
   "namespace": "samples",
   "requires": [
@@ -28,5 +35,57 @@
     "rx3_samples_audio.h",
     "rx3_samples_panel.h",
     "rx3_samples_state.h"
-  ]
+  ],
+  "messages": {
+    "en": {
+      "sampleAccess.title": "Use samples",
+      "sampleAccess.press": "Tap SAMPLES on the player’s touchscreen to use the sample pads.",
+      "sampleAccess.play": "On the sample page, press a pad to play its sample.",
+      "sampleAccess.label": "Tap SAMPLES on the player’s touchscreen to use the sample pads.",
+      "sampleAccess.playing": "Play a sample",
+      "sampleAccess.pads": "Pads",
+      "sampleAccess.touch": "Touchscreen",
+      "sampleAccess.tap": "Tap",
+      "sampleAccess.drag": "Drag",
+      "sampleAccess.holdDrag": "Hold + drag",
+      "sampleAccess.touchLabel": "Open SAMPLES on the touchscreen, play samples with the physical pads, then adjust their volume.",
+      "sampleAccess.padStep0": "Start in HOT CUE.",
+      "sampleAccess.padStep1": "Tap SAMPLES on the touchscreen: the pads control samples.",
+      "sampleAccess.padStep2": "Press a pad to play its sample.",
+      "sampleAccess.padStep3": "Samples play according to the mode chosen in the app.",
+      "sampleAccess.padStep4": "Tap SAMPLES again to restore the display for the currently selected pad mode without stopping playing sounds.",
+      "sampleAccess.touchStep0": "The pads start in HOT CUE. Tap SAMPLES on the touchscreen.",
+      "sampleAccess.touchStep1": "SAMPLES is open: each physical pad plays the sample assigned to it in the app.",
+      "sampleAccess.touchStep2": "Press physical pad 1 to play its sample.",
+      "sampleAccess.touchStep3": "Drag the bar to adjust the volume.",
+      "sampleAccess.touchStep4": "Tap SAMPLES again to restore the display for the currently selected pad mode without stopping playing sounds.",
+      "sampleAccess.physicalPads": "Physical pads · DECK 1",
+      "sampleAccess.sample": "Sample {number}"
+    },
+    "fr": {
+      "sampleAccess.title": "Utiliser les samples",
+      "sampleAccess.press": "Touchez SAMPLES sur l’écran de la platine pour utiliser les pads de samples.",
+      "sampleAccess.play": "Sur la page des samples, appuyez sur un pad pour jouer son sample.",
+      "sampleAccess.label": "Touchez SAMPLES sur l’écran de la platine pour utiliser les pads de samples.",
+      "sampleAccess.playing": "Jouer un sample",
+      "sampleAccess.pads": "Pads",
+      "sampleAccess.touch": "Écran tactile",
+      "sampleAccess.tap": "Toucher",
+      "sampleAccess.drag": "Glisser",
+      "sampleAccess.holdDrag": "Maintenir + glisser",
+      "sampleAccess.touchLabel": "Ouvrez SAMPLES sur l’écran tactile, jouez les samples avec les pads physiques, puis réglez leur volume.",
+      "sampleAccess.padStep0": "HOT CUE est le mode de départ.",
+      "sampleAccess.padStep1": "Touchez SAMPLES sur l’écran : les pads contrôlent les samples.",
+      "sampleAccess.padStep2": "Appuyez sur un pad pour jouer son sample.",
+      "sampleAccess.padStep3": "Les samples jouent selon le mode choisi dans l’application.",
+      "sampleAccess.padStep4": "Touchez de nouveau SAMPLES pour rétablir l’affichage du mode de pads actuellement sélectionné, sans couper les sons en cours.",
+      "sampleAccess.touchStep0": "Les pads sont en HOT CUE. Touchez SAMPLES sur l’écran.",
+      "sampleAccess.touchStep1": "SAMPLES est ouvert : chaque pad physique joue le sample qui lui est attribué dans l’application.",
+      "sampleAccess.touchStep2": "Appuyez sur le pad physique 1 pour jouer son sample.",
+      "sampleAccess.touchStep3": "Glissez sur la barre pour régler le volume.",
+      "sampleAccess.touchStep4": "Touchez de nouveau SAMPLES pour rétablir l’affichage du mode de pads actuellement sélectionné, sans couper les sons en cours.",
+      "sampleAccess.physicalPads": "Pads physiques · DECK 1",
+      "sampleAccess.sample": "Sample {number}"
+    }
+  }
 }

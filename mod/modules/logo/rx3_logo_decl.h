@@ -35,7 +35,7 @@ struct __attribute__((packed)) logo_header {
 
 /* The record the player already uses for the wordmark in the middle of the
  * performance screen. Replacing it rather than adding one keeps every drawing
- * decision, placement included, where the firmware already makes it.
+ * decision in the firmware; the placement adapter centers its native record.
  */
 #define LOGO_IMAGE_INDEX 0x63fu
 

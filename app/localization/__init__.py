@@ -21,8 +21,26 @@ def catalogs():
     root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
     if hasattr(sys, "_MEIPASS"):
         root /= "localization"
-    return {locale: json.loads((root / f"{locale}.json").read_text(encoding="utf-8"))
-            for locale in SUPPORTED}
+    from app.runtime.metadata import module_messages, categories, category_messages
+
+    result = {locale: json.loads((root / f"{locale}.json").read_text(encoding="utf-8"))
+              for locale in SUPPORTED}
+    resources = Path(sys._MEIPASS) / "resources" if hasattr(sys, "_MEIPASS") else Path(__file__).resolve().parents[2]
+    manifests = sorted((resources / "mod/modules").glob("*/manifest.json"))
+    if not manifests:
+        raise ValueError("Module manifests missing from application resources")
+    category_definitions = categories(resources)
+    if not category_definitions:
+        raise ValueError("Module category registry missing from application resources")
+    sources = [(resources / "mod/categories.json", category_messages(category_definitions))]
+    sources.extend((manifest, module_messages(json.loads(manifest.read_text(encoding="utf-8")))) for manifest in manifests)
+    for source, messages in sources:
+        for locale in SUPPORTED:
+            for key, value in messages[locale].items():
+                if key in result[locale]:
+                    raise ValueError(f"{source}: conflicting message {key}")
+                result[locale][key] = value
+    return result
 
 
 def translate(key, locale=DEFAULT, **params):

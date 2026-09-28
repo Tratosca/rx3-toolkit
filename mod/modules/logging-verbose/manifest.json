@@ -1,13 +1,20 @@
 {
   "id": "logging-verbose",
-  "name": "Verbose USB logging",
-  "description": "Captures continuous player output on USB for debugging. Keeps the drive open; stop the player before removing it.",
+  "name": {
+    "fr": "Rapport de dépannage détaillé",
+    "en": "Detailed troubleshooting report"
+  },
+  "description": {
+    "en": "Saves detailed player logs continuously to the USB drive for troubleshooting. Stop the player before removing the USB drive.",
+    "fr": "Enregistre en continu un journal détaillé de la platine sur la clé USB pour le diagnostic. Arrêtez la platine avant de retirer la clé USB."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 96,
+  "category": "diagnostics",
   "runtime_directory": "logging-verbose",
   "namespace": "logging_verbose",
   "requires": [

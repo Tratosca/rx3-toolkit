@@ -4,6 +4,7 @@
 
 #ifndef RX3_LOGO_FEATURE_H
 #define RX3_LOGO_FEATURE_H
+#include "rx3_logo_geometry.h"
 
 /* Set in initialize() from RX3_LOGO, the way every other feature reads its
  * own flag; the module exports it only when the artwork reached the drive.
@@ -89,6 +90,12 @@ static int logo_feature_install(void)
                                  &main_logo_width, &main_logo_height);
     if (!main_logo_pixels)
         return 0;
+    if (!logo_place((uint32_t *)LOGO_PLACEMENT, main_logo_width, main_logo_height)) {
+        munmap(main_logo_pixels, (size_t)main_logo_width * main_logo_height * LOGO_BYTES_PER_PIXEL);
+        main_logo_pixels = 0;
+        log_line("logo refused: unexpected native placement record");
+        return 0;
+    }
     main_logo_ready = 1;
 
     /* The light variant is drawn into the same rectangle as the dark one, so a
@@ -114,6 +121,7 @@ static int logo_feature_install(void)
 
 static void logo_feature_remove(void)
 {
+    logo_restore_position((uint32_t *)LOGO_PLACEMENT);
     if (main_logo_pixels)
         munmap(main_logo_pixels,
                (size_t)main_logo_width * main_logo_height * LOGO_BYTES_PER_PIXEL);
@@ -130,7 +138,7 @@ static void logo_feature_remove(void)
  *
  * The logo is not a new image: it is the record the player already draws in
  * the middle of the performance screen, so the size travels with the record
- * and artwork of any size lands centred without the drawing code being touched.
+ * while logo_place updates its native position before rendering starts.
  *
  * The format byte is 2 here where the tab labels use 1. Both files are RGB565,
  * and the one thing the logo does that a tab label never does is leave parts of

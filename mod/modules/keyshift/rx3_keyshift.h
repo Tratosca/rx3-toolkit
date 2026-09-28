@@ -2,10 +2,7 @@
  *
  * Key shift for the RX3 performance runtime: implementation.
  *
- * Included by the core hook after its logging, hook installer and deck table
- * are in place. Nothing in the core implements key shift; it only calls
- * rx3_keyshift_install, rx3_keyshift_remove, and the accessors the KEY panel
- * needs.
+ * Private implementation compiled by rx3_keyshift_module.c.
  *
  * The manager produces one block for either playback mode. Its position also
  * identifies jumps and direction changes that invalidate the shifter history.
@@ -364,24 +361,17 @@ static int rx3_keyshift_ready(void)
 static void rx3_keyshift_remove(void)
 {
     __atomic_store_n(&keyshift_callbacks_enabled, 0u, __ATOMIC_SEQ_CST);
-    if (timestretch_manager_hook.address &&
-        write_code(timestretch_manager_hook.address, timestretch_manager_hook.original, 8u))
+    if (!detach_hook(&timestretch_manager_hook))
         return;
     for (;;) {
         while (__atomic_load_n(&keyshift_callbacks_active, __ATOMIC_SEQ_CST)) usleep(10000u);
         usleep(10000u);
         if (!__atomic_load_n(&keyshift_callbacks_active, __ATOMIC_SEQ_CST)) break;
     }
-    if (timestretch_manager_hook.trampoline) munmap(timestretch_manager_hook.trampoline, 4096u);
-    memset(&timestretch_manager_hook, 0, sizeof(timestretch_manager_hook));
+    (void)release_hook(&timestretch_manager_hook);
     original_timestretch_manager = 0;
     for (unsigned int deck = 0; deck < 2u; deck++) destroy_pitch(&keyshift_decks[deck]);
 }
 
-static void rx3_keyshift_destroy_deck(unsigned int deck)
-{
-    if (deck < 2u)
-        destroy_pitch(&keyshift_decks[deck]);
-}
 
 #endif /* RX3_KEYSHIFT_H */

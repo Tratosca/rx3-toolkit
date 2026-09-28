@@ -1,13 +1,20 @@
 {
   "id": "theme-white",
-  "name": "Light display mode",
-  "description": "A light interface for a lit room, with the waveform kept dark so it stays readable.",
+  "name": {
+    "en": "Light theme",
+    "fr": "Thème clair"
+  },
+  "description": {
+    "en": "A light interface for bright rooms. The waveform stays dark so it remains readable.",
+    "fr": "Interface claire pour les lieux éclairés. La forme d'onde reste sombre pour garder sa lisibilité."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": false,
   "order": 50,
+  "category": "screen",
   "runtime_directory": "theme-white",
   "namespace": "theme_white",
   "requires": [

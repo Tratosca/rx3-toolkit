@@ -58,6 +58,7 @@ static void samples_slider_set(unsigned int deck, unsigned int widget,
                                unsigned int value, unsigned int committed)
 {
     (void)deck; (void)widget;
+    if (value > 100u) value = 100u;
     __atomic_store_n(&samples_volume_touched, 1u, __ATOMIC_SEQ_CST);
     __atomic_store_n(&samples_volume, value, __ATOMIC_SEQ_CST);
     /* One line when the finger leaves, not one per report: this runs from the
@@ -79,14 +80,14 @@ static int samples_panel_needs_refresh(void)
    there is one bank and one volume, so splitting it in two would have said
    there were two. The readout sits at the end of it. */
 static const struct rx3_pad_widget samples_widgets[2] = {
-    { RX3_PAD_SLIDER, 9 }, { RX3_PAD_TOGGLE, 1 }
+    { RX3_PAD_SLIDER, 9 }, { RX3_PAD_BUTTON, 1 }
 };
 
 static const struct rx3_pad_row samples_row = {
     3u, TAB_IMAGE_KEY_NONE, RX3_PAD_SCOPE_SCREEN, 2u, samples_widgets,
     0, samples_caption, samples_is_on, samples_fire,
     samples_slider_max, samples_slider_get, samples_slider_set,
-    samples_panel_needs_refresh
+    samples_panel_needs_refresh, 0, 0, 0, 0
 };
 
 #endif /* RX3_SAMPLES_PANEL_H */

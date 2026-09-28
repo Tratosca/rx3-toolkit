@@ -1,13 +1,20 @@
 {
   "id": "keyshift",
-  "name": "Key shifting",
-  "description": "Enables per-deck key shifting on screen by up to twelve semitones.",
+  "name": {
+    "en": "Key Shift",
+    "fr": "Key Shift"
+  },
+  "description": {
+    "en": "Change track keys during playback.",
+    "fr": "Modifier la tonalité des morceaux pendant la lecture."
+  },
   "firmwares": [
     "1.19",
     "1.20"
   ],
   "default": true,
-  "order": 35,
+  "order": 33,
+  "category": "harmonic-mixing",
   "runtime_directory": "keyshift",
   "namespace": "keyshift",
   "requires": [
@@ -27,6 +34,8 @@
     "rx3_keyshift.h",
     "rx3_keyshift_panel.h",
     "rx3_pitch_shift.h",
-    "rx3_keyshift_text.h"
+    "rx3_keyshift_text.h",
+    "rx3_keyshift_metadata.h",
+    "rx3_keyshift_module.c"
   ]
 }

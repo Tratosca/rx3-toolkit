@@ -554,7 +554,7 @@ static int theme_feature_install(void)
 static void theme_feature_remove(void)
 {
     uninstall_hook(&theme_render_pass_hook);
-    if (!theme_render_pass_hook.address) original_theme_render_pass = 0;
+    if (!hook_is_installed(&theme_render_pass_hook)) original_theme_render_pass = 0;
     utility_remove_theme_row();
     theme_refresh_pending = 0;
     if (theme_dark_table)
@@ -562,9 +562,9 @@ static void theme_feature_remove(void)
     if (theme_light_active)
         theme_waveform_apply(0);
     uninstall_hook(&send_key_hook);
-    if (!send_key_hook.address) original_send_key = 0;
+    if (!hook_is_installed(&send_key_hook)) original_send_key = 0;
     uninstall_hook(&hw_fill_rect_hook);
-    if (!hw_fill_rect_hook.address) original_hw_fill_rect = 0;
+    if (!hook_is_installed(&hw_fill_rect_hook)) original_hw_fill_rect = 0;
     theme_light_active = 0;
     theme_toggle_pending = 0;
 }

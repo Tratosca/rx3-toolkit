@@ -1,11 +1,11 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # 🥁 Sample pads
 
-Press SLIP LOOP until the pads reach the sample page: the button already steps through the player's own pages, and this is the one after them. Your hot cues are left alone. Press any pad mode button to leave, or SLIP LOOP once more to go back to the player's first page.
+Tap SAMPLES on the touchscreen to open its panel and assign the pads to samples. Tap the active SAMPLES, STEMS, KEY or BEAT FX tab again to return to STATUS. Selecting a different tab opens it directly. Physical pad-mode buttons change pad routing without closing the displayed panel; SLIP LOOP keeps its native pages and prepared stem controls. Your saved hot cues stay unchanged.
 
 At most four samples can play simultaneously, across both decks and all modes. A fifth start is refused without cutting an existing voice. Stopping a voice or letting it finish frees a slot; retriggering an already playing one-shot uses its existing slot. The desktop simulation enforces the same limit, including pending audio preparation.
 
-Each pad plays once, while held, in a loop, or as a latch (press again to stop without looping). Holds track both decks: releasing one pad does not silence the other deck while it still holds that sample. Leaving the sample page stops holds, loops and latches; one-shots finish naturally.
+Each pad plays once, while held, in a loop, or as a latch (press again to stop without looping). Holds track both decks: releasing one pad does not silence the other deck while it still holds that sample. Changing panels or pad modes preserves playing sounds. A held sample still stops on the final physical release, even after leaving sample mode. Return to SAMPLES to stop a loop or latch with its pad.
 
 With `shift.silence=1`, pressing SHIFT alone stops all samples. Loops use a 32-frame edge ramp to reduce splice clicks, except for sounds shorter than 128 frames. The desktop preview applies the same ramp and master gain curve.
 
