@@ -173,26 +173,23 @@ int main(void) {
     def test_player_identity_rejects_inherited_preload_and_read_failures(self):
         code = function(MODULES/'core/rx3_core_hook.c', 'is_player_process')
         self.run_c('''
-#define O_RDONLY 0
-static const char *comm;
-static int closes;
-static int open(const char *path,int mode) {
-    assert(!strcmp(path,"/proc/self/comm"));assert(mode==O_RDONLY);
-    return comm?3:-1;
+#include <sys/types.h>
+static const char *executable;
+static ssize_t readlink(const char *path,char *out,size_t size) {
+    assert(!strcmp(path,"/proc/self/exe"));
+    if(!executable)return -1;
+    size_t length=strlen(executable);if(length>size)length=size;
+    memcpy(out,executable,length);return (ssize_t)length;
 }
-static int read(int fd,void *out,unsigned size) {
-    assert(fd==3);unsigned n=strlen(comm);if(n>size)n=size;
-    memcpy(out,comm,n);return n;
-}
-static void close(int fd){assert(fd==3);closes++;}
 ''' + code + '''
 int main(void) {
-    comm="rbp\\n";assert(is_player_process());
-    comm="sh\\n";assert(!is_player_process());
-    comm="udhcpc\\n";assert(!is_player_process());
-    comm="rbp-helper\\n";assert(!is_player_process());
-    comm="";assert(!is_player_process());
-    comm=0;assert(!is_player_process());assert(closes==5);
+    executable="/root/pdj/rbp";assert(is_player_process());
+    executable="rbp";assert(!is_player_process());
+    executable="/tmp/rbp";assert(!is_player_process());
+    executable="/root/pdj/rbp-helper";assert(!is_player_process());
+    executable="/root/pdj/rbp (deleted)";assert(!is_player_process());
+    executable="";assert(!is_player_process());
+    executable=0;assert(!is_player_process());
     return 0;
 }
 ''')

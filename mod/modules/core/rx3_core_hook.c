@@ -1610,12 +1610,12 @@ static void uninstall_performance_hooks(void)
 static int player_process_initialized;
 static int is_player_process(void)
 {
-    char name[16];
-    int fd = open("/proc/self/comm", O_RDONLY);
-    if (fd < 0) return 0;
-    int length = read(fd, name, sizeof(name));
-    close(fd);
-    return length == 4 && !memcmp(name, "rbp\n", 4u);
+    static const char expected[] = "/root/pdj/rbp";
+    char executable[sizeof(expected)];
+    ssize_t length = readlink("/proc/self/exe", executable,
+                              sizeof(executable));
+    return length == (ssize_t)(sizeof(expected) - 1u) &&
+           !memcmp(executable, expected, sizeof(expected) - 1u);
 }
 
 __attribute__((constructor)) static void initialize(void)

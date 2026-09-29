@@ -14,6 +14,7 @@ typedef unsigned long pthread_t;
 
 extern int      open(const char *, int, ...);
 extern ssize_t  read(int, void *, size_t);
+extern ssize_t  readlink(const char *, char *, size_t);
 extern ssize_t  write(int, const void *, size_t);
 extern int      close(int);
 extern off_t    lseek(int, off_t, int);
