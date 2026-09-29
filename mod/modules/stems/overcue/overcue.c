@@ -86,7 +86,13 @@ static void oc_log(unsigned int deck,const char *event,unsigned int a,unsigned i
 {
     char line[256];int n=snprintf(line,sizeof(line),"overcue deck=%u %s a=%u b=%u\n",deck+1,event,a,b);
     int fd=open("/tmp/rx3-stems.log",O_WRONLY|O_CREAT|O_APPEND,0600);
-    if(fd>=0){if(n>0&&(unsigned int)n<sizeof(line))(void)write(fd,line,(unsigned int)n);close(fd);}
+    if(fd>=0){
+        if(n>0&&(unsigned int)n<sizeof(line)) {
+            ssize_t written=write(fd,line,(unsigned int)n);
+            (void)written;
+        }
+        close(fd);
+    }
 }
 static uint64_t oc_time_us(int clock)
 {
@@ -111,7 +117,8 @@ static int oc_child(int fd,const char *name,int directory)
 {return openat(fd,name,O_RDONLY|O_NOFOLLOW|(directory?O_DIRECTORY:0));}
 static int oc_source(int root,const char *path)
 {
-    if(path[0]!='/')return -1;int fd=oc_child(root,".",1);const char *p=path+1;
+    if(path[0]!='/')return -1;
+    int fd=oc_child(root,".",1);const char *p=path+1;
     while(fd>=0&&*p) {
         char component[512];unsigned int n=0;
         while(*p&&*p!='/'){if(n+1>=sizeof(component)){close(fd);return -1;}component[n++]=*p++;}
@@ -158,7 +165,8 @@ static int oc_bank_open(struct oc_bank *b,const char *root,const char *loaded)
     tokens=mmap(0,OC_TOKENS*sizeof(*tokens),PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
     if(json==MAP_FAILED||tokens==MAP_FAILED||!oc_read(index,json,(unsigned int)size))goto done;
     struct oc_json j={json,(unsigned int)size,0,0,tokens};
-    if(oc_value(&j,0)!=0)goto done;oc_space(&j);if(j.pos!=j.size)goto done;
+    if(oc_value(&j,0)!=0)goto done;
+    oc_space(&j);if(j.pos!=j.size)goto done;
     char text[1024];if(!oc_string(&j,oc_key(&j,0,"schema"),text,sizeof(text))||strcmp(text,"overcue-index/1"))goto done;
     const char *wanted=loaded;unsigned int rootlen=(unsigned int)strlen(root);
     if(strlen(loaded)>rootlen&&!memcmp(loaded,root,rootlen)&&loaded[rootlen]=='/')wanted=loaded+rootlen;
@@ -227,8 +235,13 @@ static int oc_bank_open(struct oc_bank *b,const char *root,const char *loaded)
 done:
     if(json!=MAP_FAILED)munmap(json,(size_t)size);
     if(tokens!=MAP_FAILED)munmap(tokens,OC_TOKENS*sizeof(*tokens));
-    if(index>=0)close(index);if(directory>=0)close(directory);if(stems>=0)close(stems);if(mods>=0)close(mods);if(rootfd>=0)close(rootfd);
-    if(result!=1)oc_bank_close(b);return result;
+    if(index>=0)close(index);
+    if(directory>=0)close(directory);
+    if(stems>=0)close(stems);
+    if(mods>=0)close(mods);
+    if(rootfd>=0)close(rootfd);
+    if(result!=1)oc_bank_close(b);
+    return result;
 }
 static int oc_page(struct oc_bank *b,unsigned int r,unsigned int number)
 {
@@ -239,7 +252,8 @@ static int oc_page(struct oc_bank *b,unsigned int r,unsigned int number)
     z_stream z;memset(&z,0,sizeof(z));z.next_in=b->compressed;z.avail_in=bytes;z.next_out=role->page;z.avail_out=expanded;
     if(inflateInit_(&z,zlibVersion(),sizeof(z)))return 0;
     int rc=inflate(&z,4);int valid=rc==1&&z.total_in==bytes&&z.total_out==expanded;inflateEnd(&z);
-    if(!valid||!oc_hash_equal(role->page,expanded,p+16))return 0;role->cached=number;return 1;
+    if(!valid||!oc_hash_equal(role->page,expanded,p+16))return 0;
+    role->cached=number;return 1;
 }
 static void oc_filter_init(void)
 {
@@ -316,7 +330,8 @@ static void *oc_worker(void *unused)
             }
             if(OC_LOAD(d->status)!=2||seen[deck]!=OC_LOAD(d->generation))continue;
             unsigned int mask=OC_LOAD(d->mask)&7,block=OC_LOAD(d->wanted)/OC_BLOCK;
-            if(!mask)continue;unsigned int role=oc_role_for_mask[mask];
+            if(!mask)continue;
+            unsigned int role=oc_role_for_mask[mask];
             for(unsigned int ahead=0;ahead<4;ahead++) {
                 unsigned int target=block+ahead;struct oc_slot *slot=&d->slots[role][target%OC_SLOTS];
                 if((uint64_t)target*OC_BLOCK*320/147>=d->bank.frames)break;
@@ -358,7 +373,8 @@ static void *oc_worker(void *unused)
 }
 int rx3_overcue_start(void)
 {
-    if(oc_started)return 1;oc_root=getenv("RX3_OVERCUE_ROOT");if(!oc_root||!*oc_root)return 0;
+    if(oc_started)return 1;
+    oc_root=getenv("RX3_OVERCUE_ROOT");if(!oc_root||!*oc_root)return 0;
     memset(oc_decks,0,sizeof(oc_decks));
     for(unsigned int d=0;d<2;d++){oc_decks[d].mask=7;for(unsigned int r=0;r<7;r++)oc_decks[d].bank.roles[r].fd=-1;}
     OC_STORE(oc_running,1);
@@ -369,9 +385,12 @@ void rx3_overcue_stop(void)
 {if(oc_started){OC_STORE(oc_running,0);pthread_join(oc_thread,0);oc_started=0;}}
 void rx3_overcue_track(unsigned int deck,const char *path)
 {
-    if(deck>=2||!oc_started)return;struct oc_deck *d=&oc_decks[deck];
+    if(deck>=2||!oc_started)return;
+    struct oc_deck *d=&oc_decks[deck];
     oc_lock(d);unsigned int n=path?(unsigned int)strlen(path):0;
-    if(n>=sizeof(d->path))n=0;if(n)memcpy(d->path,path,n);d->path[n]=0;
+    if(n>=sizeof(d->path))n=0;
+    if(n)memcpy(d->path,path,n);
+    d->path[n]=0;
     __atomic_add_fetch(&d->generation,1u,__ATOMIC_SEQ_CST);
     OC_STORE(d->status,n?1:0);OC_STORE(d->wanted,0);OC_STORE(d->mask,7);oc_unlock(d);
 }
