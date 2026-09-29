@@ -18,6 +18,7 @@ POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
 RBP_PRELOAD=""
 RBP_READY_FILES=""
+RBP_PID_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 PREVIOUS_PRELOAD=""
@@ -314,6 +315,10 @@ done
     say "FAILED: expected one live rbp, found $RBP_LIVE_COUNT"
     rm -rf "$TMP"; sync; exit 1
 }
+rbp_executable_matches || {
+    say "STOP: live rbp executable differs from the guarded $RBP file"
+    rm -rf "$TMP"; sync; exit 1
+}
 ARGS=$(tr '\0' ' ' < "/proc/$PID/cmdline" | cut -d' ' -f2-)
 CWD=$(readlink "/proc/$PID/cwd" 2>/dev/null)
 PREVIOUS_PRELOAD=$(tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n 's/^LD_PRELOAD=//p' | head -1)
@@ -495,7 +500,8 @@ announce_media
 
 MISSING_READY=""
 for ready_file in $RBP_READY_FILES; do
-    [ -s "$ready_file" ] || MISSING_READY="$MISSING_READY $ready_file"
+    ready_file_matches_pid "$ready_file" "$NEW" ||
+        MISSING_READY="$MISSING_READY $ready_file"
 done
 if [ -n "$MISSING_READY" ]; then
     say "FAILED: replacement rbp missed readiness:${MISSING_READY}; restoring previous bytes"

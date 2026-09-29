@@ -25,7 +25,7 @@ CORE_STATUS_NONE=/root/pdj/rx3-status-none-selected.rgb565
 CORE_GLYPHS_SRC=/mnt/iso/modules/core/glyph-atlas-dark.rgb565
 CORE_GLYPHS=/root/pdj/rx3-glyph-atlas-dark.rgb565
 
-register_ready_file "$CORE_READY"
+register_pid_ready_file "$CORE_READY"
 register_diagnostic_file "$CORE_LOG"
 register_runtime_preload "$CORE_LIB"
 # The pre-split name, so a rollback also unloads an older runtime.
@@ -77,6 +77,19 @@ core_normalize_preload()
     done
     RBP_PRELOAD=$cleaned
     ensure_preload_entry "$CORE_LIB"
+}
+
+core_running_ready()
+{
+    [ -n "$PID" ] && [ -r "$PROC_ROOT/$PID/maps" ] || return 1
+    [ "$(cat "$CORE_READY" 2>/dev/null)" = "$PID" ] || return 1
+    # The path alone is insufficient: a replaced .so leaves the old inode
+    # mapped, often shown as '(deleted)', while the path names new bytes.
+    core_inode=$(ls -i "$CORE_LIB" 2>/dev/null | awk '{print $1}')
+    [ -n "$core_inode" ] || return 1
+    awk -v path="$CORE_LIB" -v inode="$core_inode" \
+        'NF == 6 && $6 == path && $5 == inode && $2 ~ /x/ { found = 1 } END { exit !found }' \
+        "$PROC_ROOT/$PID/maps" 2>/dev/null
 }
 
 core_prepare()
@@ -137,11 +150,14 @@ core_prepare()
     # screen and a fresh USB rescan for no change, so the drive can be
     # reinserted freely.
     if preload_contains "$CORE_LIB" && cmp -s "$CORE_SRC" "$CORE_LIB" &&
+       core_running_ready &&
        [ "$preload_changed" = "0" ] && [ "$NEED_RBP_RESTART" = "0" ]; then
         CORE_RESIDENT=1
         say "Performance core already active, rbp left untouched"
         return
     fi
+
+    say "Performance core restart required: resident readiness or generation differs"
 
     rm -f "$CORE_LOG" "$CORE_READY" "$CORE_TMP"
     cp "$CORE_SRC" "$CORE_TMP" 2>/dev/null || {
@@ -167,7 +183,7 @@ core_after_launch()
         say "OK: performance core still active from the previous insertion"
         return 0
     fi
-    if [ -s "$CORE_READY" ] &&
+    if ready_file_matches_pid "$CORE_READY" "$NEW" &&
        grep -q 'RX3 performance hook active' "$CORE_LOG" 2>/dev/null; then
         say "OK: performance core active"
     else

@@ -20,7 +20,7 @@ establish the full contract below.
 
 | Area | Current behavior | Consequence to test or change |
 | --- | --- | --- |
-| No-restart path | `mod/autoexec.sh` skips stopping `rbp` when no hook requests a restart. | It does not independently verify that the current core finished installing its hooks. |
+| No-restart path | The core now publishes its PID on readiness; reuse requires that PID and an executable mapping of the installed core inode. The orchestrator also checks that the live `rbp` executable is the guarded file before proceeding, and a replacement launch checks its own PID marker. | Host tests cover stale markers, old/deleted mappings and executable mismatches; verify `/proc/<pid>/maps` and continuity on an RX3. |
 | Core assets | `mod/modules/core/module.sh` installs art before the resident decision. Identical files are now left in place. | Changed art may not reach an already loaded image table. Compare the desired and resident resource generation before deciding. |
 | Samples | `mod/modules/samples/module.sh` can repoint `/tmp/rx3-samples`, but `rx3_samples_feature.h` reads and stores the bank in memory in its loader. | A different active bank or bank contents cannot be considered live merely because the link changed. |
 | Module removal | The current image loads modules from its index; `module_export` compares settings only for loaded modules. | Verify that removing a module causes the old process to stop using it. This transition lacks a dedicated test. |
@@ -50,7 +50,8 @@ establish the full contract below.
    replace files used by the current process.
 3. Check the actual `rbp` executable, loaded core and current readiness. Avoid
    using a stale ready marker as sole evidence. State why a restart is requested
-   in the session log.
+   in the session log. PID-bound readiness, executable identity and core
+   mapping checks are implemented locally; device proof remains.
 4. Make recovery generation-aware: preserve previous core/art files until the
    replacement process is ready, restore them on failure and test a second
    insertion after recovery.

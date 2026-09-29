@@ -774,12 +774,43 @@ static void *watch_patch_state(void *unused)
     return 0;
 }
 
+static unsigned int self_pid(void)
+{
+    char stat[16];
+    int fd = open("/proc/self/stat", O_RDONLY);
+    if (fd < 0) return 0;
+    ssize_t count = read(fd, stat, sizeof(stat));
+    close(fd);
+    if (count < 2) return 0;
+    unsigned int pid = 0;
+    for (ssize_t i = 0; i < count; i++) {
+        if (stat[i] == ' ') return pid;
+        if (stat[i] < '0' || stat[i] > '9') return 0;
+        pid = pid * 10u + (unsigned int)(stat[i] - '0');
+    }
+    return 0;
+}
+
 static void publish_ready(void)
 {
+    unsigned int value = self_pid();
+    if (!value) return;
     int fd = open(READY_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd < 0)
         return;
-    (void)write(fd, "ready\n", 6);
+    /* Bind readiness to this process. A marker left by an earlier rbp must
+       never be accepted as proof that the current process installed hooks. */
+    char digits[16];
+    unsigned int length = 0;
+    do {
+        digits[length++] = (char)('0' + value % 10u);
+        value /= 10u;
+    } while (value && length < sizeof(digits) - 1u);
+    char marker[16];
+    for (unsigned int i = 0; i < length; i++)
+        marker[i] = digits[length - i - 1u];
+    marker[length++] = '\n';
+    (void)write(fd, marker, length);
     close(fd);
 }
 

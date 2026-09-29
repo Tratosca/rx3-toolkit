@@ -23,6 +23,7 @@ AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
 RBP_READY_FILES=""
+RBP_PID_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 LOADED_MODULES=""
@@ -47,6 +48,89 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_live_player_executable_must_be_the_guarded_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guarded = root / "rbp"
+            guarded.write_bytes(b"player")
+            old = root / "old-rbp"
+            old.write_bytes(b"player")
+            proc = root / "proc" / "4242"
+            proc.mkdir(parents=True)
+            exe = proc / "exe"
+            exe.symlink_to(guarded)
+            body = (
+                f'PROC_ROOT={shlex.quote(str(root / "proc"))}\n'
+                'PID=4242\n'
+                f'RBP={shlex.quote(str(guarded))}\n'
+                'rbp_executable_matches\n'
+            )
+            self.assertEqual(run_shell(body).returncode, 0)
+            exe.unlink()
+            exe.symlink_to(old)
+            self.assertNotEqual(run_shell(body).returncode, 0)
+            # /proc can retain the old inode while reporting the original
+            # executable path after an atomic replacement.
+            same_path = body.replace('rbp_executable_matches\n',
+                                     f'readlink() {{ printf %s {shlex.quote(str(guarded))}; }}\n'
+                                     'rbp_executable_matches\n')
+            self.assertNotEqual(run_shell(same_path).returncode, 0)
+
+    def test_pid_bound_readiness_rejects_an_earlier_player(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            marker = Path(directory) / "ready"
+            marker.write_text("1234\n")
+            body = (
+                'module_begin core core\n'
+                f'register_pid_ready_file {shlex.quote(str(marker))} || exit 10\n'
+                f'ready_file_matches_pid {shlex.quote(str(marker))} 1234 || exit 11\n'
+                f'ready_file_matches_pid {shlex.quote(str(marker))} 5678 && exit 12\n'
+                'exit 0\n'
+            )
+            result = run_shell(body)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            marker.write_text("5678\n")
+            result = run_shell(body)
+            self.assertEqual(result.returncode, 11, result.stderr)
+
+    def test_resident_core_requires_pid_marker_and_matching_executable_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / "librx3_core.so"
+            core.write_bytes(b"first core")
+            proc = root / "proc" / "4242"
+            proc.mkdir(parents=True)
+            marker = root / "performance.ready"
+            marker.write_text("4242\n")
+            maps = proc / "maps"
+            maps.write_text(
+                f"0000-1000 r-xp 00000000 00:00 {core.stat().st_ino} {core}\n"
+            )
+            body = (
+                '. "${1%/lib/module-api.sh}/modules/core/module.sh"\n'
+                'PID=4242\n'
+                f'PROC_ROOT={shlex.quote(str(root / "proc"))}\n'
+                f'CORE_LIB={shlex.quote(str(core))}\n'
+                f'CORE_READY={shlex.quote(str(marker))}\n'
+                'core_running_ready\n'
+            )
+
+            def check(expected):
+                result = run_shell(body)
+                self.assertEqual(result.returncode == 0, expected, result.stderr)
+
+            check(True)
+            marker.write_text("old marker\n")
+            check(False)
+            marker.write_text("4242\n")
+            maps.write_text(f"0000-1000 r-xp 00000000 00:00 99999 {core}\n")
+            check(False)
+            maps.write_text(
+                f"0000-1000 r-xp 00000000 00:00 {core.stat().st_ino} "
+                f"{core} (deleted)\n"
+            )
+            check(False)
+
     def test_reinsertion_keeps_unchanged_core_and_logo_assets_in_place(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.rgb565"

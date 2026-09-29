@@ -263,6 +263,18 @@ rbp_environment_value()
     tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n "s/^$1=//p" | head -1
 }
 
+# A process named rbp may still be running an old or unrelated executable.
+# Guarded writes target the file at RBP, so its live executable mapping must
+# refer to that exact file before a transition is planned.
+rbp_executable_matches()
+{
+    _rx3_exe="$PROC_ROOT/$PID/exe"
+    [ "$(readlink "$_rx3_exe" 2>/dev/null)" = "$RBP" ] || return 1
+    _rx3_live_inode=$(ls -iL "$_rx3_exe" 2>/dev/null | awk '{print $1}')
+    _rx3_file_inode=$(ls -i "$RBP" 2>/dev/null | awk '{print $1}')
+    [ -n "$_rx3_live_inode" ] && [ "$_rx3_live_inode" = "$_rx3_file_inode" ]
+}
+
 # Export one setting for the core, and ask for a restart when the running player
 # does not already carry it.
 #
@@ -360,6 +372,24 @@ register_ready_file()
     RBP_READY_FILES="$RBP_READY_FILES $1"
 }
 
+register_pid_ready_file()
+{
+    register_ready_file "$1" || return 1
+    RBP_PID_READY_FILES="$RBP_PID_READY_FILES $1"
+}
+
+ready_file_matches_pid()
+{
+    _rx3_ready_file=$1
+    _rx3_ready_pid=$2
+    [ -s "$_rx3_ready_file" ] || return 1
+    case " $RBP_PID_READY_FILES " in
+        *" $_rx3_ready_file "*)
+            [ "$(cat "$_rx3_ready_file" 2>/dev/null)" = "$_rx3_ready_pid" ] ;;
+        *) return 0 ;;
+    esac
+}
+
 register_diagnostic_file()
 {
     validate_tmp_contract_path "$1" || {
@@ -393,7 +423,7 @@ wait_for_rbp()
         if [ -n "$RBP_READY_FILES" ]; then
             _rx3_pending=0
             for _rx3_ready in $RBP_READY_FILES; do
-                [ -s "$_rx3_ready" ] || _rx3_pending=1
+                ready_file_matches_pid "$_rx3_ready" "$_rx3_pid" || _rx3_pending=1
             done
             [ "$_rx3_pending" = "0" ] && break
         fi

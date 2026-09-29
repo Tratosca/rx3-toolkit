@@ -9,6 +9,47 @@ function, MODULES = transitions.function, transitions.MODULES
 
 class StartupTests(unittest.TestCase):
     run_c = transitions.RuntimeTransitionTests.run_c
+
+    def test_ready_marker_identifies_the_player_that_installed_hooks(self):
+        source = MODULES/'core/rx3_core_hook.c'
+        code = function(source, 'self_pid') + function(source, 'publish_ready')
+        self.run_c(r'''
+#define READY_FILE "/tmp/rx3-performance.ready"
+#define O_WRONLY 1
+#define O_CREAT 0100
+#define O_TRUNC 01000
+static char marker[16];
+static unsigned marker_length;
+static int ready_open(const char *path, int flags, ...) {
+    if (!strcmp(path, "/proc/self/stat")) { assert(flags == 0); return 4; }
+    assert(!strcmp(path, READY_FILE));
+    assert(flags == (O_WRONLY | O_CREAT | O_TRUNC)); return 3;
+}
+static long ready_read(int fd, void *data, size_t length) {
+    assert(fd == 4 && length >= 7);
+    memcpy(data, "4242 (x)", 8);
+    return 8;
+}
+static long ready_write(int fd, const void *data, size_t length) {
+    assert(fd == 3 && length < sizeof(marker));
+    memcpy(marker, data, length);
+    marker_length = (unsigned)length;
+    return (long)length;
+}
+static int ready_close(int fd) { assert(fd == 3 || fd == 4); return 0; }
+#define open ready_open
+#define read ready_read
+#define write ready_write
+#define close ready_close
+#define O_RDONLY 0
+''' + code + r'''
+int main(void) {
+    publish_ready();
+    assert(marker_length == 5 && !memcmp(marker, "4242\n", 5));
+    return 0;
+}
+''')
+
     def test_logo_placement_and_guarded_restore(self):
         self.run_c('''
 #include "logo/rx3_logo_decl.h"
