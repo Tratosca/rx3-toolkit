@@ -31,6 +31,8 @@ PATCH_TABLE=""
 PATCH_OFFSETS=""
 SUPPORTED_SHA1=""
 PREPARE_HOOKS=""
+STOPPED_HOOKS=""
+ROLLBACK_HOOKS=""
 AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
@@ -566,8 +568,23 @@ verify_recovery_words_or_halt()
     sync; exit 1
 }
 
+# Stopped hooks replace resources after the old player releases them.
+run_hooks "$STOPPED_HOOKS" || {
+    say "STOP: a stopped hook failed; restoring the previous runtime."
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
+    RBP_PRELOAD=$PREVIOUS_PRELOAD
+    echo patched > /tmp/rx3-patch.state
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
+    say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
+    rm -rf "$TMP"; sync; exit 1
+}
+
 if ! commit_runtime_stage; then
     say "FAILED: staged resource commit; restoring the previous generation"
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     restore_resources_or_halt
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     launch_rbp "$RBP_RESTORE_OUTPUT"
@@ -588,6 +605,7 @@ if [ "$FAILED" != "0" ]; then
     write_words previous
     restore_resources_or_halt
     verify_recovery_words_or_halt previous
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
@@ -612,6 +630,7 @@ if [ ! -d "/proc/$NEW" ]; then
     restore_resources_or_halt
     verify_recovery_words_or_halt stock
     RBP_PRELOAD=$(preload_without_runtime "$PREVIOUS_PRELOAD")
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     echo stock > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     say "stock rbp restarted, pid=$NEW, preload=${RBP_PRELOAD:-none}"
@@ -640,6 +659,7 @@ if [ -n "$MISSING_READY" ]; then
     write_words previous
     restore_resources_or_halt
     verify_recovery_words_or_halt previous
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"

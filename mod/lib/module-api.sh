@@ -182,6 +182,8 @@ register_lifecycle_hook()
     esac
     case "$_rx3_phase" in
         prepare) PREPARE_HOOKS="$PREPARE_HOOKS $_rx3_hook" ;;
+        stopped) STOPPED_HOOKS="$STOPPED_HOOKS $_rx3_hook" ;;
+        rollback) ROLLBACK_HOOKS="$ROLLBACK_HOOKS $_rx3_hook" ;;
         after)   AFTER_LAUNCH_HOOKS="$AFTER_LAUNCH_HOOKS $_rx3_hook" ;;
         post)    POST_LAUNCH_HOOKS="$POST_LAUNCH_HOOKS $_rx3_hook" ;;
         report)  REPORT_HOOKS="$REPORT_HOOKS $_rx3_hook" ;;
@@ -488,6 +490,8 @@ register_rbp_sha1()
 }
 
 register_prepare_hook()      { register_lifecycle_hook prepare "$1"; }
+register_stopped_hook()      { register_lifecycle_hook stopped "$1"; }
+register_rollback_hook()     { register_lifecycle_hook rollback "$1"; }
 register_after_launch_hook() { register_lifecycle_hook after "$1"; }
 register_post_launch_hook()  { register_lifecycle_hook post "$1"; }
 register_report_hook()       { register_lifecycle_hook report "$1"; }
