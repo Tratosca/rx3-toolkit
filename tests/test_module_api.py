@@ -27,6 +27,7 @@ RBP_PID_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 LOADED_MODULES=""
+DISABLED_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -48,6 +49,31 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_removed_or_switched_off_module_requests_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            switch = Path(directory) / "stems.off"
+            switch.write_text("")
+            result = run_shell(
+                'module_begin core core || exit 10\n'
+                'module_begin stems stems || exit 11\n'
+                'running="core stems|"\n'
+                'rbp_environment_value() { printf %s "$running"; }\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 0 ] || exit 12\n'
+                f'module_switch_path() {{ printf %s {shlex.quote(str(switch))}; }}\n'
+                'module_disabled_by_switch stems || exit 13\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 1 ] || exit 14\n'
+                '[ "$RX3_RUNTIME_MODULE_SET" = "core stems|stems" ] || exit 15\n'
+                'NEED_RBP_RESTART=0\n'
+                'DISABLED_MODULES=""\n'
+                'LOADED_MODULES=" core"\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 1 ] || exit 16\n'
+                '[ "$RX3_RUNTIME_MODULE_SET" = "core|" ] || exit 17\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_live_player_executable_must_be_the_guarded_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

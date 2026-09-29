@@ -33,14 +33,21 @@ RUNNING_HOOK=""
 . "$MODULE_API"
 module_disabled_by_switch() { return 1; }
 CORE_OBJECT=$FAKE_CORE
+TMP=$FAKE_TMP
+RUNTIME_STAGE_DIR=$FAKE_STAGE
 rbp_environment_value() {
-    [ "$1" = RX3_SAMPLES_DIR ] || return 1
-    printf '%s' "$RUNNING_SAMPLES_DIR"
+    case "$1" in
+        RX3_SAMPLES_DIR) printf '%s' "$RUNNING_SAMPLES_DIR" ;;
+        RX3_SAMPLES_GENERATION) printf '%s' "$RUNNING_GENERATION" ;;
+    esac
 }
 . "$SAMPLES_MODULE"
 SAMPLES_LINK=$FIXED_LINK
 run_hooks "$PREPARE_HOOKS" || exit 10
-printf '%s\n%s\n' "$NEED_RBP_RESTART" "$RX3_SAMPLES_DIR"
+before_target=$(readlink "$SAMPLES_LINK" 2>/dev/null)
+[ "$NEED_RBP_RESTART" = 0 ] || commit_runtime_stage || exit 11
+discard_runtime_stage
+printf '%s\n%s\n%s\n%s\n' "$NEED_RBP_RESTART" "$RX3_SAMPLES_DIR" "$RX3_SAMPLES_GENERATION" "$before_target"
 """
 
 
@@ -52,34 +59,69 @@ class SampleDirectoryTests(unittest.TestCase):
             core.write_bytes(b"ELF")
             link = root / "rx3-samples"
             running = ""
+            running_generation = ""
+            temporary = root / "tmp"
+            temporary.mkdir()
 
-            def insert(device):
-                nonlocal running
+            def insert(device, active="live"):
+                nonlocal running, running_generation
                 usb = root / "media" / device
-                bank = usb / "RX3_RUNTIME/samples/banks/live"
-                bank.mkdir(parents=True, exist_ok=True)
-                (bank.parent.parent / "active").write_text("live\n")
+                samples = usb / "RX3_RUNTIME/samples"
+                if active is None:
+                    samples.mkdir(parents=True, exist_ok=True)
+                    (samples / "active").unlink(missing_ok=True)
+                    bank = samples
+                else:
+                    bank = samples / "banks" / active
+                    bank.mkdir(parents=True, exist_ok=True)
+                    (samples / "active").write_text(active + "\n")
                 result = subprocess.run(
                     ["sh", "-s"], input=HARNESS, text=True,
                     capture_output=True, check=False,
                     env=dict(os.environ, MODULE_API=str(MODULE_API),
                              SAMPLES_MODULE=str(SAMPLES_MODULE),
                              FAKE_CORE=str(core), FIXED_LINK=str(link),
-                             USB=str(usb), RUNNING_SAMPLES_DIR=running),
+                             FAKE_TMP=str(temporary), FAKE_STAGE=str(root / "stage"),
+                             USB=str(usb), RUNNING_SAMPLES_DIR=running,
+                             RUNNING_GENERATION=running_generation),
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                restart, published = result.stdout.splitlines()
+                restart, published, generation, before_target = result.stdout.splitlines()
                 if restart == "1":
                     running = published
-                return restart, published, bank
+                    running_generation = generation
+                return restart, published, bank, before_target
 
-            first_restart, first_path, _ = insert("sda2")
+            first_restart, first_path, _, _ = insert("sda2")
             self.assertEqual(first_restart, "1")
-            second_restart, second_path, second_bank = insert("sdb2")
+            second_restart, second_path, second_bank, _ = insert("sdb2")
             self.assertEqual(second_restart, "0")
             self.assertEqual(second_path, first_path)
             self.assertEqual(link.resolve(), second_bank.resolve())
             link_inode = link.lstat().st_ino
-            third_restart, _, _ = insert("sdb2")
+            third_restart, _, _, _ = insert("sdb2")
             self.assertEqual(third_restart, "0")
             self.assertEqual(link.lstat().st_ino, link_inode)
+
+            other = root / "media" / "sdb2" / "RX3_RUNTIME/samples/banks/other"
+            other.mkdir()
+            (other.parent.parent / "active").write_text("other\n")
+            changed_restart, _, _, before_target = insert("sdb2", "other")
+            self.assertEqual(changed_restart, "1")
+            self.assertEqual(before_target, str(second_bank))
+            self.assertEqual(link.resolve(), other.resolve())
+
+            (other / "1.wav").write_bytes(b"changed audio")
+            audio_restart, _, _, before_target = insert("sdb2", "other")
+            self.assertEqual(audio_restart, "1")
+            self.assertEqual(before_target, str(other))
+            stable_restart, _, _, _ = insert("sdb2", "other")
+            self.assertEqual(stable_restart, "0")
+
+            removed_restart, removed_path, _, before_target = insert("sdb2", None)
+            self.assertEqual(removed_restart, "1")
+            self.assertEqual(removed_path, "")
+            self.assertEqual(before_target, str(other))
+            self.assertFalse(link.exists())
+            self.assertFalse(link.is_symlink())
+            self.assertEqual(insert("sdb2", None)[0], "0")

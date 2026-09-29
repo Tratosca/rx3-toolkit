@@ -27,6 +27,7 @@ NEED_RBP_RESTART=0
 RESTART_REQUESTED_BY=""
 RUNNING_HOOK=""
 LOADED_MODULES=""
+DISABLED_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -339,6 +340,17 @@ RBP_PRELOAD=$PREVIOUS_PRELOAD
 say "rbp pid=$PID options=[$ARGS] cwd=$CWD"
 say "existing preload: ${PREVIOUS_PRELOAD:-none}"
 
+case " $LOADED_MODULES " in
+    *" core "*) ;;
+    *)
+        if preload_contains /root/pdj/librx3_core.so ||
+           preload_contains /root/pdj/librx3_stems.so; then
+            say "STOP: this image removes Core but rbp still preloads it; an explicit unload migration is required"
+            rm -rf "$TMP"; sync; exit 1
+        fi
+        ;;
+esac
+
 if defer_for_unsafe_media "$USB"; then
     exit 0
 fi
@@ -348,6 +360,7 @@ run_hooks "$PREPARE_HOOKS" || {
     discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 }
+reconcile_module_set
 
 if [ "$RUNTIME_STAGE_COUNT" != 0 ] && [ "$NEED_RBP_RESTART" = 0 ]; then
     RUNNING_HOOK=runtime-resources

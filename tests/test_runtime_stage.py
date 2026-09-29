@@ -129,3 +129,23 @@ class RuntimeStageTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(target.is_symlink())
             self.assertEqual(target.resolve(), original.resolve())
+
+    def test_symlink_change_waits_for_commit_and_rolls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_bank, new_bank, link = root / "old", root / "new", root / "bank"
+            old_bank.mkdir()
+            new_bank.mkdir()
+            link.symlink_to(old_bank)
+            body = (
+                f'RUNTIME_STAGE_DIR={quoted(root / "stage")}\n'
+                f'stage_runtime_symlink {quoted(new_bank)} {quoted(link)} || exit 10\n'
+                f'[ "$(readlink {quoted(link)})" = {quoted(str(old_bank))} ] || exit 11\n'
+                'commit_runtime_stage || exit 12\n'
+                f'[ "$(readlink {quoted(link)})" = {quoted(str(new_bank))} ] || exit 13\n'
+                'restore_runtime_stage || exit 14\n'
+                'discard_runtime_stage\n'
+            )
+            result = run_shell(body)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(link.resolve(), old_bank.resolve())

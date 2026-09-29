@@ -22,8 +22,8 @@ establish the full contract below.
 | --- | --- | --- |
 | No-restart path | The core now publishes its PID on readiness; reuse requires that PID and an executable mapping of the installed core inode. The orchestrator also checks that the live `rbp` executable is the guarded file before proceeding, and a replacement launch checks its own PID marker. | Host tests cover stale markers, old/deleted mappings and executable mismatches; verify `/proc/<pid>/maps` and continuity on an RX3. |
 | Core assets | Core binary and artwork are now compared and staged without changing live paths. Changed assets request a restart; unchanged files retain their inode. | Device validation must show that an unchanged insertion keeps the PID and that changed artwork appears only after a safe restart. |
-| Samples | `mod/modules/samples/module.sh` can repoint `/tmp/rx3-samples`, but `rx3_samples_feature.h` reads and stores the bank in memory in its loader. | A different active bank or bank contents cannot be considered live merely because the link changed. |
-| Module removal | The current image loads modules from its index; `module_export` compares settings only for loaded modules. | Verify that removing a module causes the old process to stop using it. This transition lacks a dedicated test. |
+| Samples | The active bank name, settings and numbered WAV contents now form a startup generation. A moved bank with identical bytes may repoint the live link; a changed or disabled bank stages its link transition and requests a restart. | Host tests cover moved, changed-name and changed-audio banks. Measure hashing cost and validate pad state/playback on the device. |
+| Module removal | The ordered module index and active deck switches are now exported as `RX3_RUNTIME_MODULE_SET`. Removing or disabling a feature while Core remains selected requests a restart. | Host tests cover that comparison; removing Core itself still needs an explicit unload and guarded-word migration. |
 | Recovery | Core and Logo changes are published after `rbp` stops. Old files remain in a private same-filesystem stage until the replacement is ready, and rollback restores them before relaunching the previous process. | Host tests cover deferred, partial-commit and optional-file rollback. Device and launch-failure validation remain; Samples links and module removal are not yet transactional. |
 | Concurrency | `mod/autoexec.sh` uses the fixed `/tmp/rx3-runtime` workspace and now claims `/tmp/rx3-runtime.lock` before clearing it. | A concurrent invocation stops; a lock left by SIGKILL fails closed until reboot or manual inspection. Host contention is tested; device launcher behavior remains to verify. |
 
@@ -43,12 +43,13 @@ establish the full contract below.
 
 1. Record the desired and live generations: core hash, ordered module set,
    startup settings and startup resources. Keep drive-dependent stems paths out
-   of that identity. Specify how older builds without a generation marker are
-   upgraded once.
+   of that identity. Module selection and Samples content markers are
+   implemented; an older build without them restarts once. Core removal still
+   needs an explicit unload path.
 2. Split preparation into read-only planning, private staging and one committed
    transition. A no-op does not rewrite assets. A deferred restart does not
-   replace files used by the current process. Core/Logo use private staging;
-   drive-dependent Samples links still require transition handling.
+   replace files used by the current process. Core/Logo and changed Samples
+   links use private staging; a moved identical bank can repoint its live link.
 3. Check the actual `rbp` executable, loaded core and current readiness. Avoid
    using a stale ready marker as sole evidence. State why a restart is requested
    in the session log. PID-bound readiness, executable identity and core

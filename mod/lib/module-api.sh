@@ -46,19 +46,33 @@ stage_runtime_removal()
     RUNTIME_STAGE_COUNT=$_rx3_next
 }
 
+stage_runtime_symlink()
+{
+    _rx3_link_target=$1
+    _rx3_link_path=$2
+    [ -L "$_rx3_link_path" ] &&
+        [ "$(readlink "$_rx3_link_path")" = "$_rx3_link_target" ] && return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    ln -s "$_rx3_link_target" "$RUNTIME_STAGE_DIR/new$_rx3_next" || return 1
+    printf '%s\n' "$_rx3_link_path" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
 commit_runtime_stage()
 {
     _rx3_index=1
     while [ "$_rx3_index" -le "$RUNTIME_STAGE_COUNT" ]; do
         _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
-        [ ! -d "$_rx3_target" ] || return 1
+        [ ! -d "$_rx3_target" ] || [ -L "$_rx3_target" ] || return 1
         # Mark before the first rename so even a partial commit can be undone.
         : > "$RUNTIME_STAGE_DIR/started$_rx3_index" || return 1
         if [ -e "$_rx3_target" ] || [ -L "$_rx3_target" ]; then
             : > "$RUNTIME_STAGE_DIR/had$_rx3_index" || return 1
             mv -f "$_rx3_target" "$RUNTIME_STAGE_DIR/old$_rx3_index" || return 1
         fi
-        if [ -f "$RUNTIME_STAGE_DIR/new$_rx3_index" ]; then
+        if [ -e "$RUNTIME_STAGE_DIR/new$_rx3_index" ] ||
+           [ -L "$RUNTIME_STAGE_DIR/new$_rx3_index" ]; then
             mv -f "$RUNTIME_STAGE_DIR/new$_rx3_index" "$_rx3_target" || return 1
         fi
         _rx3_index=$((_rx3_index + 1))
@@ -74,7 +88,13 @@ restore_runtime_stage()
             _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
             if [ -e "$RUNTIME_STAGE_DIR/old$_rx3_index" ] ||
                [ -L "$RUNTIME_STAGE_DIR/old$_rx3_index" ]; then
-                mv -f "$RUNTIME_STAGE_DIR/old$_rx3_index" "$_rx3_target" || _rx3_failed=1
+                if [ -d "$_rx3_target" ] && [ ! -L "$_rx3_target" ]; then
+                    _rx3_failed=1
+                elif rm -f "$_rx3_target"; then
+                    mv -f "$RUNTIME_STAGE_DIR/old$_rx3_index" "$_rx3_target" || _rx3_failed=1
+                else
+                    _rx3_failed=1
+                fi
             elif [ ! -f "$RUNTIME_STAGE_DIR/had$_rx3_index" ]; then
                 rm -f "$_rx3_target" || _rx3_failed=1
             fi
@@ -383,6 +403,20 @@ module_export()
     return 0
 }
 
+# An absent module has no prepare hook to retract its old environment setting.
+# Record the ordered image selection and runtime switches as one startup value
+# so removing or disabling a module asks for a safe restart of the old player.
+reconcile_module_set()
+{
+    case " $LOADED_MODULES " in
+        *" core "*) ;;
+        *) return 0 ;;
+    esac
+    _rx3_selection="${LOADED_MODULES# }|${DISABLED_MODULES# }"
+    RUNNING_HOOK=module-set
+    module_export RX3_RUNTIME_MODULE_SET "$_rx3_selection" "Module set" || :
+}
+
 # Where a module's kill switch lives. One shape for every module, so an operator
 # who has learned one has learned them all.
 module_switch_path() { printf '/tmp/rx3-%s.off' "$1"; }
@@ -407,6 +441,10 @@ module_disabled_by_switch()
 {
     _rx3_switch=$(module_switch_path "$1")
     [ -e "$_rx3_switch" ] || return 1
+    case " $DISABLED_MODULES " in
+        *" $1 "*) ;;
+        *) DISABLED_MODULES="$DISABLED_MODULES $1" ;;
+    esac
     say "$1 disabled: $_rx3_switch exists"
     return 0
 }
