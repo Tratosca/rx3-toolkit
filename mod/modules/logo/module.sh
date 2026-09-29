@@ -26,12 +26,13 @@ logo_install_file()
     logo_to=$2
     logo_tmp=$logo_to.$$
     [ -r "$logo_from" ] || return 1
+    cmp -s "$logo_from" "$logo_to" 2>/dev/null && return 0
     # The core reads the artwork once, in its constructor. New art on the disk
     # with an old rbp still running means the player keeps drawing the previous
     # logo, and if the two are different sizes it reads the new file with the
     # old dimensions and draws a corner of it. So a changed file is a reason to
     # restart, exactly as a changed core object is.
-    cmp -s "$logo_from" "$logo_to" 2>/dev/null || LOGO_CHANGED=1
+    LOGO_CHANGED=1
     if cp "$logo_from" "$logo_tmp" 2>/dev/null && chmod 644 "$logo_tmp" &&
        mv -f "$logo_tmp" "$logo_to" 2>/dev/null; then
         return 0

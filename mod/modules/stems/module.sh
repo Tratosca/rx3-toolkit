@@ -31,7 +31,10 @@ stems_prepare()
     done
 
     published=$STEMS_DIR
-    if [ ! -e "$STEMS_LINK" ] || [ -L "$STEMS_LINK" ]; then
+    if [ -L "$STEMS_LINK" ] &&
+       [ "$(readlink "$STEMS_LINK")" = "$STEMS_DIR" ]; then
+        published=$STEMS_LINK
+    elif [ ! -e "$STEMS_LINK" ] || [ -L "$STEMS_LINK" ]; then
         rm -f "$STEMS_LINK"
         ln -s "$STEMS_DIR" "$STEMS_LINK" 2>/dev/null && published=$STEMS_LINK
     fi

@@ -53,7 +53,10 @@ samples_prepare()
         return 0
     }
     published=$bank_dir
-    if [ ! -e "$SAMPLES_LINK" ] || [ -L "$SAMPLES_LINK" ]; then
+    if [ -L "$SAMPLES_LINK" ] &&
+       [ "$(readlink "$SAMPLES_LINK")" = "$bank_dir" ]; then
+        published=$SAMPLES_LINK
+    elif [ ! -e "$SAMPLES_LINK" ] || [ -L "$SAMPLES_LINK" ]; then
         rm -f "$SAMPLES_LINK"
         ln -s "$bank_dir" "$SAMPLES_LINK" 2>/dev/null && published=$SAMPLES_LINK
     fi

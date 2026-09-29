@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import subprocess
+import shlex
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -45,6 +47,37 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_reinsertion_keeps_unchanged_core_and_logo_assets_in_place(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.rgb565"
+            target = Path(directory) / "installed.rgb565"
+            source.write_bytes(b"same artwork")
+            target.write_bytes(source.read_bytes())
+
+            for module, function in (("core", "core_install_asset"),
+                                     ("logo", "logo_install_file")):
+                with self.subTest(module=module):
+                    before = target.stat()
+                    call = (
+                        f'. "${{1%/lib/module-api.sh}}/modules/{module}/module.sh" || exit 10\n'
+                        f'{function} {shlex.quote(str(source))} {shlex.quote(str(target))} || exit 11\n'
+                        'printf "%s" "${LOGO_CHANGED:-0}"\n'
+                    )
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, "0")
+                    after = target.stat()
+                    self.assertEqual((after.st_ino, after.st_mtime_ns),
+                                     (before.st_ino, before.st_mtime_ns))
+
+                    source.write_bytes(b"new artwork")
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(target.read_bytes(), b"new artwork")
+                    self.assertEqual(result.stdout, "1" if module == "logo" else "0")
+                    source.write_bytes(b"same artwork")
+                    target.write_bytes(source.read_bytes())
+
     def test_namespaced_lifecycle_hook_is_registered_and_run(self):
         result = run_shell(
             r'''

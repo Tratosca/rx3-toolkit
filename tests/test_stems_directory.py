@@ -138,6 +138,12 @@ class ReinsertionTests(unittest.TestCase):
                 (Path(directory) / "media/usb1/sdb2/RX3_STEMS").resolve(),
             )
 
+            # A repeat event for the same mount must not replace the link.
+            link_inode = deck.fixed_path.lstat().st_ino
+            third = deck.insert("sdb2")
+            self.assertEqual(third["restart"], "0", third["lines"])
+            self.assertEqual(deck.fixed_path.lstat().st_ino, link_inode)
+
     def test_the_published_path_never_names_the_mount_point(self):
         with tempfile.TemporaryDirectory() as directory:
             deck = Deck(Path(directory))
