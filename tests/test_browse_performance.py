@@ -5,7 +5,7 @@ from tests import test_framework
 
 HARNESS = r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+int install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o){(void)h;(void)a;(void)g;(void)r;(void)o;return 0;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}

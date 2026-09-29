@@ -93,6 +93,7 @@ int main(void) {
         decl += [f'#define {name} {i+1}' for i,name in enumerate(constants)]
         self.run_c('''
 #include <stdlib.h>
+#include "core/api/rx3_hook_types.h"
 #define READY_FILE "ready"
 #define RENDER_PROBE_FILE "probe"
 #define O_WRONLY 1
@@ -134,8 +135,10 @@ static unsigned rx3_panel_count(void){return !!(selection&(2|4|16|64));}
 static void rx3_modules_stop(void){stops++;}
 static void uninstall_performance_hooks(void){cleanup++;}
 static void publish_ready(void){ready=1;}
-static void *install_hook(void *h,unsigned long a,const void *g,void *r){
-    (void)h;(void)a;(void)g;(void)r;hook_calls++;return hook_calls==reject_hook?0:(void *)1;
+static int install_hook(void *h,unsigned long a,const void *g,void *r,void *o){
+    (void)h;(void)a;(void)g;(void)r;hook_calls++;
+    void *original=hook_calls==reject_hook?0:(void *)1;
+    memcpy(o,&original,sizeof(original));return original!=0;
 }
 #define pthread_create(a,b,c,d) (0)
 ''' + '\n'.join(decl) + '\n' + code + '''

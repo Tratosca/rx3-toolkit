@@ -68,8 +68,7 @@ static int claim(struct stage *stage, const void *owner, void *client, unsigned 
 {
     if (!owner || !client || stage->owner) return 0;
     if (!stage->original) {
-        stage->original = install_hook(&stage->hook, address, guard, replacement);
-        if (!stage->original) return 0;
+        if (!RX3_INSTALL_HOOK(install_hook, stage->original, &stage->hook, address, guard, replacement)) return 0;
     }
     stage->owner = owner;
     __atomic_store_n(&stage->client, client, __ATOMIC_SEQ_CST);

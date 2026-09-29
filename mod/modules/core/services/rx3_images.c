@@ -231,9 +231,8 @@ static int claim_variants(const void *owner, const struct rx3_image_policy *want
 {
     if (!owner || !wanted || policy_owner) return 0;
     if (!original_fill) {
-        original_fill = (hw_fill_rect_fn)install_hook(&fill_hook, HW_FILL_RECT,
-                                                      hw_fill_rect_guard, (void *)fill_hooked);
-        if (!original_fill) return 0;
+        if (!RX3_INSTALL_HOOK(install_hook, original_fill, &fill_hook, HW_FILL_RECT,
+                                                      hw_fill_rect_guard, (void *)fill_hooked)) return 0;
     }
     policy_owner = owner;
     __atomic_store_n(&policy, wanted, __ATOMIC_SEQ_CST);

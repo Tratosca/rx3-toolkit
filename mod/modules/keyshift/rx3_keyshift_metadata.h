@@ -50,10 +50,10 @@ static int keyshift_metadata_install(void)
     if(memcmp((const void *)KEYSHIFT_KEY_LINE,keyshift_key_line_guard,8))return 0;
     static const uint8_t info_guard[8]={0xf0,0x4f,0x2d,0xe9,0x00,0x60,0xa0,0xe1};
     static const uint8_t convert_guard[8]={0xf0,0x47,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
-    keyshift_original_info=(void *)install_hook(&keyshift_info_hook,0x1093f0u,info_guard,(void *)keyshift_metadata_info);
-    if(keyshift_original_info)
-        keyshift_original_convert=(void *)install_hook(&keyshift_convert_hook,0x108fbcu,convert_guard,(void *)keyshift_metadata_convert);
-    if(!keyshift_original_info || !keyshift_original_convert){keyshift_metadata_remove();return 0;}
+    int installed=RX3_INSTALL_HOOK(install_hook,keyshift_original_info,&keyshift_info_hook,0x1093f0u,info_guard,keyshift_metadata_info);
+    if(installed)
+        installed=RX3_INSTALL_HOOK(install_hook,keyshift_original_convert,&keyshift_convert_hook,0x108fbcu,convert_guard,keyshift_metadata_convert);
+    if(!installed){keyshift_metadata_remove();return 0;}
     keyshift_metadata_active=1;
     log_line("keyshift: native deck metadata observer active");
     return 1;

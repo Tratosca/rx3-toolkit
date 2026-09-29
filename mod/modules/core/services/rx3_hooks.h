@@ -10,7 +10,11 @@
 int hook_is_installed(const struct installed_hook *);
 int detach_hook(struct installed_hook *);
 int release_hook(struct installed_hook *);
-void *install_hook(struct installed_hook *, unsigned long, const uint8_t[8], void *);
-void *install_pc_ldr_hook(struct installed_hook *, unsigned long, const uint8_t[8], void *);
+/* original_slot points to pointer-sized caller storage. The trampoline is
+ * published there before target code changes and cleared on release. */
+int install_hook(struct installed_hook *, unsigned long, const uint8_t[8],
+                 void *, void *);
+int install_pc_ldr_hook(struct installed_hook *, unsigned long,
+                        const uint8_t[8], void *, void *);
 int uninstall_hook(struct installed_hook *);
 #endif

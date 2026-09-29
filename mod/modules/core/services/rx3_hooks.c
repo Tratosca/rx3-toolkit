@@ -7,6 +7,7 @@ struct hook_record {
     unsigned long address;
     uint8_t original[8];
     void *trampoline;
+    void *original_slot;
     struct installed_hook *owner;
     int detached;
 };
@@ -20,8 +21,8 @@ static struct hook_record records[RX3_HOOK_LIMIT];
  *   load        : stmdb sp!,{r4..r11,lr} ; sub sp,sp,#0x5c
  *   onKey_Pad   : ldrh r3,[r1,#8] ; stmdb sp!,{r4..r11,lr}
  */
-static void *install_raw_hook(struct hook_record *hook, unsigned long address,
-                          const uint8_t guard[8], void *replacement)
+static void *prepare_raw_hook(struct hook_record *hook, unsigned long address,
+                              const uint8_t guard[8])
 {
     if (memcmp((const void *)address, guard, 8))
         return 0;
@@ -49,15 +50,10 @@ static void *install_raw_hook(struct hook_record *hook, unsigned long address,
         return 0;
     }
 
-    uint32_t patch[2] = {0xe51ff004, (uint32_t)(unsigned long)replacement};
-    if (write_code(address, patch, sizeof(patch))) {
-        munmap(trampoline, 4096);
-        return 0;
-    }
-
     hook->address = address;
     memcpy(hook->original, guard, sizeof(hook->original));
     hook->trampoline = trampoline;
+    hook->detached = 1;
     return trampoline;
 }
 
@@ -65,9 +61,9 @@ static void *install_raw_hook(struct hook_record *hook, unsigned long address,
 /* Variant for ldr r3,[pc,#imm12] followed by push. The trampoline loads a copy
    of the original literal value, replays push, and joins address+8. This
    preserves r3 without depending on the shared object's mapped address. */
-static void *install_raw_pc_ldr_hook(struct hook_record *hook,
-                                 unsigned long address,
-                                 const uint8_t guard[8], void *replacement)
+static void *prepare_raw_pc_ldr_hook(struct hook_record *hook,
+                                     unsigned long address,
+                                     const uint8_t guard[8])
 {
     if (memcmp((const void *)address, guard, 8))
         return 0;
@@ -94,27 +90,53 @@ static void *install_raw_pc_ldr_hook(struct hook_record *hook,
         return 0;
     }
 
-    uint32_t patch[2] = {0xe51ff004u, (uint32_t)(unsigned long)replacement};
-    if (write_code(address, patch, sizeof(patch))) {
-        munmap(trampoline, 4096);
-        return 0;
-    }
-
     hook->address = address;
     memcpy(hook->original, guard, sizeof(hook->original));
     hook->trampoline = trampoline;
+    hook->detached = 1;
     return trampoline;
 }
 
+static void publish_original(void *slot, void *trampoline)
+{
+    memcpy(slot, &trampoline, sizeof(trampoline));
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+}
+
+static void clear_original(void *slot)
+{
+    void *empty = 0;
+    memcpy(slot, &empty, sizeof(empty));
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+}
+
+static int activate_hook(struct hook_record *hook, void *replacement)
+{
+    uint32_t patch[2] = {0xe51ff004u, (uint32_t)(unsigned long)replacement};
+    enum rx3_replace_result result = replace_code(
+        hook->address, patch, hook->original, sizeof(patch));
+
+    if (result == RX3_REPLACE_APPLIED) {
+        hook->detached = 0;
+        return 1;
+    }
+    if (result == RX3_REPLACE_RECOVERY_PENDING)
+        hook->detached = 0;
+    return 0;
+}
 
 /* A single pool owns every detour, even across separately compiled modules.
  * A detached address stays reserved until callbacks have drained and its
  * trampoline has been released. No implicit hook chaining is allowed.
  */
-static void *install_owned_hook(struct installed_hook *handle, unsigned long address,
-                                const uint8_t guard[8], void *replacement, int pc_ldr)
+static int install_owned_hook(struct installed_hook *handle,
+                              unsigned long address, const uint8_t guard[8],
+                              void *replacement, void *original_slot,
+                              int pc_ldr)
 {
-    if (!handle || handle->record || !address || !guard || !replacement) return 0;
+    if (!handle || handle->record || !address || !guard || !replacement ||
+        !original_slot) return 0;
+    clear_original(original_slot);
     struct hook_record *slot = 0;
     for (unsigned int i = 0; i < RX3_HOOK_LIMIT; i++) {
         if (!records[i].owner) { if (!slot) slot = &records[i]; continue; }
@@ -123,22 +145,31 @@ static void *install_owned_hook(struct installed_hook *handle, unsigned long add
             (other > address && other - address < 8u)) return 0;
     }
     if (!slot) return 0;
-    void *original = pc_ldr ? install_raw_pc_ldr_hook(slot, address, guard, replacement) :
-                             install_raw_hook(slot, address, guard, replacement);
+    void *original = pc_ldr ? prepare_raw_pc_ldr_hook(slot, address, guard) :
+                             prepare_raw_hook(slot, address, guard);
     if (!original) return 0;
     slot->owner = handle;
+    slot->original_slot = original_slot;
     handle->record = slot;
-    return original;
+    publish_original(original_slot, original);
+    if (activate_hook(slot, replacement)) return 1;
+
+    if (slot->detached) release_hook(handle);
+    return 0;
 }
-void *install_hook(struct installed_hook *handle, unsigned long address,
-                    const uint8_t guard[8], void *replacement)
+int install_hook(struct installed_hook *handle, unsigned long address,
+                 const uint8_t guard[8], void *replacement,
+                 void *original_slot)
 {
-    return install_owned_hook(handle, address, guard, replacement, 0);
+    return install_owned_hook(handle, address, guard, replacement,
+                              original_slot, 0);
 }
-void *install_pc_ldr_hook(struct installed_hook *handle, unsigned long address,
-                           const uint8_t guard[8], void *replacement)
+int install_pc_ldr_hook(struct installed_hook *handle, unsigned long address,
+                        const uint8_t guard[8], void *replacement,
+                        void *original_slot)
 {
-    return install_owned_hook(handle, address, guard, replacement, 1);
+    return install_owned_hook(handle, address, guard, replacement,
+                              original_slot, 1);
 }
 int hook_is_installed(const struct installed_hook *handle)
 {
@@ -160,6 +191,7 @@ int release_hook(struct installed_hook *handle)
     struct hook_record *record = handle->record;
     if (record->owner != handle || !record->detached) return 0;
     if (record->trampoline && munmap(record->trampoline, 4096)) return 0;
+    if (record->original_slot) clear_original(record->original_slot);
     memset(record, 0, sizeof(*record));
     handle->record = 0;
     return 1;

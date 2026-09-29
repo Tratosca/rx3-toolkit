@@ -333,10 +333,9 @@ static int theme_feature_install(void)
         log_line("light theme: unexpected window invalidation prologue");
         return 0;
     }
-    original_theme_render_pass = (void (*)(void *))install_hook(
-        &theme_render_pass_hook, THEME_RENDER_PASS, theme_render_pass_guard,
-        hooked_theme_render_pass);
-    if (!original_theme_render_pass)
+    if (!RX3_INSTALL_HOOK(install_hook, original_theme_render_pass,
+                          &theme_render_pass_hook, THEME_RENDER_PASS,
+                          theme_render_pass_guard, hooked_theme_render_pass))
         return 0;
     theme_render_pass_installed = 1;
     if (!framework->images->claim_variants(&theme_enabled, &theme_policy))

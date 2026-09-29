@@ -14,7 +14,7 @@
 #include "rx3_audio_api.h"
 #include "rx3_memory_api.h"
 #include "rx3_loader_api.h"
-#define RX3_MODULE_API_VERSION 18u
+#define RX3_MODULE_API_VERSION 19u
 /* Static composition contract, not a promise of a stable dynamic ABI.
  * All descriptors have process lifetime. Startup is serial and explicit.
  * A failed start is followed by stop, including partial installation.
@@ -28,8 +28,9 @@ struct rx3_text_observation {
     unsigned int length;
 };
 struct rx3_services {
-    void *(*install_hook)(struct installed_hook *, unsigned long,
-                          const uint8_t[8], void *);
+    /* The final argument points to the caller's original-function storage. */
+    int (*install_hook)(struct installed_hook *, unsigned long,
+                        const uint8_t[8], void *, void *);
     int (*uninstall_hook)(struct installed_hook *);
     void (*log_line)(const char *);
     struct rx3_mix_state (*mix_state)(unsigned int deck);

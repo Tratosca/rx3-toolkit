@@ -57,8 +57,8 @@ extern int unsetenv(const char *);
             stubs = directory / 'weak_services.c'
             stubs.write_text(r'''
 struct installed_hook;
-__attribute__((weak)) void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
-__attribute__((weak)) void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
+__attribute__((weak)) int install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r, void *o) { (void)h; (void)a; (void)g; (void)r; (void)o; return 0; }
+__attribute__((weak)) int install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r, void *o) { (void)h; (void)a; (void)g; (void)r; (void)o; return 0; }
 __attribute__((weak)) int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
 __attribute__((weak)) int detach_hook(struct installed_hook *h) { (void)h; return 1; }
 __attribute__((weak)) int release_hook(struct installed_hook *h) { (void)h; return 1; }
@@ -119,9 +119,9 @@ int main(void) {
 extern const struct rx3_module rx3_keyshift_module;
 static const struct rx3_pad_row *row;
 static unsigned installs, detached, released, reject, reject_row;
-static void *hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
+static int hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o) {
     (void)h; (void)g; assert(a==0x000a0e54 && r); installs++;
-    return reject ? 0 : (void *)1;
+    void *original=reject?0:(void *)1;memcpy(o,&original,sizeof(original));return original!=0;
 }
 static int detach(struct installed_hook *h){(void)h;detached++;return 1;}
 static int release(struct installed_hook *h){(void)h;released++;return 1;}
@@ -193,8 +193,8 @@ static const struct rx3_module module={.version=RX3_MODULE_API_VERSION,
     .audio_started=audio,.text_observed=text,.report=report,.track_will_load=will_load};
 const struct rx3_module *const rx3_bundle[]={&module};
 const unsigned int rx3_bundle_count=1;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){
-    (void)h;(void)a;(void)g;(void)r;return 0;
+int install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o){
+    (void)h;(void)a;(void)g;(void)r;(void)o;return 0;
 }
 int uninstall_hook(struct installed_hook *h){(void)h;return 1;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
@@ -253,8 +253,8 @@ const struct rx3_module rx3_search_module={RX3_MODULE_API_VERSION,sizeof(struct 
 const struct rx3_module rx3_now_playing_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"b",configured,start_b,stop_b,0,0,0,0,0};
 const struct rx3_module *const rx3_bundle[]={&rx3_search_module,&rx3_now_playing_module};
 const unsigned int rx3_bundle_count=2;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
-    (void)h;(void)a;(void)g;(void)r; return 0;
+int install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o) {
+    (void)h;(void)a;(void)g;(void)r;(void)o; return 0;
 }
 int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
 int detach_hook(struct installed_hook *h) { (void)h; return 1; }
@@ -282,8 +282,9 @@ static unsigned int calls, removed;
 static void original(uint16_t *text,void *context,int length) {
     (void)context; calls++; if(text && length) text[0]=0x00e9;
 }
-static void *install(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
-    assert(h && a==0x001644fc && g[0]==0x18); shape=r; return original;
+static int install(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o) {
+    assert(h && a==0x001644fc && g[0]==0x18); shape=r;
+    void *value=(void *)original;memcpy(o,&value,sizeof(value));return 1;
 }
 static int remove_hook(struct installed_hook *h) { assert(h); removed++; return 1; }
 static void log_message(const char *s) { assert(s); }
@@ -307,6 +308,8 @@ int main(void) {
 static uint8_t arena[64][4096];
 static unsigned int allocated, freed, writes;
 static int fail_write, fail_release;
+static enum rx3_replace_result replace_result=RX3_REPLACE_APPLIED;
+static void **expected_publication;
 void *mmap(void *a,size_t n,int p,int f,int d,off_t o) {
     (void)a;(void)p;(void)f;(void)d;(void)o;
     assert(n==4096 && allocated<64); return arena[allocated++];
@@ -317,40 +320,105 @@ void clear_instruction_cache(unsigned long a,unsigned long b) { assert(b>a); }
 int write_code(unsigned long address,const void *bytes,size_t n) {
     assert(n==8); if(fail_write)return -1; memcpy((void *)address,bytes,n); writes++;return 0;
 }
+enum rx3_replace_result replace_code(unsigned long address,const void *bytes,
+                                     const void *rollback,size_t n) {
+    (void)rollback;assert(n==8 && expected_publication && *expected_publication);
+    if(replace_result==RX3_REPLACE_APPLIED)memcpy((void *)address,bytes,n);
+    writes++;return replace_result;
+}
 int main(void) {
     uint32_t code[4]={1,2,3,4};
     uint8_t guard[8];memcpy(guard,code,8);
     struct installed_hook first={0}, second={0};
-    void *original=install_hook(&first,(unsigned long)code,guard,(void *)1234);
-    assert(original && allocated==1 && hook_is_installed(&first));
-    assert(!install_hook(&first,(unsigned long)(code+2),guard,(void *)1234));
+    void *original=0,*other=(void *)9;expected_publication=&original;
+    assert(install_hook(&first,(unsigned long)code,guard,(void *)1234,&original));
+    assert(original==arena[0] && allocated==1 && hook_is_installed(&first));
+    assert(!install_hook(&first,(unsigned long)(code+2),guard,(void *)1234,&other));
+    assert(other==(void *)9);
     /* Even a guard matching the detour cannot stack a second owner. */
     uint8_t patched[8];memcpy(patched,code,8);
-    assert(!install_hook(&second,(unsigned long)code,patched,(void *)5678));
-    assert(!install_hook(&second,(unsigned long)(code+1),patched,(void *)5678));
+    assert(!install_hook(&second,(unsigned long)code,patched,(void *)5678,&other));
+    assert(!other);
+    other=(void *)9;
+    assert(!install_hook(&second,(unsigned long)(code+1),patched,(void *)5678,&other));
+    assert(!other);
     assert(!release_hook(&first) && !freed);
     struct installed_hook copied=first;assert(!detach_hook(&copied) && !release_hook(&copied));
     fail_write=1; uninstall_hook(&first);
-    assert(hook_is_installed(&first) && !freed);
+    assert(hook_is_installed(&first) && original && !freed);
     fail_write=0; assert(detach_hook(&first)); assert(!memcmp(code,guard,8));
     unsigned int before=writes;assert(detach_hook(&first) && writes==before);
-    assert(!install_hook(&second,(unsigned long)code,guard,(void *)5678));
+    assert(!install_hook(&second,(unsigned long)code,guard,(void *)5678,&other));
     fail_release=1;assert(!release_hook(&first) && hook_is_installed(&first));
+    assert(original);
     fail_release=0;assert(release_hook(&first) && !hook_is_installed(&first) && freed==1);
-    assert(install_hook(&second,(unsigned long)code,guard,(void *)5678));
+    expected_publication=&other;
+    assert(install_hook(&second,(unsigned long)code,guard,(void *)5678,&other));
     uninstall_hook(&second);uninstall_hook(&second);assert(freed==2);
     uint32_t literal_code[5]={0xe0803080,0xe59f2000,0,0x12345678,0};
     memcpy(guard,literal_code,8);
-    uint32_t *relocated=install_hook(&first,(unsigned long)literal_code,guard,(void *)1234);
-    assert(relocated && relocated[0]==0xe0803080 && relocated[1]==0xe59f2008);
+    uint32_t *relocated=0;expected_publication=(void **)&relocated;
+    assert(install_hook(&first,(unsigned long)literal_code,guard,(void *)1234,&relocated));
+    assert(relocated[0]==0xe0803080 && relocated[1]==0xe59f2008);
     assert(relocated[5]==0x12345678 && relocated[3]==(uint32_t)(unsigned long)(literal_code+2));
     uninstall_hook(&first);assert(!memcmp(guard,literal_code,8));
-    uint8_t wrong[8]={0};assert(!install_hook(&first,(unsigned long)code,wrong,(void *)1234));
+
+    uint32_t pc_code[6]={0xe59f3008,0xe92d40f0,0,0,0xcafebabe,0};
+    memcpy(guard,pc_code,8);uint32_t *pc_original=0;
+    expected_publication=(void **)&pc_original;
+    assert(install_pc_ldr_hook(&first,(unsigned long)pc_code,guard,
+                               (void *)1234,&pc_original));
+    assert(pc_original[0]==0xe59f3008 && pc_original[1]==0xe92d40f0);
+    assert(pc_original[4]==0xcafebabe);
+    uninstall_hook(&first);assert(!memcmp(guard,pc_code,8));
+
+    uint8_t wrong[8]={0};original=(void *)9;expected_publication=&original;
+    assert(!install_hook(&first,(unsigned long)code,wrong,(void *)1234,&original));
+    assert(!original);
     assert(!hook_is_installed(&first));
+
+    replace_result=RX3_REPLACE_ROLLED_BACK;
+    memcpy(code,guard,8);original=0;
+    assert(!install_hook(&first,(unsigned long)code,guard,(void *)1234,&original));
+    assert(!original && !hook_is_installed(&first));
+
+    replace_result=RX3_REPLACE_RECOVERY_PENDING;original=0;
+    assert(!install_hook(&first,(unsigned long)code,guard,(void *)1234,&original));
+    assert(original && hook_is_installed(&first) && !release_hook(&first));
+    assert(detach_hook(&first) && release_hook(&first) && !original);
     return 0;
 }
 ''', ['core/services/rx3_hooks.c'], ['-Dmmap=framework_test_map',
                                '-Dmunmap=framework_test_unmap', '-Dmprotect=framework_test_protect'])
+
+    def test_code_replacement_rolls_back_after_protection_failure(self):
+        self.run_units(r'''
+#include "core/firmware/rx3_patch.h"
+static unsigned calls,failures;
+int mprotect(void *p,size_t n,int protection) {
+    (void)p;(void)n;(void)protection;
+    calls++;return (failures&(1u<<calls))?-1:0;
+}
+static void reset(unsigned mask){calls=0;failures=mask;}
+int main(void) {
+    uint32_t code[2]={1,2},original[2]={1,2},replacement[2]={3,4};
+    reset(0);assert(replace_code((unsigned long)code,replacement,original,8)==RX3_REPLACE_APPLIED);
+    assert(code[0]==3 && code[1]==4 && calls==2);
+
+    memcpy(code,original,8);reset(1u<<1);
+    assert(replace_code((unsigned long)code,replacement,original,8)==RX3_REPLACE_UNCHANGED);
+    assert(!memcmp(code,original,8) && calls==1);
+
+    reset(1u<<2);
+    assert(replace_code((unsigned long)code,replacement,original,8)==RX3_REPLACE_ROLLED_BACK);
+    assert(!memcmp(code,original,8) && calls==3);
+
+    reset((1u<<2)|(1u<<3));
+    assert(replace_code((unsigned long)code,replacement,original,8)==RX3_REPLACE_RECOVERY_PENDING);
+    assert(!memcmp(code,original,8) && calls==3);
+    return 0;
+}
+''', ['core/firmware/rx3_patch.c'])
 
     def test_modules_link_without_the_performance_core(self):
         self.run_units(r'''

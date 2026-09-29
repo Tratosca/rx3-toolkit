@@ -1671,43 +1671,39 @@ __attribute__((constructor)) static void initialize(void)
 
     /* PcmReader::load is the core deck-identity service: readers meet their
        decks there, and track notifications go out from it. */
-    original_load = (load_fn)install_hook(
-        &load_hook, PCM_LOAD, load_guard, (void *)hooked_load);
-    if (!original_load) {
+    if (!RX3_INSTALL_HOOK(install_hook, original_load,
+        &load_hook, PCM_LOAD, load_guard, (void *)hooked_load)) {
         log_line("rejected: unexpected PcmReader::load prologue");
         goto reject_performance_hooks;
     }
 
-    original_set_beatfx_selected = (set_beatfx_selected_fn)install_hook(
-        &set_beatfx_hook, SET_BEATFX_STORAGE, set_beatfx_guard,
-        (void *)hooked_set_beatfx_selected);
-    if (!original_set_beatfx_selected) {
+    if (!RX3_INSTALL_HOOK(install_hook, original_set_beatfx_selected,
+                          &set_beatfx_hook, SET_BEATFX_STORAGE,
+                          set_beatfx_guard, hooked_set_beatfx_selected)) {
         log_line("rejected: unexpected Beat FX state setter prologue");
         goto reject_performance_hooks;
     }
 
-    original_on_key_hot_cue = (on_key_pad_fn)install_hook(
-        &hot_cue_hook, ON_KEY_HOT_CUE, hot_cue_guard,
-        (void *)hooked_on_key_hot_cue);
-    original_on_key_beat_loop = (on_key_pad_fn)install_hook(
-        &beat_loop_hook, ON_KEY_BEAT_LOOP, pad_mode_guard,
-        (void *)hooked_on_key_beat_loop);
-    original_on_key_slip_loop = (on_key_pad_fn)install_hook(
-        &slip_loop_hook, ON_KEY_SLIP_LOOP, pad_mode_guard,
-        (void *)hooked_on_key_slip_loop);
-    original_on_key_beat_jump = (on_key_pad_fn)install_hook(
-        &beat_jump_hook, ON_KEY_BEAT_JUMP, pad_mode_guard,
-        (void *)hooked_on_key_beat_jump);
-    if (!original_on_key_hot_cue || !original_on_key_beat_loop ||
-        !original_on_key_slip_loop || !original_on_key_beat_jump) {
+    int pad_hooks_installed = RX3_INSTALL_HOOK(
+        install_hook, original_on_key_hot_cue, &hot_cue_hook,
+        ON_KEY_HOT_CUE, hot_cue_guard, hooked_on_key_hot_cue);
+    pad_hooks_installed &= RX3_INSTALL_HOOK(
+        install_hook, original_on_key_beat_loop, &beat_loop_hook,
+        ON_KEY_BEAT_LOOP, pad_mode_guard, hooked_on_key_beat_loop);
+    pad_hooks_installed &= RX3_INSTALL_HOOK(
+        install_hook, original_on_key_slip_loop, &slip_loop_hook,
+        ON_KEY_SLIP_LOOP, pad_mode_guard, hooked_on_key_slip_loop);
+    pad_hooks_installed &= RX3_INSTALL_HOOK(
+        install_hook, original_on_key_beat_jump, &beat_jump_hook,
+        ON_KEY_BEAT_JUMP, pad_mode_guard, hooked_on_key_beat_jump);
+    if (!pad_hooks_installed) {
         log_line("rejected: unexpected hardware pad-mode key prologue");
         goto reject_performance_hooks;
     }
 
-    original_beatfx_xpad_ctor = (beatfx_xpad_ctor_fn)install_hook(
+    if (!RX3_INSTALL_HOOK(install_hook, original_beatfx_xpad_ctor,
         &beatfx_xpad_ctor_hook, BEATFX_XPAD_CTOR, beatfx_xpad_ctor_guard,
-        (void *)hooked_beatfx_xpad_ctor);
-    if (!original_beatfx_xpad_ctor) {
+        (void *)hooked_beatfx_xpad_ctor)) {
         log_line("rejected: unexpected BeatFxAndXPad constructor prologue");
         goto reject_performance_hooks;
     }
@@ -1721,43 +1717,44 @@ __attribute__((constructor)) static void initialize(void)
     static const uint8_t image_info_guard[8] = {
         0xa5, 0x36, 0x01, 0xe3, 0x03, 0x00, 0x50, 0xe1
     };
-    original_image_info = (image_info_fn)install_hook(
-        &image_info_hook, 0x001d192c, image_info_guard, (void *)hooked_image_info);
-    if (!original_image_info) {
+    int image_info_installed = RX3_INSTALL_HOOK(
+        install_hook, original_image_info, &image_info_hook, 0x001d192c,
+        image_info_guard, hooked_image_info);
+    if (!image_info_installed) {
         static const uint8_t stock_image_info_guard[8] = {
             0xcc, 0x35, 0x01, 0xe3, 0x03, 0x00, 0x50, 0xe1
         };
-        original_image_info = (image_info_fn)install_hook(
-            &image_info_hook, 0x001d192c, stock_image_info_guard, (void *)hooked_image_info);
+        image_info_installed = RX3_INSTALL_HOOK(
+            install_hook, original_image_info, &image_info_hook, 0x001d192c,
+            stock_image_info_guard, hooked_image_info);
     }
-    if (!original_image_info)
+    if (!image_info_installed)
         log_line("warning: early image lookup hook unavailable");
 
-    original_draw_text = (draw_text_fn)install_hook(
-        &draw_text_hook, PAL_DRAW_TEXT, draw_text_guard, (void *)hooked_draw_text);
-    if (!original_draw_text) {
+    if (!RX3_INSTALL_HOOK(install_hook, original_draw_text, &draw_text_hook,
+                          PAL_DRAW_TEXT, draw_text_guard, hooked_draw_text)) {
         log_line("rejected: unexpected NS_PALRender_DrawText prologue");
         goto reject_performance_hooks;
     }
 
-    original_draw_image = (draw_image_fn)install_hook(
-        &draw_image_hook, PAL_DRAW_IMAGE, draw_image_guard, (void *)hooked_draw_image);
-    if (!original_draw_image) {
+    if (!RX3_INSTALL_HOOK(install_hook, original_draw_image, &draw_image_hook,
+                          PAL_DRAW_IMAGE, draw_image_guard,
+                          hooked_draw_image)) {
         log_line("rejected: unexpected NS_PALRender_DrawImage prologue");
         goto reject_performance_hooks;
     }
 
-    original_solve_touch = (solve_touch_fn)install_hook(
-        &touch_hook, SOLVE_TOUCH, touch_guard, (void *)hooked_solve_touch);
-    if (!original_solve_touch) {
+    if (!RX3_INSTALL_HOOK(install_hook, original_solve_touch, &touch_hook,
+                          SOLVE_TOUCH, touch_guard, hooked_solve_touch)) {
         log_line("rejected: unexpected solveCoordToKey prologue");
         goto reject_performance_hooks;
     }
 
     if (rx3_modules_uses_audio()) {
-        original_audio_start = (audio_start_fn)install_hook(
-            &audio_start_hook, AUDIO_START, audio_start_guard, (void *)hooked_audio_start);
-        if (!original_audio_start) goto reject_performance_hooks;
+        if (!RX3_INSTALL_HOOK(install_hook, original_audio_start,
+                              &audio_start_hook, AUDIO_START,
+                              audio_start_guard, hooked_audio_start))
+            goto reject_performance_hooks;
     }
 
 

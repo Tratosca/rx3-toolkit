@@ -87,10 +87,10 @@ static int start(const struct rx3_services *services)
     }
     static const uint8_t set_guard[8]={0xf0,0x4f,0x2d,0xe9,0x01,0x50,0xa0,0xe1};
     static const uint8_t show_guard[8]={0x01,0x00,0x72,0xe3,0x70,0x40,0x2d,0xe9};
-    original_set=(void *)framework->install_hook(&set_hook,SET_ICON,set_guard,(void *)set_icon);
-    original_show=(void *)framework->install_hook(&show_hook,SHOW_ICON,show_guard,(void *)show_icon);
-    original_icon=(icon_fn)framework->install_hook(&icon_hook,ICON_ID,icon_guard,(void *)icon);
-    if(!original_icon || !original_set || !original_show || !framework->browse->marker(&owner,&markers))return 0;
+    int hooks=RX3_INSTALL_HOOK(framework->install_hook,original_set,&set_hook,SET_ICON,set_guard,set_icon);
+    hooks&=RX3_INSTALL_HOOK(framework->install_hook,original_show,&show_hook,SHOW_ICON,show_guard,show_icon);
+    hooks&=RX3_INSTALL_HOOK(framework->install_hook,original_icon,&icon_hook,ICON_ID,icon_guard,icon);
+    if(!hooks || !framework->browse->marker(&owner,&markers))return 0;
     __atomic_store_n(&enabled,1u,__ATOMIC_SEQ_CST);
     return 1;
 }

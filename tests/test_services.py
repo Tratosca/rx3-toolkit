@@ -17,8 +17,8 @@ static void *fake_install(struct installed_hook *h, unsigned long a, const uint8
     if (a == refuse_address) return 0;
     replacement[installed] = r; address_of[installed++] = a; return original_for(a);
 }
-void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { return fake_install(h, a, g, r); }
-void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { return fake_install(h, a, g, r); }
+int install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r, void *o) { void *original = fake_install(h, a, g, r); memcpy(o, &original, sizeof(original)); return original != 0; }
+int install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r, void *o) { void *original = fake_install(h, a, g, r); memcpy(o, &original, sizeof(original)); return original != 0; }
 int detach_hook(struct installed_hook *h) { (void)h; detached++; return !refuse_detach; }
 int release_hook(struct installed_hook *h) { (void)h; released++; return 1; }
 int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
