@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MPL-2.0
+FROM docker.io/library/debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      bc \
+      binutils-arm-linux-gnueabi \
+      bison \
+      build-essential \
+      clang \
+      flex \
+      gcc-12-arm-linux-gnueabi \
+      libc6-dev-armel-cross \
+      python3 \
+ && ln -s /usr/bin/arm-linux-gnueabi-gcc-12 \
+      /usr/local/bin/arm-linux-gnueabi-gcc \
+ && rm -rf /var/lib/apt/lists/*

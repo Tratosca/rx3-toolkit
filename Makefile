@@ -45,7 +45,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help hook autoexec app new-module kernel-source test preflight clean overcue-audio
+.PHONY: help hook autoexec app new-module kernel-builder kernel-source kernel-modules test preflight clean overcue-audio
 
 help:
 	@printf '%s\n' \
@@ -55,7 +55,9 @@ help:
 	  'make app                          open the XDJ-RX3 Toolkit' \
 	  'make new-module ID=browse-lock CATEGORY=screen    write the files a new module is made of' \
 	  'make new-module ID=x CATEGORY=screen CORE=1       ... one that reacts while a track plays' \
+	  'make kernel-builder               build the pinned RX3 kernel toolchain' \
 	  'make kernel-source                fetch the published RX3 kernel source' \
+	  'make kernel-modules MODULE=x KERNEL_SOURCE=/path/to/kernel' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
@@ -89,9 +91,19 @@ new-module:
 	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" --category "$(CATEGORY)" \
 	  $(if $(CORE),--core,)
 
+kernel-builder:
+	podman build -t localhost/rx3-kernel-builder:bookworm tools/rx3_kernel
+
 kernel-source:
 	tools/rx3_kernel/fetch-source.sh "$(FIRMWARE)" \
 	  "$(BUILD_DIR)/kernel-source/$(FIRMWARE)"
+
+kernel-modules:
+	@test -n "$(MODULE)" || { echo 'MODULE=<module-id> is required' >&2; exit 2; }
+	@test -n "$(KERNEL_SOURCE)" || { echo 'KERNEL_SOURCE=/path/to/prepared/kernel is required' >&2; exit 2; }
+	tools/rx3_kernel/build-modules.sh "$(FIRMWARE)" "$(KERNEL_SOURCE)" \
+	  "tools/rx3_$(subst -,_,$(MODULE))_kernel" \
+	  "$(BUILD_DIR)/artifacts/$(FIRMWARE)/$(MODULE)"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'
