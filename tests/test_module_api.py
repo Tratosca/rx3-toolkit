@@ -77,16 +77,29 @@ register_patch 42 '\001\002\003\004' '\011\012\013\014' second && exit 13
             r'''
 module_begin feature-a feature_a || exit 10
 register_runtime_preload /root/pdj/librx3_core.so || exit 11
-register_runtime_preload /root/pdj/librx3_stems.so || exit 12
+register_runtime_preload /root/pdj/librx3_feature.so || exit 12
 register_runtime_preload /root/pdj/librx3_core.so || exit 13
-[ "$RUNTIME_PRELOAD_ENTRIES" = " /root/pdj/librx3_core.so /root/pdj/librx3_stems.so" ] || exit 14
+[ "$RUNTIME_PRELOAD_ENTRIES" = " /root/pdj/librx3_core.so /root/pdj/librx3_feature.so" ] || exit 14
 
 kept=$(preload_without_runtime \
-  "/root/pdj/librx3_core.so:/opt/vendor/libfoo.so:/root/pdj/librx3_stems.so")
+  "/root/pdj/librx3_core.so:/opt/vendor/libfoo.so:/root/pdj/librx3_feature.so")
 [ "$kept" = "/opt/vendor/libfoo.so" ] || exit 15
 [ -z "$(preload_without_runtime /root/pdj/librx3_core.so)" ] || exit 16
 [ -z "$(preload_without_runtime "")" ] || exit 17
 [ "$(preload_without_runtime /opt/a.so:/opt/b.so)" = "/opt/a.so:/opt/b.so" ] || exit 18
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_preload_entries_keep_stable_order_and_drop_duplicates(self):
+        result = run_shell(
+            r'''
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/pcm.so"
+ensure_preload_entry /root/pdj/core.so || exit 10
+ensure_preload_entry /root/pdj/pcm.so || exit 11
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so" ] || exit 12
+ensure_preload_entry /root/pdj/new.so || exit 13
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/new.so" ] || exit 14
 '''
         )
         self.assertEqual(result.returncode, 0, result.stderr)
