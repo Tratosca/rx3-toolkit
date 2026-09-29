@@ -7,6 +7,7 @@ OUT="$USB/RX3_RUNTIME"
 LOG="$OUT/session.txt"
 RBP=/root/pdj/rbp
 TMP=/tmp/rx3-runtime
+LOCK=/tmp/rx3-runtime.lock
 # Named so the guards below can be run against a directory that is not /proc.
 PROC_ROOT=/proc
 PATCH_TABLE=""
@@ -228,6 +229,17 @@ if awk '$2=="/root/pdj"' /proc/mounts | grep -q .; then
     sync; exit 1
 fi
 [ -x "$RBP" ] || { say "FAILED: $RBP is missing"; sync; exit 1; }
+
+# The guarded-word workspace has a fixed path. An insertion already in flight
+# owns it until exit; a second one must not erase the first one's snapshots.
+# /tmp is volatile, so a SIGKILL-stale lock safely clears on reboot.
+if ! mkdir "$LOCK" 2>/dev/null; then
+    say "STOP: RX3 runtime already applying (or stale lock at $LOCK)"
+    exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' 0
+trap 'exit 1' 1 2 15
+# End exclusive workspace entry.
 
 rm -rf "$TMP"
 mkdir -p "$TMP" || { say "FAILED: /tmp is unavailable"; sync; exit 1; }

@@ -25,7 +25,7 @@ establish the full contract below.
 | Samples | `mod/modules/samples/module.sh` can repoint `/tmp/rx3-samples`, but `rx3_samples_feature.h` reads and stores the bank in memory in its loader. | A different active bank or bank contents cannot be considered live merely because the link changed. |
 | Module removal | The current image loads modules from its index; `module_export` compares settings only for loaded modules. | Verify that removing a module causes the old process to stop using it. This transition lacks a dedicated test. |
 | Recovery | Core binary and assets can be replaced during prepare, before `rbp` is stopped. Rollback restores guarded `rbp` words and the previous preload string. | Snapshot and restore the previous core/resource generation too; otherwise a rollback can relaunch previous words against newly installed files. |
-| Concurrency | `mod/autoexec.sh` uses the fixed `/tmp/rx3-runtime` workspace. | Verify whether the launcher serializes invocations; if it does not, add one bounded session lock before removing that workspace. |
+| Concurrency | `mod/autoexec.sh` uses the fixed `/tmp/rx3-runtime` workspace and now claims `/tmp/rx3-runtime.lock` before clearing it. | A concurrent invocation stops; a lock left by SIGKILL fails closed until reboot or manual inspection. Host contention is tested; device launcher behavior remains to verify. |
 
 ## Decision matrix
 
