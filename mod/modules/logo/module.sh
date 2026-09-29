@@ -24,7 +24,6 @@ logo_install_file()
 {
     logo_from=$1
     logo_to=$2
-    logo_tmp=$logo_to.$$
     [ -r "$logo_from" ] || return 1
     [ -f "$logo_to" ] && [ ! -L "$logo_to" ] &&
         cmp -s "$logo_from" "$logo_to" 2>/dev/null && return 0
@@ -33,13 +32,8 @@ logo_install_file()
     # logo, and if the two are different sizes it reads the new file with the
     # old dimensions and draws a corner of it. So a changed file is a reason to
     # restart, exactly as a changed core object is.
+    stage_runtime_file "$logo_from" "$logo_to" || return 1
     LOGO_CHANGED=1
-    if cp "$logo_from" "$logo_tmp" 2>/dev/null && chmod 644 "$logo_tmp" &&
-       mv -f "$logo_tmp" "$logo_to" 2>/dev/null; then
-        return 0
-    fi
-    rm -f "$logo_tmp"
-    return 1
 }
 
 logo_prepare()
@@ -51,10 +45,10 @@ logo_prepare()
     module_disabled_by_switch logo && return 0
 
     for logo_pair in $LOGO_FILES; do
-        if logo_install_file "/mnt/iso/modules/logo/${logo_pair%%:*}" \
-                             "${logo_pair#*:}"; then
-            LOGO_SLOTS=$((LOGO_SLOTS+1))
-        fi
+        logo_source=/mnt/iso/modules/logo/${logo_pair%%:*}
+        [ -r "$logo_source" ] || continue
+        logo_install_file "$logo_source" "${logo_pair#*:}" || return 1
+        LOGO_SLOTS=$((LOGO_SLOTS+1))
     done
     [ "$LOGO_SLOTS" -gt 0 ] || {
         say "Logo disabled: no wordmark artwork in the image"

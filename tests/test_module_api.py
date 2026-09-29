@@ -143,8 +143,11 @@ class ModuleApiTests(unittest.TestCase):
                 with self.subTest(module=module):
                     before = target.stat()
                     call = (
+                        f'RUNTIME_STAGE_DIR={shlex.quote(str(Path(directory) / "stage"))}\n'
                         f'. "${{1%/lib/module-api.sh}}/modules/{module}/module.sh" || exit 10\n'
                         f'{function} {shlex.quote(str(source))} {shlex.quote(str(target))} || exit 11\n'
+                        'commit_runtime_stage || exit 12\n'
+                        'discard_runtime_stage\n'
                         'printf "%s" "${LOGO_CHANGED:-0}"\n'
                     )
                     result = run_shell(call)

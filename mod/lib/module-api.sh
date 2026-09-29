@@ -8,6 +8,89 @@
 # rather than repeating the path.
 CORE_OBJECT=/mnt/iso/modules/core/librx3_core.so
 
+# Core and startup artwork are staged on the same RAM filesystem as their
+# destinations. No live resource is replaced during prepare or media deferral.
+RUNTIME_STAGE_DIR=${RUNTIME_STAGE_DIR:-/root/pdj/.rx3-stage.$$}
+RUNTIME_STAGE_COUNT=0
+RUNTIME_STAGE_OWNED=0
+
+ensure_runtime_stage()
+{
+    [ "$RUNTIME_STAGE_OWNED" = 1 ] && return 0
+    mkdir "$RUNTIME_STAGE_DIR" 2>/dev/null || return 1
+    RUNTIME_STAGE_OWNED=1
+}
+
+stage_runtime_file()
+{
+    _rx3_source=$1
+    _rx3_target=$2
+    [ -r "$_rx3_source" ] || return 1
+    [ -f "$_rx3_target" ] && [ ! -L "$_rx3_target" ] &&
+        cmp -s "$_rx3_source" "$_rx3_target" 2>/dev/null && return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    cp "$_rx3_source" "$RUNTIME_STAGE_DIR/new$_rx3_next" 2>/dev/null || return 1
+    chmod 644 "$RUNTIME_STAGE_DIR/new$_rx3_next" || return 1
+    printf '%s\n' "$_rx3_target" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
+stage_runtime_removal()
+{
+    _rx3_target=$1
+    [ -e "$_rx3_target" ] || [ -L "$_rx3_target" ] || return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    printf '%s\n' "$_rx3_target" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
+commit_runtime_stage()
+{
+    _rx3_index=1
+    while [ "$_rx3_index" -le "$RUNTIME_STAGE_COUNT" ]; do
+        _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
+        [ ! -d "$_rx3_target" ] || return 1
+        # Mark before the first rename so even a partial commit can be undone.
+        : > "$RUNTIME_STAGE_DIR/started$_rx3_index" || return 1
+        if [ -e "$_rx3_target" ] || [ -L "$_rx3_target" ]; then
+            : > "$RUNTIME_STAGE_DIR/had$_rx3_index" || return 1
+            mv -f "$_rx3_target" "$RUNTIME_STAGE_DIR/old$_rx3_index" || return 1
+        fi
+        if [ -f "$RUNTIME_STAGE_DIR/new$_rx3_index" ]; then
+            mv -f "$RUNTIME_STAGE_DIR/new$_rx3_index" "$_rx3_target" || return 1
+        fi
+        _rx3_index=$((_rx3_index + 1))
+    done
+}
+
+restore_runtime_stage()
+{
+    _rx3_index=$RUNTIME_STAGE_COUNT
+    _rx3_failed=0
+    while [ "$_rx3_index" -gt 0 ]; do
+        if [ -f "$RUNTIME_STAGE_DIR/started$_rx3_index" ]; then
+            _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
+            if [ -e "$RUNTIME_STAGE_DIR/old$_rx3_index" ] ||
+               [ -L "$RUNTIME_STAGE_DIR/old$_rx3_index" ]; then
+                mv -f "$RUNTIME_STAGE_DIR/old$_rx3_index" "$_rx3_target" || _rx3_failed=1
+            elif [ ! -f "$RUNTIME_STAGE_DIR/had$_rx3_index" ]; then
+                rm -f "$_rx3_target" || _rx3_failed=1
+            fi
+        fi
+        _rx3_index=$((_rx3_index - 1))
+    done
+    [ "$_rx3_failed" = 0 ]
+}
+
+discard_runtime_stage()
+{
+    [ "$RUNTIME_STAGE_OWNED" = 0 ] || rm -rf "$RUNTIME_STAGE_DIR"
+    RUNTIME_STAGE_OWNED=0
+    RUNTIME_STAGE_COUNT=0
+}
+
 module_begin()
 {
     _rx3_module_id=$1

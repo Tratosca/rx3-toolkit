@@ -129,6 +129,7 @@ defer_for_unsafe_media()
     say "safe-load guard: $MEDIA_GUARD_REASON; not stopping rbp"
     say "playback continues; the mod is deferred until a safe restart."
     echo deferred > /tmp/rx3-patch.state
+    discard_runtime_stage
     rm -rf "$TMP"
     say "=== complete (mod deferred: unsafe USB topology) ==="
     sync
@@ -344,8 +345,14 @@ fi
 
 run_hooks "$PREPARE_HOOKS" || {
     say "STOP: a prepare hook failed; no guarded word was written."
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 }
+
+if [ "$RUNTIME_STAGE_COUNT" != 0 ] && [ "$NEED_RBP_RESTART" = 0 ]; then
+    RUNNING_HOOK=runtime-resources
+    request_rbp_restart
+fi
 
 if [ "$NEED_RBP_RESTART" = "0" ]; then
     echo patched > /tmp/rx3-patch.state
@@ -354,6 +361,7 @@ if [ "$NEED_RBP_RESTART" = "0" ]; then
     run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
     run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"
     run_hooks "$REPORT_HOOKS" || say "WARNING: a report hook failed"
+    discard_runtime_stage
     rm -rf "$TMP"
     sync
     say "=== complete ==="
@@ -371,6 +379,7 @@ say "restart requested by:${RESTART_REQUESTED_BY:- unknown}"
 say "stopping rbp"
 if ! stop_rbp "$PID"; then
     say "STOP: the running rbp did not stop; no guarded word was written."
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 
@@ -471,16 +480,50 @@ append_diagnostics()
     done
 }
 
+restore_resources_or_halt()
+{
+    restore_runtime_stage && return 0
+    say "STOP: resource restore failed; inspect $RUNTIME_STAGE_DIR before reboot"
+    : > "$LOCK/recovery-needed"
+    sync; exit 1
+}
+
+verify_recovery_words_or_halt()
+{
+    recovery_failed=$(verify_words "$1")
+    [ "$recovery_failed" = 0 ] && return 0
+    say "STOP: $recovery_failed recovery word(s) differ; player not relaunched"
+    : > "$LOCK/recovery-needed"
+    sync; exit 1
+}
+
+if ! commit_runtime_stage; then
+    say "FAILED: staged resource commit; restoring the previous generation"
+    restore_resources_or_halt
+    RBP_PRELOAD=$PREVIOUS_PRELOAD
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
+    say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
+    rm -rf "$TMP"; sync; exit 1
+fi
+for ready_file in $RBP_READY_FILES; do rm -f "$ready_file"; done
+for diagnostic_file in $RBP_DIAGNOSTIC_FILES; do rm -f "$diagnostic_file"; done
+
 write_words patched
 FAILED=$(verify_words patched)
 if [ "$FAILED" != "0" ]; then
     say "FAILED: $FAILED patch word write(s); restoring previous bytes"
     [ "$LOGGING" = "1" ] && cat "$TMP/failed" >> "$LOG" 2>&1
     write_words previous
+    restore_resources_or_halt
+    verify_recovery_words_or_halt previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 say "write verified: $PATCH_COUNT/$PATCH_COUNT words"
@@ -495,13 +538,13 @@ if [ ! -d "/proc/$NEW" ]; then
     say "FAILED: replacement rbp exited; restoring the stock binary"
     append_diagnostics
     write_words stock
-    STOCK_FAILED=$(verify_words stock)
-    [ "$STOCK_FAILED" = "0" ] || \
-        say "WARNING: $STOCK_FAILED stock word(s) could not be restored"
+    restore_resources_or_halt
+    verify_recovery_words_or_halt stock
     RBP_PRELOAD=$(preload_without_runtime "$PREVIOUS_PRELOAD")
     echo stock > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     say "stock rbp restarted, pid=$NEW, preload=${RBP_PRELOAD:-none}"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 # As soon as the process is alive the drive goes back in front of it. What
@@ -518,18 +561,26 @@ done
 if [ -n "$MISSING_READY" ]; then
     say "FAILED: replacement rbp missed readiness:${MISSING_READY}; restoring previous bytes"
     append_diagnostics
-    kill "$NEW" 2>/dev/null
+    if ! stop_rbp "$NEW"; then
+        say "STOP: replacement rbp survived; resources cannot be restored safely"
+        : > "$LOCK/recovery-needed"
+        sync; exit 1
+    fi
     write_words previous
+    restore_resources_or_halt
+    verify_recovery_words_or_halt previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     wait_for_rbp "$NEW"
     announce_media
     say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 say "OK: rbp active, pid=$NEW"
 echo patched > /tmp/rx3-patch.state
+discard_runtime_stage
 
 run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
 run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"

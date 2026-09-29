@@ -9,7 +9,6 @@ module_begin core core
 
 CORE_SRC=/mnt/iso/modules/core/librx3_core.so
 CORE_LIB=/root/pdj/librx3_core.so
-CORE_TMP=/root/pdj/.librx3_core.so.$$
 CORE_READY=/tmp/rx3-performance.ready
 CORE_LOG=/tmp/rx3-stems.log
 CORE_INSTALLED=0
@@ -41,18 +40,16 @@ register_patch 1874220 '\314\065\001\343' '\245\066\001\343' image-table-private
 
 core_install_asset()
 {
-    source_file=$1
-    target_file=$2
-    temporary_file=$target_file.$$
-    [ -r "$source_file" ] || return 1
-    [ -f "$target_file" ] && [ ! -L "$target_file" ] &&
-        cmp -s "$source_file" "$target_file" 2>/dev/null && return 0
-    cp "$source_file" "$temporary_file" 2>/dev/null || return 1
-    chmod 644 "$temporary_file"
-    mv -f "$temporary_file" "$target_file" 2>/dev/null || {
-        rm -f "$temporary_file"
-        return 1
-    }
+    stage_runtime_file "$1" "$2"
+}
+
+core_optional_asset()
+{
+    if [ -r "$1" ]; then
+        core_install_asset "$1" "$2"
+    else
+        stage_runtime_removal "$2"
+    fi
 }
 
 core_normalize_preload()
@@ -98,6 +95,7 @@ core_prepare()
         say "Performance core disabled: shared object is missing"
         return 1
     }
+    core_stage_start=$RUNTIME_STAGE_COUNT
     core_install_asset "$CORE_TAB_KEY_SRC" "$CORE_TAB_KEY" &&
     core_install_asset "$CORE_TAB_STEMS_SRC" "$CORE_TAB_STEMS" &&
     core_install_asset "$CORE_TAB_NONE_SRC" "$CORE_TAB_NONE" &&
@@ -123,21 +121,23 @@ core_prepare()
     # The pad row letters its controls from this, one image per character. The
     # core keeps its stock text if it is missing, so the row is legible rather
     # than blank, but it will be lettered in the wrong face and size.
-    core_install_asset "$CORE_GLYPHS_SRC" "$CORE_GLYPHS" ||
-        say "Performance core: pad glyph artwork is missing"
+    core_optional_asset "$CORE_GLYPHS_SRC" "$CORE_GLYPHS" || return 1
 
     # The light glyphs are optional in the same way the light tabs are: the
     # core repoints the same image IDs at them only when they are there.
     target=/root/pdj/rx3-glyph-atlas-light.rgb565
-    core_install_asset /mnt/iso/modules/core/glyph-atlas-light.rgb565 "$target" ||
-        rm -f "$target"
+    core_optional_asset /mnt/iso/modules/core/glyph-atlas-light.rgb565 "$target" || return 1
 
     # Light tabs are optional; the core uses the dark set if any file is absent.
     for tab_asset in key-selected stems-selected status-none-selected none-selected samples-selected samples-none-selected samples-beatfx-selected single-key-none single-key-selected single-stems-none single-stems-selected; do
         target=/root/pdj/rx3-$tab_asset-light.rgb565
-        core_install_asset /mnt/iso/modules/core/$tab_asset-light.rgb565 "$target" ||
-            rm -f "$target"
+        core_optional_asset /mnt/iso/modules/core/$tab_asset-light.rgb565 "$target" || return 1
     done
+
+    core_install_asset "$CORE_SRC" "$CORE_LIB" || {
+        say "Performance core disabled: shared object cannot be staged"
+        return 1
+    }
 
     previous_preload=$RBP_PRELOAD
     core_normalize_preload
@@ -149,7 +149,8 @@ core_prepare()
     # Already resident and identical: leave rbp alone. Reapplying costs a frozen
     # screen and a fresh USB rescan for no change, so the drive can be
     # reinserted freely.
-    if preload_contains "$CORE_LIB" && cmp -s "$CORE_SRC" "$CORE_LIB" &&
+    if preload_contains "$CORE_LIB" &&
+       [ "$RUNTIME_STAGE_COUNT" = "$core_stage_start" ] &&
        core_running_ready &&
        [ "$preload_changed" = "0" ] && [ "$NEED_RBP_RESTART" = "0" ]; then
         CORE_RESIDENT=1
@@ -158,28 +159,14 @@ core_prepare()
     fi
 
     say "Performance core restart required: resident readiness or generation differs"
-
-    rm -f "$CORE_LOG" "$CORE_READY" "$CORE_TMP"
-    cp "$CORE_SRC" "$CORE_TMP" 2>/dev/null || {
-        say "Performance core disabled: cannot copy shared object"
-        CORE_INSTALLED=0
-        return 1
-    }
-    chmod 644 "$CORE_TMP"
-    mv -f "$CORE_TMP" "$CORE_LIB" 2>/dev/null || {
-        rm -f "$CORE_TMP"
-        say "Performance core disabled: cannot install shared object atomically"
-        CORE_INSTALLED=0
-        return 1
-    }
     request_rbp_restart
-    say "Performance core prepared: native overlay and touch"
+    say "Performance core staged: native overlay and touch"
 }
 
 core_after_launch()
 {
     [ "$CORE_INSTALLED" = "1" ] || return 0
-    if [ "$CORE_RESIDENT" = "1" ]; then
+    if [ "$CORE_RESIDENT" = "1" ] && [ "$NEW" = "$PID" ]; then
         say "OK: performance core still active from the previous insertion"
         return 0
     fi
