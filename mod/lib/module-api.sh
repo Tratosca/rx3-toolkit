@@ -209,16 +209,85 @@ register_patch()
             return 1
             ;;
     esac
-    case " $PATCH_OFFSETS " in
-        *" $1 "*)
-            say "FAILED: modules share guarded patch offset $1"
+    if patch_span_conflicts "$1" 4; then
+        say "FAILED: modules share guarded patch bytes at $1"
+        MODULE_LOAD_FAILED=1
+        return 1
+    fi
+    PATCH_OFFSETS="$PATCH_OFFSETS $1"
+    PATCH_SPANS="${PATCH_SPANS}
+$1 4 $CURRENT_MODULE:$4"
+    PATCH_TABLE="${PATCH_TABLE}
+$1 $2 $3 $CURRENT_MODULE:$4"
+}
+
+patch_span_conflicts()
+{
+    _rx3_start=$1
+    _rx3_length=$2
+    printf '%s\n' "$PATCH_SPANS" | awk \
+        -v start="$_rx3_start" -v finish="$((_rx3_start + _rx3_length))" '
+        NF >= 2 && start < $1 + $2 && $1 < finish { conflict = 1 }
+        END { exit conflict ? 0 : 1 }
+    '
+}
+
+patch_file_path_valid()
+{
+    case "$1" in
+        /mnt/iso/modules/*|/tmp/*)
+            case "$1" in
+                *[!A-Za-z0-9_./-]*|*/../*|*/..|*/./*|*/.) return 1 ;;
+                *) return 0 ;;
+            esac
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# Register a contiguous, aligned file-backed replacement. Both files are
+# copied into the orchestrator workspace before rbp is inspected, so generated
+# /tmp inputs can be cleaned after launch without weakening rollback.
+register_patch_file()
+{
+    [ -n "$CURRENT_MODULE" ] || {
+        say "FAILED: binary patch registered outside a module"
+        MODULE_LOAD_FAILED=1
+        return 1
+    }
+    case "$1:$2" in
+        *[!0-9:]*|:*|*:|*:0)
+            say "FAILED: $CURRENT_MODULE registered invalid patch range [$1,$2]"
             MODULE_LOAD_FAILED=1
             return 1
             ;;
     esac
-    PATCH_OFFSETS="$PATCH_OFFSETS $1"
-    PATCH_TABLE="${PATCH_TABLE}
-$1 $2 $3 $CURRENT_MODULE:$4"
+    [ $(( $1 % 4 )) -eq 0 ] && [ $(( $2 % 4 )) -eq 0 ] || {
+        say "FAILED: $CURRENT_MODULE registered unaligned patch range [$1,$2]"
+        MODULE_LOAD_FAILED=1
+        return 1
+    }
+    patch_file_path_valid "$3" && patch_file_path_valid "$4" || {
+        say "FAILED: $CURRENT_MODULE registered an unsafe patch file"
+        MODULE_LOAD_FAILED=1
+        return 1
+    }
+    [ -r "$3" ] && [ -r "$4" ] &&
+        [ "$(wc -c < "$3" 2>/dev/null)" = "$2" ] &&
+        [ "$(wc -c < "$4" 2>/dev/null)" = "$2" ] || {
+        say "FAILED: $CURRENT_MODULE registered an incomplete patch range [$1,$2]"
+        MODULE_LOAD_FAILED=1
+        return 1
+    }
+    if patch_span_conflicts "$1" "$2"; then
+        say "FAILED: modules share guarded patch bytes at $1"
+        MODULE_LOAD_FAILED=1
+        return 1
+    fi
+    PATCH_SPANS="${PATCH_SPANS}
+$1 $2 $CURRENT_MODULE:$5"
+    PATCH_FILE_TABLE="${PATCH_FILE_TABLE}
+$1 $2 $3 $4 $CURRENT_MODULE:$5"
 }
 
 # Restarting rbp costs a frozen screen and a fresh media rescan, so a session
@@ -305,8 +374,9 @@ preload_without_runtime()
     printf '%s' "$_rx3_cleaned"
 }
 
-# Write every guarded word into `directory`, one file per word, numbered by its
-# position in PATCH_TABLE, plus an `order` index sorted by offset.
+# Materialise every guarded patch in `directory`, plus an index sorted by file
+# offset. Range inputs are copied now so later validation and rollback do not
+# depend on their original paths.
 extract_guarded_words()
 {
     _rx3_directory=$1
@@ -317,18 +387,27 @@ extract_guarded_words()
         printf "$_rx3_stock" > "$_rx3_directory/stock$_rx3_index"
         printf "$_rx3_patched" > "$_rx3_directory/patched$_rx3_index"
     done
-    printf '%s\n' "$PATCH_TABLE" | awk '/^[0-9]/ {print $1, ++n}' | sort -n \
-        > "$_rx3_directory/order"
+    _rx3_index=0
+    printf '%s\n' "$PATCH_FILE_TABLE" | while read -r _rx3_offset _rx3_length _rx3_stock _rx3_patched _rx3_label; do
+        [ -n "$_rx3_offset" ] || continue
+        _rx3_index=$((_rx3_index + 1))
+        cp "$_rx3_stock" "$_rx3_directory/stock-file$_rx3_index" || exit 1
+        cp "$_rx3_patched" "$_rx3_directory/patched-file$_rx3_index" || exit 1
+    done || return 1
+    {
+        printf '%s\n' "$PATCH_TABLE" | awk '/^[0-9]/ {print $1, 4, "word", ++n}'
+        printf '%s\n' "$PATCH_FILE_TABLE" | awk '/^[0-9]/ {print $1, $2, "file", ++n}'
+    } | sort -n > "$_rx3_directory/order"
 }
 
-# SHA-1 of `binary` with every guarded word put back to its stock value.
+# SHA-1 of `binary` with every guarded patch put back to its stock value.
 #
 # The identity check hashes the whole file, so a session this runtime already
 # patched no longer matches the state it started from and reinserting the drive
 # stops. Normalising first asks the question the check means to ask - is this
-# the binary I know? - without being fooled by our own writes. A guarded word
-# holding neither value survives normalisation, but the word-by-word audit that
-# follows rejects it before anything is written.
+# the binary I know? - without being fooled by our own writes. A guarded patch
+# holding neither value survives normalisation, but the state audit that follows
+# rejects it before anything is written.
 #
 # Words are 32-bit instructions at aligned offsets, which is what lets the
 # untouched spans stream back out of dd. An unaligned registration would need a
@@ -365,21 +444,54 @@ normalized_rbp_sha1()
 {
     _rx3_binary=$1
     _rx3_directory=$2
-    awk '$1 % 4 != 0 { unaligned = 1 } END { exit !unaligned }' \
+    awk '$1 % 4 != 0 || $2 % 4 != 0 { unaligned = 1 } END { exit !unaligned }' \
         "$_rx3_directory/order" && return 1
     _rx3_size=$(wc -c < "$_rx3_binary" 2>/dev/null)
     [ -n "$_rx3_size" ] || return 1
     {
         _rx3_previous=0
-        while read -r _rx3_offset _rx3_index; do
+        while read -r _rx3_offset _rx3_length _rx3_kind _rx3_index; do
             _rx3_emit_span "$_rx3_previous" "$_rx3_offset"
-            cat "$_rx3_directory/stock$_rx3_index"
-            _rx3_previous=$((_rx3_offset + 4))
+            if [ "$_rx3_kind" = "word" ]; then
+                cat "$_rx3_directory/stock$_rx3_index"
+            else
+                cat "$_rx3_directory/stock-file$_rx3_index"
+            fi
+            _rx3_previous=$((_rx3_offset + _rx3_length))
         done < "$_rx3_directory/order"
         _rx3_emit_span "$_rx3_previous" $((_rx3_size - _rx3_size % 4))
         [ $((_rx3_size % 4)) -gt 0 ] && dd if="$_rx3_binary" bs=1 \
             skip=$((_rx3_size - _rx3_size % 4)) 2>/dev/null
     } | sha1sum | awk '{print $1}'
+}
+
+guarded_patch_file_state()
+{
+    _rx3_binary=$1
+    _rx3_offset=$2
+    _rx3_length=$3
+    _rx3_stock=$4
+    _rx3_patched=$5
+    if guarded_patch_file_matches "$_rx3_binary" "$_rx3_offset" \
+        "$_rx3_length" "$_rx3_stock"; then
+        printf '%s\n' stock
+    elif guarded_patch_file_matches "$_rx3_binary" "$_rx3_offset" \
+        "$_rx3_length" "$_rx3_patched"; then
+        printf '%s\n' patched
+    else
+        printf '%s\n' unknown
+    fi
+}
+
+guarded_patch_file_matches()
+{
+    dd if="$1" bs=1 skip="$2" count="$3" 2>/dev/null | cmp -s - "$4"
+}
+
+write_guarded_patch_file()
+{
+    [ "$(wc -c < "$4" 2>/dev/null)" = "$3" ] || return 1
+    dd if="$4" of="$1" bs=1 seek="$2" conv=notrunc 2>/dev/null
 }
 
 # Read one variable out of the running rbp environment. A module uses this to

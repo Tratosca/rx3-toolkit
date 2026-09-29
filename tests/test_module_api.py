@@ -246,7 +246,7 @@ register_prepare_hook feature_b_prepare && exit 11
         self.assertEqual(autoexec.count('run_hooks "$ROLLBACK_HOOKS"'), 5)
         for failure in (
             "a stopped hook failed",
-            "patch word write(s)",
+            "patch write(s)",
             "replacement rbp exited",
             "replacement rbp missed readiness",
         ):

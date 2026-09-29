@@ -3821,7 +3821,7 @@ Delete `autoexec.bin` from the drive before using the RX3 again.
 
 `STOP:` means a precondition failed and nothing was modified. The most common one is `STOP: unsupported rbp SHA-1`, which means the player binary is not one the runtime recognises. That is a firmware other than `1.19` or `1.20`, or a build of one of them this project has not seen.
 
-A drive that was removed and pushed back in without a power cycle used to report that same `STOP`, because the player binary carried the writes of the first run and no longer matched the state it started from. It no longer does: the guarded words are put back to their stock values before the comparison, so an already-patched session is recognised and the log says `accepted rbp SHA-1: … (already patched; normalises to …)`.
+A drive that was removed and pushed back in without a power cycle used to report that same `STOP`, because the player binary carried the writes of the first run and no longer matched the state it started from. It no longer does: guarded patches are put back to their stock values before the comparison, so an already-patched session is recognised and the log says `accepted rbp SHA-1: … (already patched; normalises to …)`.
 
 `FAILED:` means something went wrong during modification and the previous state was restored automatically. The exception is a player that exits straight after being relaunched: there the previous state is what just died, so the stock binary is put back instead and this runtime's shared objects are taken out of the preload. The log then says `stock rbp restarted`.
 
