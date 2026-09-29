@@ -8,7 +8,12 @@ from dataclasses import replace
 from pathlib import Path
 
 from app.runtime import build as build_module
-from app.runtime.build import build_runtime, discover_patches, resolve_patches
+from app.runtime.build import (
+    build_runtime,
+    discover_patches,
+    resolve_patches,
+    runtime_file_source,
+)
 
 
 REPOSITORY = Path(__file__).parents[1]
@@ -109,6 +114,45 @@ class ModGeneratorTests(unittest.TestCase):
         right = replace(core, patch_id="right", selectable=True)
         with self.assertRaisesRegex(ValueError, "incompatible modules"):
             resolve_patches([left, right], ["left", "right"])
+
+    def test_generated_module_artifacts_stay_outside_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "mod/modules/example"
+            module.mkdir(parents=True)
+            (module / "module.sh").write_text("module_begin example example\n")
+            (module / "manifest.json").write_text(
+                """{
+  "id": "example",
+  "name": "Example",
+  "description": "Generated artifact fixture.",
+  "firmwares": ["1.19"],
+  "selectable": false,
+  "runtime_directory": "example",
+  "namespace": "example",
+  "files": [
+    {"source": "module.sh", "target": "module.sh"},
+    {"source": "example.ko", "target": "example.ko", "artifact": true}
+  ]
+}
+"""
+            )
+
+            patch = discover_patches(root, "1.19")[0]
+            artifact = patch.files[1]
+            artifacts = root / "local-artifacts"
+            with self.assertRaisesRegex(
+                ValueError,
+                "local-artifacts/1.19/example/example.ko",
+            ):
+                runtime_file_source(root, "1.19", patch, artifact, artifacts)
+
+            output = artifacts / "1.19/example/example.ko"
+            output.parent.mkdir(parents=True)
+            output.write_bytes(b"built outside source")
+            self.assertEqual(
+                runtime_file_source(root, "1.19", patch, artifact, artifacts), output
+            )
 
     def test_builds_selected_modules_without_external_iso_tool(self):
         codec = load_firmware_codec()

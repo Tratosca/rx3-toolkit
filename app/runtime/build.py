@@ -62,6 +62,7 @@ class RuntimeFile:
     source: str
     target: str
     executable: bool = False
+    artifact: bool = False
 
 
 @dataclass(frozen=True)
@@ -249,7 +250,12 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
         if not re.fullmatch(r"[a-z][a-z0-9_]*", data["namespace"]):
             raise ValueError(f"{manifest_path}: unsafe shell namespace")
         files = tuple(
-            RuntimeFile(item["source"], item["target"], bool(item.get("executable", False)))
+            RuntimeFile(
+                item["source"],
+                item["target"],
+                bool(item.get("executable", False)),
+                bool(item.get("artifact", False)),
+            )
             for item in data["files"]
         )
         build_files = tuple(data.get("build_files", []))
@@ -320,7 +326,10 @@ def _validate_patch_files(patch: PatchDefinition) -> None:
         target_path = pathlib.PurePosixPath(runtime_file.target)
         if source_path.is_absolute() or ".." in source_path.parts:
             raise ValueError(f"{patch.patch_id}: unsafe source {runtime_file.source!r}")
-        if not (patch.directory / runtime_file.source).is_file():
+        if (
+            not runtime_file.artifact
+            and not (patch.directory / runtime_file.source).is_file()
+        ):
             raise ValueError(f"{patch.patch_id}: missing {runtime_file.source}")
         if target_path.is_absolute() or ".." in target_path.parts:
             raise ValueError(f"{patch.patch_id}: unsafe target {runtime_file.target!r}")
@@ -524,7 +533,8 @@ def available_versions(root: pathlib.Path | None = None) -> list[str]:
 
 def validate_arm_hook(path: pathlib.Path) -> None:
     """Validate the architecture and EABI marker without a host `file` tool."""
-    header = path.read_bytes()[:52]
+    data = path.read_bytes()
+    header = data[:52]
     if len(header) < 52 or header[:4] != b"\x7fELF":
         raise ValueError(f"{path}: compiled hook is not an ELF file")
     if header[4:6] != b"\x01\x01":
@@ -533,6 +543,44 @@ def validate_arm_hook(path: pathlib.Path) -> None:
     flags = struct.unpack_from("<I", header, 36)[0]
     if machine != 40 or (flags & 0xFF000000) != 0x05000000:
         raise ValueError(f"{path}: hook must target ARM EABI5")
+
+    forbidden = {"bcmp", "__memcmp_chk"}
+    imported = _undefined_elf32_symbols(data)
+    rejected = sorted(imported & forbidden)
+    if rejected:
+        names = ", ".join(rejected)
+        raise ValueError(f"{path}: hook imports unavailable symbol(s): {names}")
+
+
+def _undefined_elf32_symbols(data: bytes) -> set[str]:
+    """Return undefined dynamic symbols from a little-endian ELF32 image."""
+    section_offset, = struct.unpack_from("<I", data, 0x20)
+    section_size, section_count = struct.unpack_from("<HH", data, 0x2E)
+
+    def section(index: int) -> tuple[int, int, int, int, int]:
+        base = section_offset + index * section_size
+        section_type, = struct.unpack_from("<I", data, base + 4)
+        offset, size, link = struct.unpack_from("<III", data, base + 0x10)
+        entry_size, = struct.unpack_from("<I", data, base + 0x24)
+        return section_type, offset, size, link, entry_size
+
+    names: set[str] = set()
+    for index in range(section_count):
+        section_type, offset, size, link, entry_size = section(index)
+        if section_type != 11 or not entry_size:  # SHT_DYNSYM
+            continue
+        _, strings_offset, _, _, _ = section(link)
+        for entry in range(size // entry_size):
+            base = offset + entry * entry_size
+            name_offset, _, _, _, _, defined = struct.unpack_from(
+                "<IIIBBH", data, base
+            )
+            if defined != 0 or not name_offset:  # SHN_UNDEF only
+                continue
+            start = strings_offset + name_offset
+            end = data.index(b"\0", start)
+            names.add(data[start:end].decode("ascii"))
+    return names
 
 
 def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str | None = None,
@@ -646,6 +694,26 @@ def _validate_supplied_files(
     return supplied
 
 
+def runtime_file_source(
+    root: pathlib.Path,
+    firmware: str,
+    patch: PatchDefinition,
+    runtime_file: RuntimeFile,
+    artifact_directory: pathlib.Path | None = None,
+) -> pathlib.Path:
+    if not runtime_file.artifact:
+        return patch.directory / runtime_file.source
+
+    base = pathlib.Path(artifact_directory or root / "build/artifacts")
+    source = base / firmware / patch.patch_id / runtime_file.source
+    if not source.is_file():
+        raise ValueError(
+            f"{patch.patch_id}: missing generated artifact {runtime_file.source}. "
+            f"Build it into {source} before packaging"
+        )
+    return source
+
+
 def build_runtime(
     firmware: str,
     patch_ids: Iterable[str],
@@ -656,6 +724,7 @@ def build_runtime(
     prebuilt_hook: pathlib.Path | None = None,
     supplied_files: Mapping[str, Mapping[str, bytes]] | None = None,
     cancellation: Cancellation | None = None,
+    artifact_directory: pathlib.Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> BuildResult:
     """Build an atomic `autoexec.bin` from selected versioned modules.
@@ -712,7 +781,10 @@ def build_runtime(
             for runtime_file in patch.files:
                 written = destination / runtime_file.target
                 written.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(patch.directory / runtime_file.source, written)
+                source = runtime_file_source(
+                    root, firmware, patch, runtime_file, artifact_directory
+                )
+                shutil.copy2(source, written)
                 written.chmod(0o755 if runtime_file.executable else 0o644)
             for name, content in by_module.get(patch.patch_id, {}).items():
                 (destination / name).write_bytes(content)
