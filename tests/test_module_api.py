@@ -91,6 +91,40 @@ kept=$(preload_without_runtime \
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_preload_insertion_keeps_first_position_and_collapses_duplicates(self):
+        result = run_shell(
+            r'''
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/pcm.so"
+ensure_preload_entry /root/pdj/core.so || exit 10
+ensure_preload_entry /root/pdj/pcm.so || exit 11
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so" ] || exit 12
+ensure_preload_entry /root/pdj/new.so || exit 13
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/new.so" ] || exit 14
+ensure_preload_entry /root/pdj/new.so || exit 15
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/new.so" ] || exit 16
+ensure_preload_entry "" && exit 17
+exit 0
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_core_preload_keeps_order_and_retires_legacy_library(self):
+        result = run_shell(
+            r'''
+. "${1%/lib/module-api.sh}/modules/core/module.sh" || exit 9
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so"
+core_normalize_preload || exit 10
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 11
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_stems.so"
+core_normalize_preload || exit 12
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 13
+RBP_PRELOAD=""
+core_normalize_preload || exit 14
+[ "$RBP_PRELOAD" = "/root/pdj/librx3_core.so" ] || exit 15
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
     def test_a_setting_the_running_player_lacks_asks_for_a_restart(self):
         # rbp reads its environment once, so exporting alone would leave a

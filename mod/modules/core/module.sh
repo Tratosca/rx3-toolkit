@@ -55,8 +55,8 @@ core_install_asset()
 
 core_normalize_preload()
 {
-    # Keep exactly one entry for the core, at the front, however many earlier
-    # insertions left behind.
+    # Retire the pre-split library on a same-boot upgrade. Keep the first core
+    # position so independently packaged preloads retain their precedence.
     pending=$RBP_PRELOAD
     cleaned=""
     while [ -n "$pending" ]; do
@@ -65,7 +65,6 @@ core_normalize_preload()
             *)   entry=$pending; pending="" ;;
         esac
         [ -n "$entry" ] || continue
-        [ "$entry" = "$CORE_LIB" ] && continue
         # The pre-split name, so an older runtime is superseded cleanly.
         [ "$entry" = "/root/pdj/librx3_stems.so" ] && continue
         if [ -n "$cleaned" ]; then
@@ -74,11 +73,8 @@ core_normalize_preload()
             cleaned=$entry
         fi
     done
-    if [ -n "$cleaned" ]; then
-        RBP_PRELOAD="$CORE_LIB:$cleaned"
-    else
-        RBP_PRELOAD=$CORE_LIB
-    fi
+    RBP_PRELOAD=$cleaned
+    ensure_preload_entry "$CORE_LIB"
 }
 
 core_prepare()
