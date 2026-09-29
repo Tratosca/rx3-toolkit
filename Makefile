@@ -14,6 +14,7 @@ BUILD_DIR ?= build
 FIRMWARE ?= 1.19
 MODULES ?=
 PROFILES ?=
+PROFILE ?=
 # The key stays outside this repository. RX3_KEY saves retyping its path on
 # every build; KEY= on the command line still wins.
 KEY ?= $(RX3_KEY)
@@ -61,6 +62,7 @@ help:
 	  'make kernel-builder               build the pinned RX3 kernel toolchain' \
 	  'make kernel-source                fetch the published RX3 kernel source' \
 	  'make kernel-modules MODULE=x KERNEL_SOURCE=/path/to/kernel' \
+	  'make kernel-modules MODULE=x PROFILE=<profile> ...' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
@@ -105,9 +107,17 @@ kernel-source:
 kernel-modules:
 	@test -n "$(MODULE)" || { echo 'MODULE=<module-id> is required' >&2; exit 2; }
 	@test -n "$(KERNEL_SOURCE)" || { echo 'KERNEL_SOURCE=/path/to/prepared/kernel is required' >&2; exit 2; }
-	tools/rx3_kernel/build-modules.sh "$(FIRMWARE)" "$(KERNEL_SOURCE)" \
-	  "tools/rx3_$(subst -,_,$(MODULE))_kernel" \
-	  "$(BUILD_DIR)/artifacts/$(FIRMWARE)/$(MODULE)"
+	@recipe="tools/rx3_$(subst -,_,$(MODULE))_kernel"; \
+	  sources="$(BUILD_DIR)/sources/$(MODULE)"; \
+	  output="$(BUILD_DIR)/artifacts/$(FIRMWARE)/$(MODULE)"; \
+	  if [ -n "$(PROFILE)" ]; then \
+	    recipe="$$recipe/profiles/$(PROFILE)"; \
+	    sources="$$sources/$(PROFILE)"; \
+	    output="$$output/$(PROFILE)"; \
+	  fi; \
+	  test -d "$$recipe" || { echo "unknown kernel recipe: $$recipe" >&2; exit 2; }; \
+	  tools/rx3_kernel/build-recipe.sh \
+	    "$(FIRMWARE)" "$(KERNEL_SOURCE)" "$$recipe" "$$sources" "$$output"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'

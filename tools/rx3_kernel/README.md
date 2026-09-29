@@ -36,6 +36,20 @@ Outputs go to `build/artifacts/<firmware>/<module>/`. They are ignored by Git.
 A runtime manifest marks a generated input with `"artifact": true`; packaging
 then reads it from that directory instead of the module's source directory.
 
+A module with multiple hardware implementations keeps each recipe under
+`tools/rx3_<module>_kernel/profiles/<profile>/` and selects one explicitly:
+
+```sh
+make kernel-modules \
+  MODULE=example \
+  PROFILE=example-device \
+  FIRMWARE=1.19 \
+  KERNEL_SOURCE=/path/to/prepared/kernel
+```
+
+Profile outputs go to
+`build/artifacts/<firmware>/<module>/<profile>/`.
+
 ## Feature recipe contract
 
 `tools/rx3_<module>_kernel` contains:
@@ -46,6 +60,17 @@ then reads it from that directory instead of the module's source directory.
 - `production.symvers`, the minimal production CRC entries imported by those
   outputs, and `production.symvers.sha256`, which pins that profile's contents;
 - any original compatibility source or Kbuild files the feature owns.
+
+A recipe that needs source outside the published kernel tree also provides:
+
+- `fetch-sources.sh`, which writes pinned inputs into the supplied cache;
+- `sources.sha256`, which verifies every fetched input before use;
+- `prepare-recipe.sh`, which expands or transforms those inputs inside a
+  temporary copy of the recipe.
+
+All three source-hook files must be present together. The common runner keeps
+downloads outside Git, verifies them before preparation, and passes only the
+prepared recipe into the offline kernel build container.
 
 The recipe sources `/tool/kernel-build-lib.sh`, changes Kconfig as needed, calls
 `rx3_kernel_prepare`, and builds through `rx3_kernel_make`. The common runner

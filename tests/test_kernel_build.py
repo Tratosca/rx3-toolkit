@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 import hashlib
 import importlib.util
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -175,6 +176,84 @@ class ModuleSymversValidationTest(unittest.TestCase):
             },
             {"provider.ko": {"feature_helper"}},
         )
+
+
+class SourcedKernelRecipeTest(unittest.TestCase):
+    def test_fetches_verifies_and_prepares_external_source(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            tool = root / "tools/rx3_kernel"
+            recipe = root / "recipe"
+            cache = root / "cache"
+            output = root / "output"
+            kernel = root / "kernel"
+            tool.mkdir(parents=True)
+            recipe.mkdir()
+            kernel.mkdir()
+            shutil.copy2(ROOT / "tools/rx3_kernel/build-recipe.sh", tool)
+
+            payload = b"pinned driver source\n"
+            (recipe / "sources.sha256").write_text(
+                f"{hashlib.sha256(payload).hexdigest()}  driver.tar\n"
+            )
+            (recipe / "fetch-sources.sh").write_text(
+                "#!/bin/sh\nprintf 'pinned driver source\\n' > \"$1/driver.tar\"\n"
+            )
+            (recipe / "prepare-recipe.sh").write_text(
+                "#!/bin/sh\nmkdir -p \"$2/driver\"\n"
+                "cp \"$1/driver.tar\" \"$2/driver/source\"\n"
+            )
+            (tool / "build-modules.sh").write_text(
+                "#!/bin/sh\nset -eu\n"
+                "test -f \"$3/driver/source\"\n"
+                "mkdir -p \"$4\"\n"
+                "cp \"$3/driver/source\" \"$4/receipt\"\n"
+            )
+            for script in (
+                tool / "build-recipe.sh",
+                tool / "build-modules.sh",
+                recipe / "fetch-sources.sh",
+                recipe / "prepare-recipe.sh",
+            ):
+                script.chmod(0o755)
+
+            result = subprocess.run(
+                [
+                    tool / "build-recipe.sh", "1.19", kernel, recipe,
+                    cache, output,
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((output / "receipt").read_bytes(), payload)
+
+    def test_rejects_partial_source_hooks(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            tool = root / "tools/rx3_kernel"
+            recipe = root / "recipe"
+            tool.mkdir(parents=True)
+            recipe.mkdir()
+            shutil.copy2(ROOT / "tools/rx3_kernel/build-recipe.sh", tool)
+            (recipe / "sources.sha256").touch()
+
+            result = subprocess.run(
+                [
+                    tool / "build-recipe.sh", "1.19", root / "kernel",
+                    recipe, root / "cache", root / "output",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("source hooks must include", result.stderr)
 
 
 if __name__ == "__main__":
