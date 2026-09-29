@@ -45,7 +45,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help hook autoexec app new-module test preflight clean overcue-audio
+.PHONY: help hook autoexec app new-module kernel-source test preflight clean overcue-audio
 
 help:
 	@printf '%s\n' \
@@ -55,6 +55,7 @@ help:
 	  'make app                          open the XDJ-RX3 Toolkit' \
 	  'make new-module ID=browse-lock CATEGORY=screen    write the files a new module is made of' \
 	  'make new-module ID=x CATEGORY=screen CORE=1       ... one that reacts while a track plays' \
+	  'make kernel-source                fetch the published RX3 kernel source' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
@@ -87,6 +88,10 @@ new-module:
 	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock CATEGORY=screen' >&2; exit 2; }
 	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" --category "$(CATEGORY)" \
 	  $(if $(CORE),--core,)
+
+kernel-source:
+	tools/rx3_kernel/fetch-source.sh "$(FIRMWARE)" \
+	  "$(BUILD_DIR)/kernel-source/$(FIRMWARE)"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'
