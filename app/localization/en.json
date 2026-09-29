@@ -46,6 +46,8 @@
   "modules.performanceTradeoff": "On the player, Key Shift and Stems replace the ZOOM and GRID touch controls. Enabling either module makes both native controls unavailable.",
   "modules.advanced": "Components and technical settings",
   "modules.firmware": "Compatible XDJ-RX3 versions",
+  "modules.profile": "Hardware profile",
+  "modules.chooseProfile": "Choose a hardware profile.",
   "modules.needs": "Requires the {names} module",
   "modules.clashes": "Cannot be used with {names}",
   "modules.key": "Encryption key",

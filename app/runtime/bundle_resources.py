@@ -31,27 +31,42 @@ def collect_bundle_resources(
     for patch in discover_patches(repository):
         manifest = patch.directory / "manifest.json"
         resources.append((str(manifest), _bundle_directory(repository, manifest)))
+        for profile in patch.profiles:
+            definition = patch.directory / "profiles" / profile / "profile.json"
+            resources.append(
+                (str(definition), _bundle_directory(repository, definition))
+        )
 
         for runtime_file in patch.files:
             if runtime_file.artifact:
                 for firmware in patch.firmwares:
-                    source = runtime_file_source(
-                        repository,
-                        firmware,
-                        patch,
-                        runtime_file,
-                        artifact_root,
-                    )
-                    bundled = (
-                        repository
-                        / "build/artifacts"
-                        / firmware
-                        / patch.patch_id
-                        / runtime_file.source
-                    )
-                    resources.append(
-                        (str(source), _bundle_directory(repository, bundled))
-                    )
+                    profiles = patch.profiles or (None,)
+                    for profile in profiles:
+                        source = runtime_file_source(
+                            repository,
+                            firmware,
+                            patch,
+                            runtime_file,
+                            artifact_root,
+                            profile,
+                        )
+                        bundled = (
+                            repository
+                            / "build/artifacts"
+                            / firmware
+                            / patch.patch_id
+                        )
+                        if profile:
+                            bundled /= profile
+                        bundled /= runtime_file.source
+                        destination = (
+                            f"resources/{bundled.relative_to(repository).as_posix()}"
+                            if runtime_file.directory
+                            else _bundle_directory(repository, bundled)
+                        )
+                        resources.append(
+                            (str(source), destination)
+                        )
                 continue
 
             source = patch.directory / runtime_file.source

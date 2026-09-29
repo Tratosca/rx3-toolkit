@@ -13,6 +13,7 @@ BUILD_DIR ?= build
 # versions it is built for; this picks which of them a drive carries.
 FIRMWARE ?= 1.19
 MODULES ?=
+PROFILES ?=
 # The key stays outside this repository. RX3_KEY saves retyping its path on
 # every build; KEY= on the command line still wins.
 KEY ?= $(RX3_KEY)
@@ -24,6 +25,7 @@ HOOK := $(BUILD_DIR)/librx3_core.so
 HOOK_UNITS := $(shell $(PYTHON) -c 'import json; print(" ".join("mod/modules/" + p for p in json.load(open("$(CORE_DIR)/manifest.json"))["arm_hook"].get("sources", [])))')
 AUTOEXEC := $(BUILD_DIR)/autoexec.bin
 PATCH_ARGS := $(foreach patch,$(MODULES),--patch $(patch))
+PROFILE_ARGS := $(foreach profile,$(PROFILES),--profile $(profile))
 
 # -fno-builtin-memcmp is load-bearing. At -O2 clang rewrites `memcmp(a,b,n) == 0`
 # into a call to bcmp, which rbp's libc does not export: the hook then fails to
@@ -52,6 +54,7 @@ help:
 	  'make hook                         compile the ARM EABI5 hook' \
 	  'make autoexec KEY=/path/key       build the runtime for firmware $(FIRMWARE)' \
 	  'make autoexec KEY=... MODULES="beatjump-32bars decoder-sleep"' \
+	  'make autoexec KEY=... MODULES="x" PROFILES="x=profile"' \
 	  'make app                          open the XDJ-RX3 Toolkit' \
 	  'make new-module ID=browse-lock CATEGORY=screen    write the files a new module is made of' \
 	  'make new-module ID=x CATEGORY=screen CORE=1       ... one that reacts while a track plays' \
@@ -78,7 +81,8 @@ autoexec:
 	@test -f "$(KEY)" || { echo 'key not found: $(KEY)' >&2; exit 2; }
 	@mkdir -p "$(BUILD_DIR)"
 	$(PYTHON) -m app.runtime.cli build \
-	  --firmware "$(FIRMWARE)" $(PATCH_ARGS) --key "$(KEY)" --output "$(BUILD_DIR)"
+	  --firmware "$(FIRMWARE)" $(PATCH_ARGS) $(PROFILE_ARGS) \
+	  --key "$(KEY)" --output "$(BUILD_DIR)"
 
 app:
 	$(PYTHON) app/ui/shell.py

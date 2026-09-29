@@ -114,6 +114,21 @@ for(const invalid of ['0','14','oops','1.5']) {
 }
 
 {
+  const profiled={id:'native-wifi',requires:[],conflicts:[],selectable:true,profiles:['rtl8188cu','rtl8192cu']};
+  ui=load();ui.t=(key)=>key;ui.renderSummary=()=>{};
+  ui.state.modules=[profiled];ui.state.selected=['native-wifi'];
+  const group=ui.moduleTile(profiled),select=group.children[1].children[1];
+  assert.equal(select.children.length,3);assert.equal(select.value,'');
+  select.value='rtl8192cu';select.events.change();
+  assert.equal(ui.state.profiles['native-wifi'],'rtl8192cu');
+
+  ui.state.key='chosen-key';ui.state.output='/fixture/USB';
+  let request;ui.ask=async (...args)=>{request=args;return {started:true};};ui.watchJob=()=>{};
+  await ui.startBuild();
+  assert.deepEqual(Object.entries(request[10]),[['native-wifi','rtl8192cu']]);
+}
+
+{
   ui=load();
   ui.state.modules=[item,{id:'core',selectable:false},{id:'key-match',selectable:true}];
   ui.state.selected=['core','key-match','key-sync'];
