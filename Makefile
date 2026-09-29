@@ -8,6 +8,7 @@ endif
 
 PYTHON ?= python3
 CARGO ?= cargo
+DOCKER ?= docker
 BUILD_DIR ?= build
 # The version an operator reads in the deck's menu. Each module says which
 # versions it is built for; this picks which of them a drive carries.
@@ -98,7 +99,8 @@ new-module:
 	  $(if $(CORE),--core,)
 
 kernel-builder:
-	podman build -t localhost/rx3-kernel-builder:bookworm tools/rx3_kernel
+	$(DOCKER) build --file tools/rx3_kernel/Containerfile \
+	  --tag rx3-kernel-builder:bookworm tools/rx3_kernel
 
 kernel-source:
 	tools/rx3_kernel/fetch-source.sh "$(FIRMWARE)" \
@@ -116,7 +118,7 @@ kernel-modules:
 	    output="$$output/$(PROFILE)"; \
 	  fi; \
 	  test -d "$$recipe" || { echo "unknown kernel recipe: $$recipe" >&2; exit 2; }; \
-	  tools/rx3_kernel/build-recipe.sh \
+	  DOCKER="$(DOCKER)" tools/rx3_kernel/build-recipe.sh \
 	    "$(FIRMWARE)" "$(KERNEL_SOURCE)" "$$recipe" "$$sources" "$$output"
 
 test:

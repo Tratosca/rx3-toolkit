@@ -24,7 +24,8 @@ recipe_directory=$(realpath "$3")
 output_directory=$(realpath -m "$4")
 tool_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 profile=$tool_directory/firmware/$firmware.conf
-builder_image=localhost/rx3-kernel-builder:bookworm
+docker=${DOCKER:-docker}
+builder_image=rx3-kernel-builder:bookworm
 
 [ -f "$profile" ] || {
     echo "unsupported kernel firmware profile: $firmware" >&2
@@ -81,7 +82,12 @@ cleanup()
 trap cleanup EXIT HUP INT TERM
 mkdir -p "$work/kernel" "$work/output"
 
-podman run --rm --network=none \
+set -- --user "$(id -u):$(id -g)"
+case "${docker##*/}" in
+    podman) set -- --userns=keep-id "$@" ;;
+esac
+
+"$docker" run --rm --network=none "$@" \
     -e RX3_KERNEL_RELEASE="$RX3_KERNEL_RELEASE" \
     -e RX3_KERNEL_VERMAGIC="$RX3_KERNEL_VERMAGIC" \
     -e RX3_KERNEL_LOCALVERSION_APPEND="$RX3_KERNEL_LOCALVERSION_APPEND" \

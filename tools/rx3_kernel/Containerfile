@@ -11,6 +11,7 @@ RUN apt-get update \
       flex \
       gcc-12-arm-linux-gnueabi \
       libc6-dev-armel-cross \
+      p7zip-full \
       python3 \
  && ln -s /usr/bin/arm-linux-gnueabi-gcc-12 \
       /usr/local/bin/arm-linux-gnueabi-gcc \

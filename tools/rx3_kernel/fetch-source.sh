@@ -11,6 +11,8 @@ firmware=$1
 destination=$(realpath -m "$2")
 tool_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 profile=$tool_directory/firmware/$firmware.conf
+docker=${DOCKER:-docker}
+builder_image=rx3-kernel-builder:bookworm
 
 [ -f "$profile" ] || {
     echo "unsupported kernel firmware profile: $firmware" >&2
@@ -44,18 +46,18 @@ fetch "$RX3_KERNEL_SOURCE_PART_00_SHA256" \
 fetch "$RX3_KERNEL_SOURCE_PART_01_SHA256" \
     "$RX3_KERNEL_SOURCE_PART_01_URL" "$work/source-01.zip"
 
-if command -v 7zz >/dev/null 2>&1; then
-    seven_zip=7zz
-elif command -v 7z >/dev/null 2>&1; then
-    seven_zip=7z
-else
-    echo "7-Zip command not found; install 7zz or 7z" >&2
-    exit 1
-fi
+set -- --user "$(id -u):$(id -g)"
+case "${docker##*/}" in
+    podman) set -- --userns=keep-id "$@" ;;
+esac
 
-mkdir "$work/parts"
-"$seven_zip" x -y -o"$work/parts" "$work/source-00.zip" >/dev/null
-"$seven_zip" x -y -o"$work/parts" "$work/source-01.zip" >/dev/null
+"$docker" run --rm --network=none "$@" \
+    -v "$work:/work:rw" \
+    "$builder_image" sh -eu -c '
+        mkdir /work/parts
+        7z x -y -o/work/parts /work/source-00.zip >/dev/null
+        7z x -y -o/work/parts /work/source-01.zip >/dev/null
+    '
 cat "$work/parts/pioneerdj_xdj_rx3.tar.bz2.00" \
     "$work/parts/pioneerdj_xdj_rx3.tar.bz2.01" > \
     "$work/pioneerdj_xdj_rx3.tar.bz2"

@@ -17,11 +17,25 @@ Build the common toolchain image once:
 make kernel-builder
 ```
 
+The build uses Docker by default. Set `DOCKER=podman` on the `make` command
+when using a compatible Podman installation instead.
+
 Fetch Pioneer's checksum-pinned GPL source release:
 
 ```sh
-make kernel-source FIRMWARE=1.19
+make DOCKER=podman kernel-source FIRMWARE=1.19
 ```
+
+The fetcher downloads and verifies the archives on the host, then runs 7-Zip
+without network access inside the common builder image. Build that image first;
+the host does not need a 7-Zip installation. Omit `DOCKER=podman` to use Docker.
+
+For firmware 1.19, the two downloads total about 241 MiB and the resulting
+kernel tree occupies about 742 MiB. Extraction temporarily keeps the split
+downloads, reconstructed archive, full GPL tree, and final kernel copy at the
+same time. Reserve at least 3 GiB for `kernel-source`. Module compilation copies
+the kernel tree again and creates build objects, so reserve at least 6 GiB on
+the filesystems backing `build/` and `${TMPDIR:-/tmp}` for the complete flow.
 
 Build one module's artifacts:
 
@@ -35,6 +49,9 @@ make kernel-modules \
 Outputs go to `build/artifacts/<firmware>/<module>/`. They are ignored by Git.
 A runtime manifest marks a generated input with `"artifact": true`; packaging
 then reads it from that directory instead of the module's source directory.
+The runner maps the current host user into the container and enables Podman's
+keep-ID user namespace when selected, so rootless builds can write their
+temporary module outputs with the correct host ownership.
 
 A module with multiple hardware implementations keeps each recipe under
 `tools/rx3_<module>_kernel/profiles/<profile>/` and selects one explicitly:
