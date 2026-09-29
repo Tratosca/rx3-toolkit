@@ -14,6 +14,7 @@ from app.runtime.build import (
     resolve_patches,
     runtime_file_source,
 )
+from app.runtime.bundle_resources import collect_bundle_resources
 
 
 REPOSITORY = Path(__file__).parents[1]
@@ -152,6 +153,50 @@ class ModGeneratorTests(unittest.TestCase):
             output.write_bytes(b"built outside source")
             self.assertEqual(
                 runtime_file_source(root, "1.19", patch, artifact, artifacts), output
+            )
+
+    def test_desktop_bundle_reads_generated_artifacts_from_build_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "mod/modules/example"
+            module.mkdir(parents=True)
+            (module / "module.sh").write_text("module_begin example example\n")
+            (module / "manifest.json").write_text(
+                """{
+  "id": "example",
+  "name": "Example",
+  "description": "Generated artifact fixture.",
+  "firmwares": ["1.19"],
+  "selectable": false,
+  "runtime_directory": "example",
+  "namespace": "example",
+  "files": [
+    {"source": "module.sh", "target": "module.sh"},
+    {"source": "helper", "target": "helper", "artifact": true}
+  ]
+}
+"""
+            )
+            artifacts = root / "release-inputs"
+            artifact = artifacts / "1.19/example/helper"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_bytes(b"generated outside source")
+
+            resources = collect_bundle_resources(root, artifacts)
+
+            self.assertIn(
+                (
+                    str(module / "module.sh"),
+                    "resources/mod/modules/example",
+                ),
+                resources,
+            )
+            self.assertIn(
+                (
+                    str(artifact),
+                    "resources/build/artifacts/1.19/example",
+                ),
+                resources,
             )
 
     def test_builds_selected_modules_without_external_iso_tool(self):
