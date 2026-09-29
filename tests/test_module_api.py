@@ -75,6 +75,15 @@ class ModuleApiTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(target.read_bytes(), b"new artwork")
                     self.assertEqual(result.stdout, "1" if module == "logo" else "0")
+
+                    # Matching bytes through a symlink must not preserve an
+                    # unexpected link under the player's runtime directory.
+                    target.unlink()
+                    target.symlink_to(source)
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertFalse(target.is_symlink())
+                    self.assertEqual(target.read_bytes(), b"new artwork")
                     source.write_bytes(b"same artwork")
                     target.write_bytes(source.read_bytes())
 

@@ -45,7 +45,8 @@ core_install_asset()
     target_file=$2
     temporary_file=$target_file.$$
     [ -r "$source_file" ] || return 1
-    cmp -s "$source_file" "$target_file" 2>/dev/null && return 0
+    [ -f "$target_file" ] && [ ! -L "$target_file" ] &&
+        cmp -s "$source_file" "$target_file" 2>/dev/null && return 0
     cp "$source_file" "$temporary_file" 2>/dev/null || return 1
     chmod 644 "$temporary_file"
     mv -f "$temporary_file" "$target_file" 2>/dev/null || {

@@ -26,7 +26,8 @@ logo_install_file()
     logo_to=$2
     logo_tmp=$logo_to.$$
     [ -r "$logo_from" ] || return 1
-    cmp -s "$logo_from" "$logo_to" 2>/dev/null && return 0
+    [ -f "$logo_to" ] && [ ! -L "$logo_to" ] &&
+        cmp -s "$logo_from" "$logo_to" 2>/dev/null && return 0
     # The core reads the artwork once, in its constructor. New art on the disk
     # with an old rbp still running means the player keeps drawing the previous
     # logo, and if the two are different sizes it reads the new file with the
