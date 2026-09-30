@@ -126,6 +126,7 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertEqual(result.output, directory / "autoexec.bin")
             plain = codec.read_autoexec(result.output, key)
             self.assertEqual(codec.autoexec_iso_metadata(plain), "UsbAuto")
+            self.assertIn(b"/dev/subucom_spi1.0", plain)
             self.assertEqual(result.patches, ("decoder-sleep",))
 
 

@@ -5,6 +5,10 @@
 
 - Stem preparation installs again on Intel Macs ([#21](https://github.com/Tratosca/rx3-toolkit/issues/21)). PyTorch no longer publishes Intel builds, so the app installs the last versions that have them, with Python 3.10 to 3.12; 3.11 and 3.12 need the Xcode Command Line Tools. Checked under Rosetta with vocals, 3-part and every preset; not yet run on a real Intel Mac.
 
+- Hold SHIFT on either deck while you plug in the USB drive to start without the mod for that session: the deck then works stock. Not yet run on hardware.
+
+- When the mod restarts the player, the USB drive is announced again, so it appears in SOURCE without unplugging it. Not yet run on hardware.
+
 - Fix pad-preview asset lookup after the core directory reorganization.
 
 - Keep full-sized KEY and STEMS tabs aligned with the modules that actually registered: either missing tab is blank and inert. Keep STATUS visible and touchable without Samples; retain native ZOOM/GRID when neither KEY nor STEMS is active. Document the ZOOM/GRID replacement beside module selection in the Toolkit. Emulator captures cover isolated KEY, isolated STEMS, isolated Samples and all three enabled; hardware is pending.

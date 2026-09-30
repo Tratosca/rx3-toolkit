@@ -3,6 +3,23 @@
 # RX3 volatile runtime orchestrator. Feature logic lives in module directories.
 
 USB="$1"
+# Sample the held panel state before logs, module loading, locks or patching.
+# An unreadable frame is not evidence that SHIFT is released: fail closed.
+SAFE_MODE_PROBE=$(sh /mnt/iso/lib/safe-mode.sh)
+SAFE_MODE_RESULT=$?
+# This one small USB note is written even when the mods are bypassed. It lets
+# the operator distinguish a held SHIFT, an unreadable panel and an autoexec
+# that was never launched. It has no effect on rbp or module selection.
+if [ -d "$USB" ]; then
+    mkdir -p "$USB/RX3_RUNTIME" 2>/dev/null
+    printf 'result=%s %s\n' "$SAFE_MODE_RESULT" "$SAFE_MODE_PROBE" \
+        > "$USB/RX3_RUNTIME/startup-probe.txt" 2>/dev/null
+fi
+case "$SAFE_MODE_RESULT" in
+    0) ;;
+    10|11) exit 0 ;;
+    *) exit 0 ;;
+esac
 OUT="$USB/RX3_RUNTIME"
 LOG="$OUT/session.txt"
 RBP=/root/pdj/rbp
@@ -458,29 +475,68 @@ launch_rbp()
     NEW=$!
 }
 
-# rbp learns that a drive exists from the hotplug event the kernel emits when it
-# appears. That event fired for this drive while the previous process was
-# running, so the replacement comes up blind to media that is still mounted, and
-# the operator has to pull the drive out and push it back to be seen - which is
-# exactly the reinsertion the identity check used to refuse. Asking the kernel to
-# re-emit the event puts the drive in front of the new process again without
-# unmounting anything.
+# The udev block "add" rule mounts the drive AND runs decrypt_autoexec.sh.
+# Re-emitting it after restart can therefore launch this runtime again. Instead
+# replay only the two procfs messages the vendor rules send to rbp: "connect"
+# and "mount <path>". Wait until the replacement process opened both channels;
+# a hook constructor's readiness marker alone precedes that initialization.
+rbp_has_usb_channels()
+{
+    _rx3_pid=$1
+    _rx3_slot=$2
+    _rx3_connect=0
+    _rx3_mount=0
+    for _rx3_fd in "$PROC_ROOT/$_rx3_pid/fd"/*; do
+        _rx3_target=$(readlink "$_rx3_fd" 2>/dev/null) || continue
+        case "$_rx3_target" in
+            /proc/udev_usbctn"$_rx3_slot") _rx3_connect=1 ;;
+            /proc/udev_usb"$_rx3_slot") _rx3_mount=1 ;;
+        esac
+    done
+    [ "$_rx3_connect" = 1 ] && [ "$_rx3_mount" = 1 ]
+}
+
 announce_media()
 {
-    media_device=$(awk -v mount="$USB" '$2 == mount {print $1}' /proc/mounts | tail -1)
+    case "$USB" in
+        /media/usb1/*) media_slot=1 ;;
+        /media/usb2/*) media_slot=2 ;;
+        *) say "media announce skipped: unsupported mount path $USB"; return 0 ;;
+    esac
+    media_name=${USB#/media/usb$media_slot/}
+    case "$media_name" in
+        ""|*/*|*[!a-zA-Z0-9._-]*)
+            say "media announce skipped: unsafe mount path $USB"; return 0 ;;
+    esac
+    media_device=$(awk -v mount="$USB" '$2 == mount {print $1}' "$PROC_ROOT/mounts" | tail -1)
     case "$media_device" in
         /dev/*) ;;
-        *) say "media re-announce skipped: $USB is not a block device mount"; return 0 ;;
+        *) say "media announce skipped: $USB is not a block device mount"; return 0 ;;
     esac
-    media_uevent=/sys/class/block/${media_device#/dev/}/uevent
-    [ -w "$media_uevent" ] || {
-        say "media re-announce skipped: $media_uevent is not writable"
+    media_connect=$PROC_ROOT/udev_usbctn$media_slot
+    media_mount=$PROC_ROOT/udev_usb$media_slot
+    if [ ! -w "$media_connect" ] || [ ! -w "$media_mount" ]; then
+        say "media announce skipped: USB notification channels unavailable"
         return 0
-    }
-    if echo add > "$media_uevent" 2>/dev/null; then
-        say "re-announced $media_device to the hotplug handler"
+    fi
+    media_wait=0
+    while ! rbp_has_usb_channels "$NEW" "$media_slot"; do
+        rbp_alive "$NEW" || {
+            say "media announce skipped: rbp pid $NEW exited"
+            return 0
+        }
+        if [ "$media_wait" -ge 80 ]; then
+            say "WARNING: media announce timed out waiting for rbp USB channels"
+            return 0
+        fi
+        usleep 100000
+        media_wait=$((media_wait + 1))
+    done
+    if printf connect > "$media_connect" &&
+       printf 'mount %s' "$USB" > "$media_mount"; then
+        say "announced mounted $media_device to rbp pid $NEW via USB$media_slot"
     else
-        say "WARNING: media re-announce failed for $media_device"
+        say "WARNING: media announce failed for $media_device"
     fi
 }
 
@@ -535,6 +591,8 @@ if [ "$FAILED" != "0" ]; then
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
     say "previous rbp restarted, pid=$NEW"
     discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
