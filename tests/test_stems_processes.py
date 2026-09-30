@@ -126,7 +126,8 @@ time.sleep(60)
 
     def test_managed_separator_install_is_pinned_for_each_accelerator(self):
         for acceleration in provisioning.ACCELERATIONS.values():
-            commands = list(provisioning.install_packages(pathlib.Path('/runtime'), acceleration))
+            with patch.object(provisioning.sys, 'platform', 'linux'):
+                commands = list(provisioning.install_packages(pathlib.Path('/runtime'), acceleration))
             command = commands[-1][1]
             self.assertIn(f'audio-separator[{acceleration.extra}]==0.44.5', command)
             self.assertIn('librosa==0.11.0', command)
@@ -142,6 +143,18 @@ time.sleep(60)
             self.assertFalse(runtime.ready)
             (root / '.installing').unlink()
             self.assertTrue(runtime.ready)
+
+    def test_mac_intel_installs_the_locked_set_for_the_current_separator(self):
+        with patch.object(provisioning.sys, 'platform', 'darwin'), \
+             patch.object(provisioning.platform, 'machine', return_value='x86_64'):
+            command = list(provisioning.install_packages(pathlib.Path('/runtime'), provisioning.ACCELERATIONS['cpu']))[-1][1]
+            self.assertEqual(provisioning.maximum_python(), (3, 12))
+        self.assertEqual(command[-3:], ['--no-deps', '-r', str(provisioning.mac_intel_requirements())])
+        # A separator bump that skips regenerating the set would leave Intel Macs
+        # on another separator than every other platform.
+        pins = set(provisioning.mac_intel_requirements().read_text().split())
+        self.assertIn(f'audio-separator=={provisioning.SEPARATOR_VERSION}', pins)
+        self.assertLessEqual(set(provisioning.SUPPORT_PACKAGES), pins)
 
     def test_mac_arm_installs_the_validated_inference_versions(self):
         with patch.object(provisioning.sys, 'platform', 'darwin'), \

@@ -49,6 +49,12 @@ MINIMUM_PYTHON = (3, 10)
 # 3.13. On 3.14 it rejects the separator's own annotations, so an interpreter
 # beyond this is refused up front rather than after a multi-gigabyte download.
 MAXIMUM_PYTHON = (3, 13)
+# PyTorch published its last Intel macOS build with 2.2.2, below what the
+# separator declares, so pip cannot resolve it there. Intel Macs install a
+# locked set instead; the file explains how it was built. PyTorch 2.2.2 has no
+# build for Python 3.13.
+MAC_INTEL_REQUIREMENTS = "mac-intel-requirements.txt"
+MAC_INTEL_MAXIMUM_PYTHON = (3, 12)
 
 CPU_WHEEL_INDEX = "https://download.pytorch.org/whl/cpu"
 ROCM_WHEEL_INDEX = "https://download.pytorch.org/whl/rocm6.4"
@@ -165,6 +171,20 @@ def _nvidia_compute_capability() -> tuple[int, int] | None:
 
 def _has_rocm() -> bool:
     return bool(shutil.which("rocminfo")) or pathlib.Path("/opt/rocm").is_dir()
+
+
+def _mac_intel() -> bool:
+    return sys.platform == "darwin" and platform.machine() == "x86_64"
+
+
+def mac_intel_requirements() -> pathlib.Path:
+    if getattr(sys, "frozen", False):
+        return pathlib.Path(sys._MEIPASS) / "stems" / MAC_INTEL_REQUIREMENTS
+    return pathlib.Path(__file__).with_name("data") / MAC_INTEL_REQUIREMENTS
+
+
+def maximum_python() -> tuple[int, int]:
+    return MAC_INTEL_MAXIMUM_PYTHON if _mac_intel() else MAXIMUM_PYTHON
 
 
 def detect_acceleration() -> str:
@@ -489,7 +509,7 @@ def _search_directories() -> list[pathlib.Path | None]:
 
 
 def _candidate_interpreters() -> list[pathlib.Path]:
-    names = [f"python3.{minor}" for minor in range(MAXIMUM_PYTHON[1], MINIMUM_PYTHON[1] - 1, -1)]
+    names = [f"python3.{minor}" for minor in range(maximum_python()[1], MINIMUM_PYTHON[1] - 1, -1)]
     names += ["python3", "python"]
     candidates: list[pathlib.Path] = []
     seen: set[str] = set()
@@ -526,7 +546,7 @@ def _candidate_interpreters() -> list[pathlib.Path]:
 def supported_python_range() -> str:
     return (
         f"{MINIMUM_PYTHON[0]}.{MINIMUM_PYTHON[1]} to "
-        f"{MAXIMUM_PYTHON[0]}.{MAXIMUM_PYTHON[1]}"
+        f"{maximum_python()[0]}.{maximum_python()[1]}"
     )
 
 
@@ -544,7 +564,7 @@ def host_python() -> pathlib.Path:
     usable = [
         (version, path) for path, version in
         ((path, _venv_version(path)) for path in _candidate_interpreters())
-        if version is not None and MINIMUM_PYTHON <= version <= MAXIMUM_PYTHON
+        if version is not None and MINIMUM_PYTHON <= version <= maximum_python()
     ]
     if not usable:
         raise ProvisioningError(
@@ -567,7 +587,7 @@ def _venv_version(interpreter: pathlib.Path) -> tuple[int, int] | None:
         major, minor = (int(part) for part in probe.stdout.split())
     except ValueError:
         return None
-    return (major, minor) if MINIMUM_PYTHON <= (major, minor) <= MAXIMUM_PYTHON else None
+    return (major, minor) if MINIMUM_PYTHON <= (major, minor) <= maximum_python() else None
 
 
 def _stream(command: Sequence[str], progress: ProgressCallback, label: str) -> None:
@@ -609,6 +629,11 @@ def install_packages(
             str(python), "-m", "pip", "install",
             "--index-url", acceleration.torch_index, "torch",
         ]
+    if _mac_intel():
+        yield f"Installing audio-separator for {acceleration.label}", [
+            str(python), "-m", "pip", "install", "--no-deps", "-r", str(mac_intel_requirements()),
+        ]
+        return
     inference = MAC_ARM_INFERENCE if sys.platform == "darwin" and platform.machine() in ("arm64", "aarch64") else ()
     yield f"Installing audio-separator for {acceleration.label}", [
         str(python), "-m", "pip", "install", acceleration.requirement, *SUPPORT_PACKAGES, *inference,
