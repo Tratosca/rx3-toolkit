@@ -222,7 +222,7 @@ static float rx3_align_head(const struct rx3_shifter *state, long outgoing,
     return (float)fine_lag;
 }
 
-static void rx3_shifter_init(struct rx3_shifter *state, float *history)
+static void rx3_shifter_reset_state(struct rx3_shifter *state, float *history)
 {
     if (!rx3_hann_ready)
         rx3_build_hann();
@@ -234,8 +234,28 @@ static void rx3_shifter_init(struct rx3_shifter *state, float *history)
     for (unsigned int head = 0; head < RX3_SHIFT_HEADS; head++)
         state->align[head] = 0.0f;
     state->grain = (float)RX3_SHIFT_GRAIN;
+}
+
+static void rx3_shifter_init(struct rx3_shifter *state, float *history)
+{
+    rx3_shifter_reset_state(state, history);
     for (unsigned int i = 0; i < RX3_SHIFT_HISTORY * 2u; i++)
         history[i] = 0.0f;
+}
+
+/* Transport resets replace the entire history: no preceding zero fill and no
+   integer division in the audio callback. Input contains at least one frame. */
+static void rx3_shifter_seed(struct rx3_shifter *state, float *history,
+                             const float *input, unsigned int frames)
+{
+    rx3_shifter_reset_state(state, history);
+    unsigned int at = 0;
+    for (unsigned int i = 0; i < RX3_SHIFT_HISTORY; i++) {
+        history[i * 2u] = input[at * 2u];
+        history[i * 2u + 1u] = input[at * 2u + 1u];
+        if (++at == frames) at = 0;
+    }
+    state->written = RX3_SHIFT_HISTORY;
 }
 
 static void rx3_shifter_set_semitones(struct rx3_shifter *state, int semitones)

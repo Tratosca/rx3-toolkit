@@ -231,7 +231,7 @@ static unsigned int pad_atlas_text_width(const uint16_t *text)
 static uint32_t pad_atlas_ground_colour(unsigned int ink)
 {
     if (ink >= pad_atlas.state_count) ink=RX3_PAD_INK_INACTIVE;
-    if (theme_light_active && pad_atlas_light_blob) {
+    if (rx3_image_is_light() && pad_atlas_light_blob) {
         uint32_t colour;
         memcpy(&colour,pad_atlas_light_blob+sizeof(struct rx3_pad_atlas_header)+ink*4u,4u);
         return colour;

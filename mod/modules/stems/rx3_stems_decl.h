@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0
- * Private Stems state and data formats used by its core adapters.
+ * Private Stems state and data formats, compiled by rx3_stems_module.c.
  */
 
 #ifndef RX3_STEMS_DECL_H
@@ -10,9 +10,10 @@
 #include "overcue/overcue.h"
 #endif
 
-/* Private native stream entry, owned by Stems rather than Keyshift. */
-#define TIMESTRETCH_STREAM ((unsigned long)0x000c292c)
-static const uint8_t timestretch_stream_guard[8] = {0xf8,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
+typedef struct { int16_t left, right; } Short2;
+
+/* Crossfade length when a role is switched, in valid frames. */
+#define TRANSITION_FRAMES 256u
 
 
 enum stem_mode {
@@ -93,10 +94,7 @@ static struct stems_deck_context stems_decks[2] = {
     {.pending_fds = {-1,-1,-1}}, {.pending_fds = {-1,-1,-1}}
 };
 static volatile unsigned int stems_callbacks_enabled;
-static volatile unsigned int stems_callbacks_active;
 static volatile unsigned int captured_pad_mask[2];
 static const char *stems_dir;
-static volatile unsigned int blink_origin;
-static volatile unsigned int blink_origin_valid;
 
 #endif /* RX3_STEMS_DECL_H */

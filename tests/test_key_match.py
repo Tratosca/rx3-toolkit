@@ -124,7 +124,7 @@ static void unreg(const void *o){assert(o);removed++;registered=0;}
 static int add_marker(const void *o,const struct rx3_browse_marker *m){assert(o&&m==&markers);return 1;}
 static void remove_marker(const void *o){assert(o);}
 static const struct rx3_browse_service browse={.marker=add_marker,.unregister_owner=remove_marker};
-static const struct rx3_image_service images={reg,unreg};
+static const struct rx3_image_service images={.register_recolour=reg,.unregister_owner=unreg};
 static const struct rx3_services api={.install_hook=install,.detach_hook=detach,.release_hook=detach,.images=&images,.browse=&browse};
 static void expect_colour(unsigned id,unsigned source,uint16_t rgb){
     assert(id>=0x1700 && id<0x1700+registered);

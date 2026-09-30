@@ -31,6 +31,8 @@ NEED_RBP_RESTART=0
 RESTART_REQUESTED_BY=""
 RUNNING_HOOK=""
 . "$MODULE_API"
+# Directory lifecycle only; artwork staging has its own executable contract.
+stage_panel_asset() { :; }
 module_disabled_by_switch() { return 1; }
 CORE_OBJECT=$FAKE_CORE
 TMP=$FAKE_TMP

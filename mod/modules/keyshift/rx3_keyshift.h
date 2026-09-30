@@ -272,12 +272,8 @@ static long hooked_timestretch_manager(void *manager, uint32_t position,
             if (keyshift_transport_reset(context, position, frames, silent)) {
                 int semitones = rx3_keyshift_semitones(deck);
                 if (context->shifter.history) {
-                    rx3_shifter_init(&context->shifter, context->shifter.history);
-                    for (unsigned int i = 0; i < RX3_SHIFT_HISTORY; i++) {
-                        context->shifter.history[i * 2u] = output[i % frames].left;
-                        context->shifter.history[i * 2u + 1u] = output[i % frames].right;
-                    }
-                    context->shifter.written = RX3_SHIFT_HISTORY;
+                    rx3_shifter_seed(&context->shifter, context->shifter.history,
+                                     (const float *)(const void *)output, frames);
                     rx3_shifter_set_semitones(&context->shifter, semitones);
                     context->shifter.ratio = context->shifter.target;
                 }

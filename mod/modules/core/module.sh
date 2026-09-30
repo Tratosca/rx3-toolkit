@@ -13,14 +13,6 @@ CORE_READY=/tmp/rx3-performance.ready
 CORE_LOG=/tmp/rx3-stems.log
 CORE_INSTALLED=0
 CORE_RESIDENT=0
-CORE_TAB_KEY_SRC=/mnt/iso/modules/core/key-selected.rgb565
-CORE_TAB_STEMS_SRC=/mnt/iso/modules/core/stems-selected.rgb565
-CORE_TAB_NONE_SRC=/mnt/iso/modules/core/none-selected.rgb565
-CORE_STATUS_NONE_SRC=/mnt/iso/modules/core/status-none-selected.rgb565
-CORE_TAB_KEY=/root/pdj/rx3-key-selected.rgb565
-CORE_TAB_STEMS=/root/pdj/rx3-stems-selected.rgb565
-CORE_TAB_NONE=/root/pdj/rx3-none-selected.rgb565
-CORE_STATUS_NONE=/root/pdj/rx3-status-none-selected.rgb565
 CORE_GLYPHS_SRC=/mnt/iso/modules/core/glyph-atlas-dark.rgb565
 CORE_GLYPHS=/root/pdj/rx3-glyph-atlas-dark.rgb565
 
@@ -96,27 +88,7 @@ core_prepare()
         return 1
     }
     core_stage_start=$RUNTIME_STAGE_COUNT
-    core_install_asset "$CORE_TAB_KEY_SRC" "$CORE_TAB_KEY" &&
-    core_install_asset "$CORE_TAB_STEMS_SRC" "$CORE_TAB_STEMS" &&
-    core_install_asset "$CORE_TAB_NONE_SRC" "$CORE_TAB_NONE" &&
-    core_install_asset "$CORE_STATUS_NONE_SRC" "$CORE_STATUS_NONE" || {
-        say "Performance core disabled: custom tab assets cannot be installed"
-        return 1
-    }
-
-    for tab in samples-selected samples-none-selected samples-beatfx-selected; do
-        core_install_asset "/mnt/iso/modules/core/$tab.rgb565" "/root/pdj/rx3-$tab.rgb565" || {
-            say "Performance core disabled: sample tab assets cannot be installed"
-            return 1
-        }
-    done
-    for tab in single-key-none single-key-selected single-stems-none single-stems-selected; do
-        core_install_asset "/mnt/iso/modules/core/$tab.rgb565" "/root/pdj/rx3-$tab.rgb565" || {
-            say "Performance core disabled: single-module tab asset cannot be installed"
-            return 1
-        }
-    done
-
+    stage_panel_asset core 02 status-none-selected || return 1
 
     # The pad row letters its controls from this, one image per character. The
     # core keeps its stock text if it is missing, so the row is legible rather
@@ -127,12 +99,6 @@ core_prepare()
     # core repoints the same image IDs at them only when they are there.
     target=/root/pdj/rx3-glyph-atlas-light.rgb565
     core_optional_asset /mnt/iso/modules/core/glyph-atlas-light.rgb565 "$target" || return 1
-
-    # Light tabs are optional; the core uses the dark set if any file is absent.
-    for tab_asset in key-selected stems-selected status-none-selected none-selected samples-selected samples-none-selected samples-beatfx-selected single-key-none single-key-selected single-stems-none single-stems-selected; do
-        target=/root/pdj/rx3-$tab_asset-light.rgb565
-        core_optional_asset /mnt/iso/modules/core/$tab_asset-light.rgb565 "$target" || return 1
-    done
 
     core_install_asset "$CORE_SRC" "$CORE_LIB" || {
         say "Performance core disabled: shared object cannot be staged"

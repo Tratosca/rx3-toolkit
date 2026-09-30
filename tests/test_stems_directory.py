@@ -41,6 +41,8 @@ NEED_RBP_RESTART=0
 RESTART_REQUESTED_BY=""
 RUNNING_HOOK=""
 . "$MODULE_API"
+# Directory lifecycle only; artwork staging has its own executable contract.
+stage_panel_asset() { :; }
 
 # The packaged core lives on the mounted ISO on device; here it is a fixture.
 CORE_OBJECT=$FAKE_CORE

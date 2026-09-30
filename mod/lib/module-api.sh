@@ -36,6 +36,28 @@ stage_runtime_file()
     RUNTIME_STAGE_COUNT=$_rx3_next
 }
 
+# Fixed native tab slots are a renderer contract; artwork belongs to its module.
+# The generic loader reads only paths explicitly published for this launch.
+stage_panel_asset()
+{
+    _rx3_panel_module=$1
+    _rx3_panel_slot=$2
+    _rx3_panel_name=$3
+    _rx3_panel_source=/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name.rgb565
+    _rx3_panel_target=/root/pdj/rx3-$_rx3_panel_name.rgb565
+    _rx3_panel_before=$RUNTIME_STAGE_COUNT
+    stage_runtime_file "$_rx3_panel_source" "$_rx3_panel_target" || return 1
+    if [ -r "/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name-light.rgb565" ]; then
+        stage_runtime_file "/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name-light.rgb565" "/root/pdj/rx3-$_rx3_panel_name-light.rgb565" || return 1
+        module_export "RX3_TAB_LIGHT_$_rx3_panel_slot" "/root/pdj/rx3-$_rx3_panel_name-light.rgb565" "Panel artwork" || :
+    else
+        module_export "RX3_TAB_LIGHT_$_rx3_panel_slot" "" "Panel artwork" || :
+    fi
+    module_export "RX3_TAB_DARK_$_rx3_panel_slot" "$_rx3_panel_target" "Panel artwork" || :
+    [ "$RUNTIME_STAGE_COUNT" = "$_rx3_panel_before" ] || request_rbp_restart
+    return 0
+}
+
 stage_runtime_removal()
 {
     _rx3_target=$1

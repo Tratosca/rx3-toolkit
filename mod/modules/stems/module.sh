@@ -18,11 +18,15 @@ STEMS_READY=0
 
 stems_prepare()
 {
+
     [ -r "$CORE_OBJECT" ] || {
         say "Stems disabled: the performance core is not selected"
         return 1
     }
     module_disabled_by_switch stems && return 0
+    stage_panel_asset stems 01 stems-selected || return 1
+    stage_panel_asset stems 09 single-stems-none || return 1
+    stage_panel_asset stems 10 single-stems-selected || return 1
 
     count=0
     for candidate in "$STEMS_DIR"/*.rx3stem; do

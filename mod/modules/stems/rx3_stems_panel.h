@@ -106,9 +106,13 @@ static int stems_slider_visible(unsigned int deck, unsigned int widget)
     return value && (value < 100u || (until && (int)(until - now_ms()) > 0));
 }
 
+/* Watcher thread. While a deck loads, the row is redrawn on each blink phase
+   change and nothing else, so the toggles keep the LEDs' parity; the pending
+   changes land with the next phase. */
 static int stems_panel_needs_refresh(void)
 {
     static unsigned int seen[2][4];
+    static int last_phase = -1;
     int changed = 0;
     for (unsigned int deck = 0; deck < 2u; deck++) {
 #ifdef RX3_OVERCUE_PROTOTYPE
@@ -123,8 +127,16 @@ static int stems_panel_needs_refresh(void)
             if (stems_slider_visible(deck, w)) mode |= 1u << w;
         if (seen[deck][2] != levels || seen[deck][3] != mode) changed = 1;
         seen[deck][2] = levels; seen[deck][3] = mode;
-        if (seen[deck][0] != status || seen[deck][1] != selection || status == 1u) changed = 1;
+        if (seen[deck][0] != status || seen[deck][1] != selection) changed = 1;
         seen[deck][0] = status; seen[deck][1] = selection;
+    }
+    if (stems_any_deck_loading()) {
+        int phase = blink_phase_is_on();
+        changed = phase != last_phase;
+        last_phase = phase;
+    } else {
+        last_phase = -1;
+        if (!changed) stems_blink_idle();
     }
     return changed;
 }

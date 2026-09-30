@@ -4,39 +4,41 @@
 
 #include "rx3_stems_loader.h"
 
-static unsigned long hooked_get_stream(void *stretch, unsigned long position,
-                                       Float2 *output, unsigned long frames)
+static int block_is_silent(const struct rx3_stereo *output, unsigned int frames)
 {
-    __sync_add_and_fetch(&stems_callbacks_active, 1u);
-    unsigned long result = original_get_stream(stretch, position, output, frames);
-    void *reader = *(void **)((uint8_t *)stretch + 4u);
-    int deck = deck_index_for_reader(reader);
-    if (deck >= 0 && __atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST)) {
-        struct stems_deck_context *context = &stems_decks[deck];
-        __sync_add_and_fetch(&context->readers_active, 1u);
-        if (__atomic_load_n(&context->reader, __ATOMIC_SEQ_CST) == reader &&
-            output && !block_is_silent(output, frames))
-            stems_mix(context, (int)position, output, frames);
-        __sync_sub_and_fetch(&context->readers_active, 1u);
-    }
-    __sync_sub_and_fetch(&stems_callbacks_active, 1u);
-    return result;
+    for (unsigned int i = 0; i < frames; i++)
+        if (output[i].left != 0.0f || output[i].right != 0.0f)
+            return 0;
+    return 1;
 }
 
-static int stems_on_key_pad(void *player_innards, const void *key_input)
+/* Audio thread, after the deck's TimeStretch stage. The reader check keeps a
+   stale request from mixing into the next track. */
+static void stems_stream(unsigned int deck, const void *reader, int position,
+                         struct rx3_stereo *output, unsigned int frames)
 {
-    const uint8_t *event = key_input;
-    unsigned int code = event[8] | ((unsigned int)event[9] << 8u);
+    if (deck >= 2u || !__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST)) return;
+    struct stems_deck_context *context = &stems_decks[deck];
+    __sync_add_and_fetch(&context->readers_active, 1u);
+    if (__atomic_load_n(&context->reader, __ATOMIC_SEQ_CST) == reader &&
+        !block_is_silent(output, frames))
+        stems_mix(context, position, output, frames);
+    __sync_sub_and_fetch(&context->readers_active, 1u);
+}
+
+/* SLIP LOOP pads 5 to 8 toggle the prepared roles once the set is resident.
+   A captured press also takes its release, so the native loop never sees half
+   of a gesture. */
+static int stems_pad(const struct rx3_pad_event *event)
+{
+    unsigned int code = event->code;
     if (!__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST) ||
-        code < 0x411bu || code > 0x411eu) return original_on_key_pad(player_innards, key_input);
-    unsigned int operation = event[11] & 15u;
-    unsigned int channel = event[10];
-    if (channel < 1u || channel > 2u) channel = *((const uint8_t *)player_innards + 0x26u);
-    if (channel < 1u || channel > 2u) return original_on_key_pad(player_innards, key_input);
-    unsigned int deck = channel - 1u, pad = code - 0x411bu, captured = 1u << pad;
+        code < 0x411bu || code > 0x411eu || event->deck >= 2u) return 0;
+    unsigned int operation = event->operation;
+    unsigned int deck = event->deck, pad = code - 0x411bu, captured = 1u << pad;
     struct stems_deck_context *context = &stems_decks[deck];
     unsigned int bit = stems_display_order[pad];
-    if (!operation && *(const uint32_t *)((const uint8_t *)player_innards + 0x74u) == 2u &&
+    if (!operation && event->pad_mode == 2u &&
         context->status == 2u && context->reader && context->armed && (stems_available(context) & bit)) {
         __atomic_fetch_or(&captured_pad_mask[deck], captured, __ATOMIC_SEQ_CST);
         stems_toggle(context, bit);
@@ -47,47 +49,26 @@ static int stems_on_key_pad(void *player_innards, const void *key_input)
             __atomic_fetch_and(&captured_pad_mask[deck], ~captured, __ATOMIC_SEQ_CST);
         return 1;
     }
-    return original_on_key_pad(player_innards, key_input);
+    return 0;
 }
 
-static void hooked_check_slip_led(void *player, void *led_stat)
+/* SLIP LOOP pads 5 to 8 blink while the set loads, then hold their role
+   colour, dimmed when the role is off. Pads without a role stay native. */
+static void stems_light(unsigned int deck, unsigned int control, struct rx3_light *light)
 {
-    const struct stems_rgb *colour = stems_pad_colour;
-    __sync_add_and_fetch(&pad_callbacks_active, 1u);
-    original_check_slip_led(player, led_stat);
-    struct stems_deck_context *context = context_for_player(player);
-    if (!__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST) || !context ||
-        !context->reader || !context->armed || !led_stat) goto done;
-    unsigned int count = *(const uint16_t *)((const uint8_t *)led_stat + 4u);
-    uint8_t *entries = *(uint8_t **)((uint8_t *)led_stat + 8u);
-    if (!entries || count > 256u) goto done;
-    unsigned int available = stems_available(context);
-    unsigned int selected = stems_selected(context);
-    unsigned int deck_channel = (unsigned int)(context - stems_decks) + 1u;
-    int loading = !context->payloads[0].data;
-    unsigned int origin = blink_origin_ms();
-    for (unsigned int i = 0; i < count; i++) {
-        uint8_t *led = entries + i * 44u;
-        uint32_t channel = *(const uint32_t *)(led + 4u);
-        if (channel != deck_channel) continue;
-        unsigned int id = *(const uint32_t *)led;
-        if (id < 22u || id > 25u) continue;
-        unsigned int pad = id - 22u, bit = stems_display_order[pad];
-        if (!(available & bit)) continue;
-        if (loading) {
-            ((set_led_state_fn)SET_LED_STATE)(led, LED_BLINK, BLINK_PERIOD_MS, origin, 0, 0);
-            ((set_led_color_fn)SET_LED_COLOR)(led, LED_BLINK, 0, &colour[pad]);
-        } else {
-            ((set_led_color_fn)SET_LED_COLOR)(led, LED_ON, !(selected & bit), &colour[pad]);
-        }
-    }
-done:
-    __sync_sub_and_fetch(&pad_callbacks_active, 1u);
-}
-
-static int stems_feature_configured(void)
-{
-    return stems_dir != 0;
+    if (deck >= 2u || control < 4u || control > 7u) return;
+    struct stems_deck_context *context = &stems_decks[deck];
+    if (!__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST) ||
+        !context->reader || !context->armed) return;
+    unsigned int pad = control - 4u, bit = stems_display_order[pad];
+    if (!(stems_available(context) & bit)) return;
+    const struct stems_rgb *c = &stems_pad_colour[pad];
+    light->rgb = ((uint32_t)c->red << 16u) | ((uint32_t)c->green << 8u) | c->blue;
+    if (!context->payloads[0].data)
+        light->state = RX3_LIGHT_BLINK;
+    else
+        light->state = stems_selected(context) & bit ? RX3_LIGHT_ON : RX3_LIGHT_DIM;
+    if (!stems_any_deck_loading()) stems_blink_idle();
 }
 
 /* Publish values through the sharing framework, never the PCM context. */
@@ -159,45 +140,33 @@ static int stems_feature_install(void)
 #ifdef RX3_OVERCUE_PROTOTYPE
     if(getenv("RX3_OVERCUE_ROOT")&&!rx3_overcue_start())return 0;
 #endif
-    original_get_stream = (get_stream_fn)install_hook(&get_stream_hook,
-        TIMESTRETCH_STREAM, timestretch_stream_guard, (void *)hooked_get_stream);
-    original_on_key_pad = (on_key_pad_fn)install_hook(&pad_hook, ON_KEY_PAD,
-        pad_guard, (void *)hooked_on_key_pad);
-    original_check_slip_led = (check_slip_led_fn)install_pc_ldr_hook(&slip_led_hook,
-        CHECK_SLIP_LED, slip_led_guard, (void *)hooked_check_slip_led);
-    if (!original_get_stream || !original_on_key_pad || !original_check_slip_led) return 0;
-    stems_loader_running = 1u;
-    if (pthread_create(&stems_loader_thread, 0, stems_loader_loop, 0)) {
-        stems_loader_running = 0u;
-        return 0;
+    for (unsigned int i = 0; i < 2u; i++) {
+        stems_decks[i].selection = 0u;
+        stems_decks[i].transition_cursor = TRANSITION_FRAMES;
     }
-    stems_loader_started = 1;
-    if (!rx3_mix_claim(stems_mix_state) || !rx3_wave_claim(stems_waveform)) return 0;
+    if (!framework->audio->claim_deck_stream(&stems_decks, stems_stream) ||
+        !framework->input->register_pad(&stems_decks, 20u, stems_pad) ||
+        !framework->input->register_lights(&stems_decks, RX3_LIGHTS_SLIP_LOOP, stems_light) ||
+        !framework->loader->claim(&stems_decks)) return 0;
+    if (!framework->provide_mix(stems_mix_state) ||
+        !framework->provide_waveform(stems_waveform)) return 0;
     __atomic_store_n(&stems_callbacks_enabled, 1u, __ATOMIC_SEQ_CST);
-    return 1;
+    return framework->panels->register_row(&stems_row);
 }
 
+/* The core detaches and drains the shared stream, pad and LED hooks before
+   these calls return; the deck drains below cover the waveform readers. */
 static void stems_feature_remove(void)
 {
-    rx3_wave_release(stems_waveform);
-    rx3_mix_release(stems_mix_state);
+    framework->withdraw_waveform(stems_waveform);
+    framework->withdraw_mix(stems_mix_state);
     __atomic_store_n(&stems_callbacks_enabled, 0u, __ATOMIC_SEQ_CST);
-    struct installed_hook *hooks[3] = {&slip_led_hook, &pad_hook, &get_stream_hook};
-    int detached[3];
-    for (unsigned int i = 0; i < 3u; i++)
-        detached[i] = detach_hook(hooks[i]);
-    for (;;) {
-        while (__atomic_load_n(&stems_callbacks_active, __ATOMIC_SEQ_CST) ||
-               __atomic_load_n(&pad_callbacks_active, __ATOMIC_SEQ_CST)) usleep(10000u);
-        usleep(10000u);
-        if (!__atomic_load_n(&stems_callbacks_active, __ATOMIC_SEQ_CST) &&
-            !__atomic_load_n(&pad_callbacks_active, __ATOMIC_SEQ_CST)) break;
-    }
-    __atomic_store_n(&stems_loader_running, 0u, __ATOMIC_SEQ_CST);
-    if (stems_loader_started) {
-        pthread_join(stems_loader_thread, 0);
-        stems_loader_started = 0;
-    }
+    framework->panels->unregister_row(&stems_row);
+    framework->audio->release_deck_stream(&stems_decks);
+    framework->input->unregister_owner(&stems_decks);
+    /* Queued loads are dropped and a running one finishes before this
+       returns; pending requests are released below. */
+    framework->loader->release(&stems_decks);
     for (unsigned int deck = 0; deck < 2u; deck++) {
         stems_release_request(stems_pending_loads[deck]);
         stems_pending_loads[deck] = 0;
@@ -213,17 +182,6 @@ static void stems_feature_remove(void)
 #ifdef RX3_OVERCUE_PROTOTYPE
     rx3_overcue_stop();
 #endif
-    for (unsigned int i = 0; i < 3u; i++) if (detached[i]) {
-        (void)release_hook(hooks[i]);
-    }
-    if (detached[0]) original_check_slip_led = 0;
-    if (detached[1]) original_on_key_pad = 0;
-    if (detached[2]) original_get_stream = 0;
-}
-
-static void stems_feature_destroy_deck(unsigned int deck)
-{
-    for (unsigned int i = 0; i < 3u; i++) release_payload(&stems_decks[deck].payloads[i]);
 }
 
 #endif /* RX3_STEMS_FEATURE_H */

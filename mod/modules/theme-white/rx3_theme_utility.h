@@ -32,9 +32,9 @@ static int utility_theme_set_line(uint32_t *row, uint8_t **lines)
     utility_copy_line(lines[0], (const uint16_t *)(unsigned long)row[0]);
     unsigned int choice = row[4];
     if (choice >= row[2]) {
-        choice = theme_light_active != 0;
+        choice = theme_light_active() != 0;
         row[3] = choice;
-    } else if (choice != (unsigned int)theme_light_active) {
+    } else if (choice != (unsigned int)theme_light_active()) {
         __sync_bool_compare_and_swap(&theme_toggle_pending, 0, 2);
     }
     const uint16_t *const *choices = (const uint16_t *const *)(unsigned long)row[1];
@@ -52,17 +52,26 @@ static void utility_poll_theme_row(void)
     if (choice >= row[2]) return;
     __atomic_store_n(&row[4], 0xffffffffu, __ATOMIC_SEQ_CST);
     row[3] = choice != 0u;
-    if ((choice != 0u) != (theme_light_active != 0))
+    if ((choice != 0u) != (theme_light_active() != 0))
         __sync_bool_compare_and_swap(&theme_toggle_pending, 0, 2);
+}
+
+/* Each literal is restored only while it still points at this module's copy. */
+static int utility_write_literal(unsigned long address, uint32_t expected, uint32_t wanted)
+{
+    if (*(const uint32_t *)address == wanted) return 1;
+    return framework->write_guarded &&
+           framework->write_guarded(address, &expected, &wanted, 4u);
 }
 
 static void utility_remove_theme_row(void)
 {
     if (!utility_theme_table) return;
-    uint32_t rows = 0x005140bcu, count = 0x005140b8u;
-    int failed = write_code(0x0013d9e4, &rows, 4u);
+    uint32_t rows = (uint32_t)(unsigned long)(utility_theme_table + 4u);
+    uint32_t count = (uint32_t)(unsigned long)utility_theme_table;
+    int failed = !utility_write_literal(0x0013d9e4, rows, 0x005140bcu);
     for (unsigned int i = 0; i < 6u; i++)
-        failed |= write_code(utility_count_literals[i], &count, 4u);
+        failed |= !utility_write_literal(utility_count_literals[i], count, 0x005140b8u);
     /* A failed restoration can leave the firmware pointing at this allocation. */
     if (!failed) {
         munmap(utility_theme_table, 0x774u);
@@ -104,9 +113,9 @@ static void utility_install_theme_row(void)
     uint32_t rows = (uint32_t)(unsigned long)(table + 4u);
     uint32_t count = (uint32_t)(unsigned long)table;
     utility_theme_table = table;
-    int failed = write_code(0x0013d9e4, &rows, 4u);
+    int failed = !utility_write_literal(0x0013d9e4, 0x005140bcu, rows);
     for (unsigned int i = 0; !failed && i < 6u; i++)
-        failed = write_code(utility_count_literals[i], &count, 4u);
+        failed = !utility_write_literal(utility_count_literals[i], 0x005140b8u, count);
     if (failed) utility_remove_theme_row();
     else log_line("light theme: DISPLAY MODE installed in Utility");
 }

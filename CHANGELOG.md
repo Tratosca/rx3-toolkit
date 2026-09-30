@@ -11,6 +11,14 @@
 
 - When the mod restarts the player, the USB drive is announced again, so it appears in SOURCE without unplugging it. Not yet run on hardware.
 
+- Complete the core/module separation. Stems, Samples, Logo and Theme are separate compilation units that use the public API only; the core includes no module file and names no feature. New shared services (API 18): input (pad chain by priority, SHIFT, declarative pad lights on one blink clock, pad-mode keys), typed audio stages (deck stream, master bus), image tables with native replacements and light variants, guarded firmware writes, one RAM reservation ledger and one background loader. Behaviour, assets and limits are meant to be unchanged. Host tests only; not yet run in the emulator or on hardware.
+
+- Fix the startup notification crash by drawing notices through the active native header renderer. The previous caution API belongs to an uninitialized UI branch. Tested in the emulator; not yet run on hardware.
+
+- Correct Asshole mode’s native object IDs after the first RX3 test; replace the temporary STATUS round trip on return from KEY/STEMS with a full native-layer refresh and explicit tab selection. Add BROWSE timing/cache counters because the first scroll optimisation remained slow on hardware. Retest pending; see [hardware findings](REFERENCES.md#doc-hardware-feedback-20260929).
+
+- Add optional **Asshole mode**: tap each deck’s eye to hide or restore its track title. Decks are independent; the choice survives track changes and resets at startup. Other deck information and BROWSE remain available. ARM build and host tests cover the implementation; real RX3 validation is pending.
+
 - Reduce BROWSE pauses on local rekordbox USB libraries by reusing artist, duration, BPM and key metadata while the firmware prepares each page. Returning to an unchanged list after a pause no longer triggers a timed reload of every visible track. Sorting and harmonic markers remain active. Tested in the emulator; not yet run on hardware.
 
 - Fix pad-preview asset lookup after the core directory reorganization.

@@ -9,11 +9,16 @@ KEYSHIFT_READY=0
 
 keyshift_prepare()
 {
+
     [ -r "$CORE_OBJECT" ] || {
         say "Key shift disabled: the performance core is not selected"
         return 1
     }
     module_disabled_by_switch keyshift && return 0
+    stage_panel_asset keyshift 00 key-selected || return 1
+    stage_panel_asset keyshift 03 none-selected || return 1
+    stage_panel_asset keyshift 07 single-key-none || return 1
+    stage_panel_asset keyshift 08 single-key-selected || return 1
     KEYSHIFT_SYNC_ENABLED=0
     case " $LOADED_MODULES " in *" key-sync "*) KEYSHIFT_SYNC_ENABLED=1 ;; esac
     if module_disabled_by_switch key-sync; then KEYSHIFT_SYNC_ENABLED=0; fi

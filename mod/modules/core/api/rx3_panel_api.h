@@ -71,6 +71,10 @@ struct rx3_pad_row {
     /* Optional per-part semantic RGB565 accent, independent of selection.
        Zero means no semantic colour (unknown value or unavailable choice). */
     uint16_t (*part_colour)(unsigned int deck, unsigned int widget, unsigned int part);
+    /* Optional, on the input or render thread: 1 when this row becomes the
+       visible panel, 0 whenever the core leaves or bypasses it. Calls with
+       0 can repeat. Panel 3 replaces the native STATUS tab. */
+    void (*activate)(unsigned int active);
 };
 
 
@@ -82,6 +86,8 @@ struct rx3_panel_service {
     int (*register_row)(const struct rx3_pad_row *);
     void (*unregister_row)(const struct rx3_pad_row *);
     int (*open)(unsigned int panel_id);
+    /* Render thread only: repaint the performance row and tabs now. */
+    void (*refresh)(void);
 };
 extern const struct rx3_panel_service rx3_panels;
 #endif

@@ -1,0 +1,35 @@
+{
+  "id": "asshole-mode",
+  "name": {
+    "en": "Asshole mode",
+    "fr": "Mode trou du cul"
+  },
+  "description": {
+    "en": "Hide the song currently playing by tapping the eye next to each deck title. Please don't be a gatekeeper, sharing is caring - that's why this project is open source !",
+    "fr": "Masquez la chanson en cours de lecture en appuyant sur l’œil à côté du titre de chaque deck. Ne soyez pas ce type de DJ ; le partage c'est important - pour rappel, ce projet est open source !"
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 57,
+  "category": "screen",
+  "runtime_directory": "asshole-mode",
+  "namespace": "asshole_mode",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_asshole_module.c",
+    "rx3_asshole_artwork.h"
+  ]
+}

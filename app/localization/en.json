@@ -43,7 +43,7 @@
   },
   "modules.title": "Choose modules",
   "modules.lede": "Choose the functions to add to your XDJ-RX3, then open Install the mod.",
-  "modules.performanceTradeoff": "On the player, Key Shift and Stems replace the ZOOM and GRID touch controls. Enabling either module makes both native controls unavailable. STATUS remains available without Samples.",
+  "modules.performanceTradeoff": "On the player, Key Shift and Stems replace the ZOOM and GRID touch controls. Enabling either module makes both native controls unavailable.",
   "modules.advanced": "Components and technical settings",
   "modules.firmware": "Compatible XDJ-RX3 versions",
   "modules.needs": "Requires the {names} module",

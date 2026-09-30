@@ -66,6 +66,7 @@ samples_repoint_live_link()
 
 samples_prepare()
 {
+
     [ -r "$CORE_OBJECT" ] || {
         say "Sample pads disabled: the performance core is not selected"
         return 1
@@ -74,6 +75,9 @@ samples_prepare()
         samples_disable || say "Sample pads: disabled link could not be staged"
     fi
     module_disabled_by_switch samples && return 0
+    stage_panel_asset samples 04 samples-selected || return 1
+    stage_panel_asset samples 05 samples-none-selected || return 1
+    stage_panel_asset samples 06 samples-beatfx-selected || return 1
 
     # A drive with no banks on it is the ordinary case, not a failure. A
     # prepare hook that returns non-zero stops the whole session and no

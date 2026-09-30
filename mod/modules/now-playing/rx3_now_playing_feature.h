@@ -29,6 +29,7 @@ static now_playing_mixer_fn  original_now_playing_mixer;
 
 static struct now_playing_deck now_playing_decks[2];
 static volatile unsigned int now_playing_pending;
+static unsigned int now_playing_callbacks;
 static volatile int now_playing_running;
 static int now_playing_wake[2] = {-1, -1};
 static int now_playing_socket = -1;
@@ -64,16 +65,19 @@ static unsigned int now_playing_mask(void *player)
 
 static void hooked_now_playing_status(void *player, int force)
 {
+    __atomic_add_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
     original_now_playing_status(player, force);
     now_playing_signal(now_playing_mask(player));
+    __atomic_sub_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
 }
 
 static int hooked_now_playing_load(void *player, const void *music)
 {
+    __atomic_add_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
     int result = original_now_playing_load(player, music);
     int index = now_playing_index(player);
     if (!result || index < 0 || !music)
-        return result;
+        goto done;
     struct now_playing_deck *deck = &now_playing_decks[index];
     (void)__sync_add_and_fetch(&deck->revision, 1u);
     memcpy(&deck->track_id, (const uint8_t *)music + NOW_PLAYING_MUSIC_ID,
@@ -88,6 +92,8 @@ static int hooked_now_playing_load(void *player, const void *music)
     __sync_synchronize();
     (void)__sync_add_and_fetch(&deck->revision, 1u);
     now_playing_signal(1u << (unsigned int)index);
+done:
+    __atomic_sub_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
     return result;
 }
 
@@ -96,11 +102,12 @@ static int hooked_now_playing_load(void *player, const void *music)
 static void hooked_now_playing_unload(void *player, int result, unsigned int device,
                                       unsigned int number)
 {
+    __atomic_add_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
     original_now_playing_unload(player, result, device, number);
     int index = now_playing_index(player);
     if (index < 0 ||
         ((now_playing_current_track_fn)NOW_PLAYING_CURRENT_TRACK)(player, 0))
-        return;
+        goto done;
     struct now_playing_deck *deck = &now_playing_decks[index];
     int changed = deck->loaded || deck->track_id || deck->title[0];
     (void)__sync_add_and_fetch(&deck->revision, 1u);
@@ -111,16 +118,20 @@ static void hooked_now_playing_unload(void *player, int result, unsigned int dev
     (void)__sync_add_and_fetch(&deck->revision, 1u);
     if (changed)
         now_playing_signal(1u << (unsigned int)index);
+done:
+    __atomic_sub_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
 }
 
 static void hooked_now_playing_mixer(void *mixer)
 {
+    __atomic_add_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
     uint8_t a = *((const uint8_t *)mixer + NOW_PLAYING_MIXER_ON_AIR_A);
     uint8_t b = *((const uint8_t *)mixer + NOW_PLAYING_MIXER_ON_AIR_B);
     original_now_playing_mixer(mixer);
     if (a != *((const uint8_t *)mixer + NOW_PLAYING_MIXER_ON_AIR_A) ||
         b != *((const uint8_t *)mixer + NOW_PLAYING_MIXER_ON_AIR_B))
         now_playing_signal(3u);
+    __atomic_sub_fetch(&now_playing_callbacks, 1u, __ATOMIC_SEQ_CST);
 }
 
 /* The datagram ----------------------------------------------------------------- */
@@ -332,13 +343,19 @@ static void now_playing_feature_remove(void)
         pthread_join(now_playing_thread, 0);
         now_playing_thread_started = 0;
     }
-    if (framework->uninstall_hook(&now_playing_mixer_hook))
+    int detached = framework->detach_hook(&now_playing_mixer_hook);
+    detached = framework->detach_hook(&now_playing_unload_hook) && detached;
+    detached = framework->detach_hook(&now_playing_load_hook) && detached;
+    detached = framework->detach_hook(&now_playing_status_hook) && detached;
+    if (!detached) return; /* Live hooks still own their wake descriptors. */
+    while (__atomic_load_n(&now_playing_callbacks, __ATOMIC_SEQ_CST)) usleep(1000u);
+    if (framework->release_hook(&now_playing_mixer_hook))
         original_now_playing_mixer = 0;
-    if (framework->uninstall_hook(&now_playing_unload_hook))
+    if (framework->release_hook(&now_playing_unload_hook))
         original_now_playing_unload = 0;
-    if (framework->uninstall_hook(&now_playing_load_hook))
+    if (framework->release_hook(&now_playing_load_hook))
         original_now_playing_load = 0;
-    if (framework->uninstall_hook(&now_playing_status_hook))
+    if (framework->release_hook(&now_playing_status_hook))
         original_now_playing_status = 0;
     for (unsigned int i = 0; i < 2u; i++) {
         if (now_playing_wake[i] >= 0)

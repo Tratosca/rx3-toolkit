@@ -4,11 +4,15 @@ from pathlib import Path
 from struct import pack
 from PIL import Image
 
-ASSETS = Path(__file__).resolve().parents[1] / "mod/modules/core/assets"
+MODULES = Path(__file__).resolve().parents[1] / "mod/modules"
+
+def assets(name):
+    owner = "stems" if "stems" in name else "keyshift"
+    return MODULES / owner / "assets"
 
 
 def read(name):
-    return Image.frombytes("RGB", (180, 50), (ASSETS / name).read_bytes(),
+    return Image.frombytes("RGB", (180, 50), (assets(name) / name).read_bytes(),
                            "raw", "BGR;16")
 
 
@@ -16,7 +20,7 @@ def write(name, image):
     pixels = bytearray()
     for red, green, blue in image.get_flattened_data():
         pixels += pack("<H", (red >> 3) << 11 | (green >> 2) << 5 | (blue >> 3))
-    (ASSETS / name).write_bytes(pixels)
+    (assets(name) / name).write_bytes(pixels)
 
 
 for light in (False, True):
