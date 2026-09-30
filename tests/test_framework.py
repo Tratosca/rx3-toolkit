@@ -37,6 +37,9 @@ class FrameworkTests(unittest.TestCase):
 #include <pthread.h>
 #include <unistd.h>
 extern int gettimeofday(void *, void *);
+extern int usleep(unsigned int);
+extern int setenv(const char *, const char *, int);
+extern int unsetenv(const char *);
 ''')
             source = directory / 'test.c'
             if 'core/runtime/rx3_modules.c' in units:

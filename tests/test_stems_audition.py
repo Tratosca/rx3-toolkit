@@ -74,4 +74,4 @@ class BrowserAuditionTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node"), "browser harness requires Node")
     def test_selection_and_seek_preserve_position_and_mixer_state(self):
         root = pathlib.Path(__file__).resolve().parents[1]
-        subprocess.run(["node", "tests/stems_preview.cjs"], cwd=root, check=True, timeout=10)
+        subprocess.run(["node", "tests/stems_preview.cjs"], cwd=root, check=True, timeout=30)

@@ -29,11 +29,12 @@ BUILD = REPOSITORY / "build"
 HOOKS = ("librx3_core.so",)
 
 # memmove is exported by the player libc as GLIBC_2.4. Clang can introduce it
-# when copying a variable-length native label.
+# when copying a variable-length native label. The firmware's libgcc_s.so.1
+# exports all three unsigned division helpers below as GCC_3.5 symbols.
 # Everything rbp itself is known to export. A new name here is a deliberate
 # decision -- confirm rbp really provides it before adding one.
 ALLOWED = {
-    "__aeabi_uidiv", "__aeabi_uldivmod",
+    "__aeabi_uidiv", "__aeabi_uidivmod", "__aeabi_uldivmod",
     "close", "getenv", "gettimeofday", "lseek",
     "memcmp", "memcpy", "memmove", "memset",
     "mmap", "mprotect", "munmap", "open",
