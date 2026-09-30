@@ -344,7 +344,7 @@ static void rx3_keyshift_install(void)
 {
     original_timestretch_manager = (timestretch_manager_fn)install_hook(
         &timestretch_manager_hook, TIMESTRETCH_MANAGER,
-        timestretch_manager_guard, (void *)hooked_timestretch_manager);
+        timestretch_manager_guard, (void *)hooked_timestretch_manager, (void **)&original_timestretch_manager);
     if (original_timestretch_manager)
         __atomic_store_n(&keyshift_callbacks_enabled, 1u, __ATOMIC_SEQ_CST);
 }

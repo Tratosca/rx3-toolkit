@@ -17,6 +17,46 @@ MODULES = ROOT / 'mod/modules'
 class AuditRegressions(unittest.TestCase):
     run_units = harness.FrameworkTests.run_units
 
+    def test_original_is_published_before_the_detour_goes_live(self):
+        # The replacement calls through its original pointer; a thread reaching
+        # the detour before that pointer is set would jump to zero.
+        patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
+        writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
+        self.run_units(r'''
+#include "core/services/rx3_hooks.h"
+#include "core/firmware/rx3_patch.h"
+static uint32_t arena[1024];
+static void *original,*seen_at_patch;
+static unsigned fail_code;
+void *mmap(void *a,size_t n,int p,int f,int d,off_t o) {
+ (void)a;(void)n;(void)p;(void)f;(void)d;(void)o;return arena;
+}
+int munmap(void *p,size_t n){(void)p;(void)n;return 0;}
+int mprotect(void *p,size_t n,int f){
+ (void)n;(void)f;
+ if(p==(void *)arena)return 0;            /* the trampoline page */
+ if(!seen_at_patch)seen_at_patch=original; /* first touch of the player's code */
+ return fail_code?-1:0;
+}
+void clear_instruction_cache(unsigned long a,unsigned long b){assert(b>a);}
+''' + writer + r'''
+int main(void){
+ for(unsigned pc=0;pc<2;pc++) {
+  uint32_t code[4]={0xe59f3000,0xe92d4010,0x12345678,0};uint8_t guard[8];memcpy(guard,code,8);
+  struct installed_hook hook={0};original=seen_at_patch=0;fail_code=0;
+  void *returned=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234,&original):
+                    install_hook(&hook,(unsigned long)code,guard,(void *)1234,&original);
+  assert(returned && original==returned && seen_at_patch==returned);
+  assert(uninstall_hook(&hook));
+  struct installed_hook failed={0};original=seen_at_patch=0;fail_code=1;
+  returned=pc?install_pc_ldr_hook(&failed,(unsigned long)code,guard,(void *)1234,&original):
+              install_hook(&failed,(unsigned long)code,guard,(void *)1234,&original);
+  assert(!returned && !original && !memcmp(code,guard,8));
+ }
+ return 0;
+}
+''', ['core/services/rx3_hooks.c'], ['-Dmmap=audit_map', '-Dmunmap=audit_unmap', '-Dmprotect=audit_protect'])
+
     def test_patch_failure_restores_bytes_before_trampoline_release(self):
         patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
         writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
@@ -41,14 +81,14 @@ int main(void){
   uint32_t code[4]={0xe59f3000,0xe92d4010,0x12345678,0};
   uint8_t guard[8];memcpy(guard,code,8);struct installed_hook hook={0};
   protects=freed=0;fail_at=failure;fail_twice=failure==3;
-  void *original=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234):
-                    install_hook(&hook,(unsigned long)code,guard,(void *)1234);
+  void *original=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234,0):
+                    install_hook(&hook,(unsigned long)code,guard,(void *)1234,0);
   assert(!original && !hook_is_installed(&hook));
   assert(!memcmp(code,guard,8) && freed==1);
  }
  uint32_t code[4]={1,2,3,4};uint8_t guard[8];memcpy(guard,code,8);
  struct installed_hook hook={0};protects=freed=fail_at=fail_twice=0;
- assert(install_hook(&hook,(unsigned long)code,guard,(void *)1234));
+ assert(install_hook(&hook,(unsigned long)code,guard,(void *)1234,0));
  fail_at=protects+2; /* RX restoration on detach */
  assert(!detach_hook(&hook) && hook_is_installed(&hook) && !freed);
  assert(code[0]==0xe51ff004 && code[1]==1234);

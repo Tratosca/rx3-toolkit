@@ -12,13 +12,15 @@ static void *replacement[8];
 static unsigned long address_of[8];
 static unsigned installed, detached, released, refuse_address, refuse_detach;
 static void *original_for(unsigned long address);
-static void *fake_install(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) {
+static void *fake_install(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r,void **o) {
     (void)h; assert(g);
     if (a == refuse_address) return 0;
-    replacement[installed] = r; address_of[installed++] = a; return original_for(a);
+    replacement[installed] = r; address_of[installed++] = a;
+    if (o) *o = original_for(a); /* published before the detour, like the service */
+    return original_for(a);
 }
-void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { return fake_install(h, a, g, r); }
-void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { return fake_install(h, a, g, r); }
+void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r,void **o) { return fake_install(h, a, g, r, o); }
+void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r,void **o) { return fake_install(h, a, g, r, o); }
 int detach_hook(struct installed_hook *h) { (void)h; detached++; return !refuse_detach; }
 int release_hook(struct installed_hook *h) { (void)h; released++; return 1; }
 int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }

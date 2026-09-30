@@ -232,7 +232,7 @@ static int claim_variants(const void *owner, const struct rx3_image_policy *want
     if (!owner || !wanted || policy_owner) return 0;
     if (!original_fill) {
         original_fill = (hw_fill_rect_fn)install_hook(&fill_hook, HW_FILL_RECT,
-                                                      hw_fill_rect_guard, (void *)fill_hooked);
+                                                      hw_fill_rect_guard, (void *)fill_hooked, (void **)&original_fill);
         if (!original_fill) return 0;
     }
     policy_owner = owner;

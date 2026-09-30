@@ -134,7 +134,7 @@ static unsigned rx3_panel_count(void){return !!(selection&(2|4|16|64));}
 static void rx3_modules_stop(void){stops++;}
 static void uninstall_performance_hooks(void){cleanup++;}
 static void publish_ready(void){ready=1;}
-static void *install_hook(void *h,unsigned long a,const void *g,void *r){
+static void *install_hook(void *h,unsigned long a,const void *g,void *r,void **o){(void)o;
     (void)h;(void)a;(void)g;(void)r;hook_calls++;return hook_calls==reject_hook?0:(void *)1;
 }
 #define pthread_create(a,b,c,d) (0)

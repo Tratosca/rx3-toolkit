@@ -595,12 +595,12 @@ static int ensure(void)
     for(unsigned i=0;i<sizeof(guards)/sizeof(*guards);i++)
         if(memcmp((const void *)(unsigned long)guards[i].address,&guards[i].a,8))return 0;
     static const uint8_t guard[8]={0xf0,0x4f,0x2d,0xe9,0x2c,0xd0,0x4d,0xe2};
-    original_rows=(void *)install_hook(&row_hook,ROW_HOOK,guard,(void *)rows);
+    original_rows=(void *)install_hook(&row_hook,ROW_HOOK,guard,(void *)rows, (void **)&original_rows);
     if(!original_rows)return 0;
     static const uint32_t page_guard[2]={0xe92d4ff0u,0xe24dd064u};
     static const uint32_t record_guard[2]={0xe92d4ff0u,0xe24dd014u};
-    original_local_page=(void *)install_hook(&local_page_hook,0x20805cu,(const uint8_t *)page_guard,(void *)local_page_rows);
-    if(original_local_page)original_local_record=(void *)install_hook(&local_record_hook,0x207dd0u,(const uint8_t *)record_guard,(void *)local_record);
+    original_local_page=(void *)install_hook(&local_page_hook,0x20805cu,(const uint8_t *)page_guard,(void *)local_page_rows, (void **)&original_local_page);
+    if(original_local_page)original_local_record=(void *)install_hook(&local_record_hook,0x207dd0u,(const uint8_t *)record_guard,(void *)local_record, (void **)&original_local_record);
     /* A failed optional optimization keeps the existing metadata path. */
     return 1;
 }
@@ -625,8 +625,8 @@ static void remove_load_hooks(void)
 static int install_load_hooks(void)
 {
     static const uint8_t guard[8]={0x10,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
-    original_load[0]=(void *)install_hook(&load_hooks[0],0x11d9b0u,guard,(void *)list_load1);
-    if(original_load[0])original_load[1]=(void *)install_hook(&load_hooks[1],0x11d83cu,guard,(void *)list_load2);
+    original_load[0]=(void *)install_hook(&load_hooks[0],0x11d9b0u,guard,(void *)list_load1, (void **)&original_load[0]);
+    if(original_load[0])original_load[1]=(void *)install_hook(&load_hooks[1],0x11d83cu,guard,(void *)list_load2, (void **)&original_load[1]);
     if(original_load[0] && original_load[1])return 1;
     remove_load_hooks();return 0;
 }
@@ -753,12 +753,12 @@ static int install_sort_hooks(void)
         if(memcmp((void *)(unsigned long)guards[i].address,&guards[i].a,8))return 0;
     static const uint8_t req_guard[]={0x38,0x40,0x2d,0xe9,0x01,0x50,0xa0,0xe1};
     static const uint8_t sel_guard[]={0xf0,0x4f,0x2d,0xe9,0xc8,0x8f,0x06,0xe3};
-    original_sort_select=(void *)install_hook(&sort_hooks[1],0x2596ccu,sel_guard,(void *)sort_select);
-    if(original_sort_select)original_sort_validate=(void *)install_hook(&sort_hooks[0],0x104edcu,req_guard,(void *)sort_validate);
+    original_sort_select=(void *)install_hook(&sort_hooks[1],0x2596ccu,sel_guard,(void *)sort_select, (void **)&original_sort_select);
+    if(original_sort_select)original_sort_validate=(void *)install_hook(&sort_hooks[0],0x104edcu,req_guard,(void *)sort_validate, (void **)&original_sort_validate);
     static const uint8_t key_guard[]={0x01,0x10,0x41,0xe2,0x30,0x40,0x2d,0xe9};
-    if(original_sort_validate)original_sort_keys=(void *)install_hook(&sort_hooks[2],0x171780u,key_guard,(void *)sort_keys);
+    if(original_sort_validate)original_sort_keys=(void *)install_hook(&sort_hooks[2],0x171780u,key_guard,(void *)sort_keys, (void **)&original_sort_keys);
     static const uint8_t dispatch_guard[]={0xf0,0x40,0x2d,0xe9,0x01,0x50,0xa0,0xe1};
-    if(original_sort_keys)original_sort_dispatch=(void *)install_hook(&sort_hooks[3],0x153530u,dispatch_guard,(void *)sort_dispatch);
+    if(original_sort_keys)original_sort_dispatch=(void *)install_hook(&sort_hooks[3],0x153530u,dispatch_guard,(void *)sort_dispatch, (void **)&original_sort_dispatch);
     if(original_sort_validate && original_sort_select && original_sort_keys && original_sort_dispatch)return 1;
     remove_sort_hooks();return 0;
 }
@@ -940,9 +940,9 @@ static int install_scroll_hooks(void)
     static const uint8_t prep[]={0x80,0x30,0x80,0xe0,0xb0,0x22,0x9f,0xe5};
     static const uint8_t start[]={0xf0,0x4f,0x2d,0xe9,0x74,0xa0,0xa0,0xe3};
     static const uint8_t run[]={0xf0,0x4f,0x2d,0xe9,0x74,0x40,0xa0,0xe3};
-    original_scroll_prepare=(void *)install_hook(&scroll_hooks[0],0x2995c8u,prep,(void *)scroll_prepare);
-    if(original_scroll_prepare)original_scroll_start=(void *)install_hook(&scroll_hooks[1],0x2955d8u,start,(void *)scroll_start);
-    if(original_scroll_start)original_scroll_run=(void *)install_hook(&scroll_hooks[2],0x29992cu,run,(void *)scroll_run);
+    original_scroll_prepare=(void *)install_hook(&scroll_hooks[0],0x2995c8u,prep,(void *)scroll_prepare, (void **)&original_scroll_prepare);
+    if(original_scroll_prepare)original_scroll_start=(void *)install_hook(&scroll_hooks[1],0x2955d8u,start,(void *)scroll_start, (void **)&original_scroll_start);
+    if(original_scroll_start)original_scroll_run=(void *)install_hook(&scroll_hooks[2],0x29992cu,run,(void *)scroll_run, (void **)&original_scroll_run);
     if(original_scroll_run)return 1;
     remove_scroll_hooks();return 0;
 }

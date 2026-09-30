@@ -335,7 +335,7 @@ static int theme_feature_install(void)
     }
     original_theme_render_pass = (void (*)(void *))install_hook(
         &theme_render_pass_hook, THEME_RENDER_PASS, theme_render_pass_guard,
-        hooked_theme_render_pass);
+        hooked_theme_render_pass, (void **)&original_theme_render_pass);
     if (!original_theme_render_pass)
         return 0;
     theme_render_pass_installed = 1;

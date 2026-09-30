@@ -103,8 +103,8 @@ static int shown;
 static int native_icon(unsigned c,int selected,int side){(void)selected;return side?228:(c==52?227:225);}
 static int native_show(void *w,int object,int im){(void)w;(void)object;shown=im;return 1;}
 static void native_set(unsigned side,unsigned row){(void)row;assert(icon(draw_category,0,side)==227);show_icon(0,0,draw_image);}
-static void *install(struct installed_hook *h,unsigned long addr,const uint8_t g[8],void *r){
-    (void)h;(void)g;assert(r);installs++;
+static void *install(struct installed_hook *h,unsigned long addr,const uint8_t g[8],void *r,void **o){
+    (void)h;(void)g;(void)o;assert(r);installs++;
     if(installs==fail_install)return 0;
     if(addr==SET_ICON)return (void *)native_set;
     if(addr==SHOW_ICON)return (void *)native_show;
