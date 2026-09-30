@@ -21,7 +21,8 @@ from app.stems.provisioning import Acceleration, Runtime, resolve_acceleration
 from app.stems.rekordbox import Collection, Playlist, Track, export_stem
 from app.stems.engine import AudioSeparatorEngine, configuration, PREFIX, model_identity, runtime_identity, OutputError
 from app.stems.separation import Settings, input_normalization
-from app.stems.stem import PREPARED_ROLES, ROLE_ORDER, ROLE_SUFFIXES, count_frames, write_stem
+from app.stems.stem import (PREPARED_ROLES, ROLE_ORDER, ROLE_SUFFIXES, count_frames, decode_for_separation,
+                             separator_grid_differs, write_stem)
 
 
 MANIFEST_NAME = "rx3-stems-manifest.json"
@@ -284,7 +285,35 @@ class StemJob:
             return
         self._notice(Message("stems.cpuFallback", accelerator=Message("accelerator." + self.acceleration.key)))
 
+    def _current_processing(self, processing, source: pathlib.Path) -> bool:
+        """Whether stems recorded with `processing` are what this run would make.
+
+        Stems made before the separator read the deck's decode are kept, except
+        for the sources its own decoder trimmed differently: those came out early.
+        """
+        if processing == self._signature:
+            return True
+        return (processing == cache.legacy_signature(self._signature)
+                and not separator_grid_differs(source))
+
     def _separate(
+        self, source: pathlib.Path, workspace: pathlib.Path, index: int, total: int, *, progress=None
+    ) -> dict[str, pathlib.Path]:
+        """Separate the deck's own decode of `source`.
+
+        `_untrimmed_input` records whether the stems are on the deck's grid,
+        which is the case whenever ffmpeg could write that decode.
+        """
+        if self.runtime.separator is None:
+            raise LocalizedError("stems.engineMissing")
+        with tempfile.TemporaryDirectory(prefix="rx3-separate-") as scratch:
+            decoded = pathlib.Path(scratch) / "source.wav"
+            self._untrimmed_input = decode_for_separation(source, decoded, self.runtime.ffmpeg or "ffmpeg")
+            self._checkpoint()
+            return self._run_separator(decoded if self._untrimmed_input else source, workspace, index, total,
+                                       progress=progress)
+
+    def _run_separator(
         self, source: pathlib.Path, workspace: pathlib.Path, index: int, total: int, *, progress=None
     ) -> dict[str, pathlib.Path]:
         if self.runtime.separator is None:
@@ -350,11 +379,12 @@ class StemJob:
             self._started = time.monotonic()
         self._check_limits(track, track.location)
         try:
+            self._untrimmed_input = False
             separated = self._separate(track.location, workspace, index, total, progress=progress)
             self._checkpoint()
             output = workspace / "migration.rx3drums"
             write_stem(separated["drums"], output, ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16_gain",
-                       match_full=track.location,
+                       match_full=track.location, untrimmed_input=self._untrimmed_input,
                        separator_normalization=input_normalization(self.settings, self.architecture))
             self._checkpoint()
             return output
@@ -413,7 +443,8 @@ class StemJob:
                 return self._result(track, {role: targets["vocals"] for role in self.roles},
                                     status, before, metadata, preserve_processing=True)
         known = previous is not None and previous.get("source_sha256") is not None
-        matching = not self.upgrade_existing and known and previous.get("source_sha256") == before[2] and previous.get("processing") == self._signature
+        matching = (not self.upgrade_existing and known and previous.get("source_sha256") == before[2] and
+                    self._current_processing(previous.get("processing"), source))
         verified = cache.verified_files(output, previous, self.roles) if matching else None
         current_waveform = (verified and package.is_package(targets["vocals"]) and
                             (not self.waveforms or wave_settings.supports(package.read(targets["vocals"])["waveform"])))
@@ -460,6 +491,7 @@ class StemJob:
             else:
                 status = "created"
                 self._update(stage=Message("stems.separating"), track_progress=1)
+                self._untrimmed_input = False
                 separated = self._separate(source, workspace, index, total)
                 if self._identity_loaded and any(v is None for v in self._signature["model_assets"].values()):
                     self._signature["model_assets"] = model_identity(self.runtime, self.settings)
@@ -470,7 +502,8 @@ class StemJob:
                     local = workspace / targets[role].name
                     encoded = write_stem(separated[role], local,
                                          ffmpeg=self.runtime.ffmpeg or "ffmpeg", sample_format="s16_gain",
-                                         match_full=source, separator_normalization=input_normalization(self.settings, self.architecture))
+                                         match_full=source, untrimmed_input=self._untrimmed_input,
+                                         separator_normalization=input_normalization(self.settings, self.architecture))
                     prepared[role] = local
                     # The decoded length is exact from here on; the waveforms
                     # still to compute are not spent on a refused package.

@@ -127,6 +127,66 @@ def count_frames(source: pathlib.Path, ffmpeg: pathlib.Path | str = "ffmpeg",
     return total // 8
 
 
+def decode_for_separation(source: pathlib.Path, destination: pathlib.Path,
+                          ffmpeg: pathlib.Path | str = "ffmpeg") -> bool:
+    """Write `source` as the deck's decoder emits it, for the separator to read.
+
+    The separator decodes compressed audio with its own library, which may drop
+    an encoder delay the deck plays: an MP3 whose LAME extension is signed
+    "Lame" loses 1105 frames there and none on the deck or in ffmpeg, leaving the
+    stem 25 ms early. Handing it the untrimmed decode as float WAV puts it on
+    the deck's grid, and float keeps the overshoot its normalization measures.
+    Returns False when ffmpeg cannot write it; the source is then separated as
+    before.
+    """
+    try:
+        _decode(ffmpeg, [*UNTRIMMED, "-i", str(source), "-map", "0:a:0", "-vn",
+                         "-af", f"aresample={SAMPLE_RATE}", "-ar", str(SAMPLE_RATE),
+                         "-ac", str(CHANNELS), "-c:a", "pcm_f32le", str(destination)])
+    except RuntimeError:
+        destination.unlink(missing_ok=True)
+        return False
+    return destination.is_file() and destination.stat().st_size > 0
+
+
+# ffmpeg trusts a LAME extension only under these encoder signatures; libmpg123,
+# which the separator's audio library uses, reads the delay whatever the name.
+FFMPEG_LAME_SIGNATURES = (b"LAME", b"Lavf", b"Lavc")
+
+
+def separator_grid_differs(source: pathlib.Path) -> bool:
+    """Whether a stem made from `source` before untrimmed separator input is early.
+
+    True for an MP3 whose Xing/Info frame carries a LAME extension with a delay
+    under a signature ffmpeg ignores: the separator dropped that delay, the
+    stem's alignment did not add it back, and the deck plays it.
+    """
+    try:
+        with source.open("rb") as handle:
+            head = handle.read(1 << 20)
+    except OSError:
+        return False
+    position = 0
+    if head[:3] == b"ID3" and len(head) >= 10:
+        position = 10 + ((head[6] & 127) << 21 | (head[7] & 127) << 14 |
+                         (head[8] & 127) << 7 | (head[9] & 127))
+    frame = head[position:position + 4]
+    if len(frame) < 4 or frame[0] != 0xFF or frame[1] & 0xE0 != 0xE0:
+        return False
+    mpeg1, mono = frame[1] & 0x18 == 0x18, frame[3] >> 6 == 3
+    side = (17 if mono else 32) if mpeg1 else (9 if mono else 17)
+    tag = position + 4 + side
+    if head[tag:tag + 4] not in (b"Xing", b"Info") or len(head) < tag + 8:
+        return False
+    flags = int.from_bytes(head[tag + 4:tag + 8], "big")
+    extension = tag + 8 + 4 * bool(flags & 1) + 4 * bool(flags & 2) + 100 * bool(flags & 4) + 4 * bool(flags & 8)
+    lame = head[extension:extension + 24]
+    if len(lame) < 24 or lame[:4] in FFMPEG_LAME_SIGNATURES:
+        return False
+    delay = lame[21] << 4 | lame[22] >> 4
+    return lame[:1].isalpha() and delay > 0
+
+
 def _peak_amplitude(report: str) -> float | None:
     """The largest sample magnitude `astats` saw, or None when it said nothing.
 
@@ -185,6 +245,7 @@ def write_stem(
     sample_format: str = "s16",
     match_full: pathlib.Path | None = None,
     separator_normalization: float | None = None,
+    untrimmed_input: bool = False,
 ) -> StemResult:
     """Convert `vocals` to the RX3 audio domain and write the stem container.
 
@@ -199,6 +260,9 @@ def write_stem(
     untouched source; undoing the factor here keeps the two in one gain domain.
     Measuring rather than assuming covers the sources that decode above full
     scale, which are exactly the ones the separator rescales.
+
+    `untrimmed_input` says the separator read `decode_for_separation`'s output,
+    so its stem is already on the deck's grid and no delay is put back.
     """
     if sample_format not in FORMATS:
         raise ValueError(f"Unsupported sample format: {sample_format}")
@@ -228,29 +292,33 @@ def write_stem(
                     raise ValueError("full track decodes to empty or unaligned stereo PCM")
                 return raw_path, report
 
-            # The separator's grid, which its stem comes back on, and the deck's
-            # grid, which the stem is indexed against.
-            trimmed_raw, trimmed_report = decode_full("trimmed.s16le", untrimmed=False)
-            offset: int | None = None
-            try:
-                untrimmed_raw, untrimmed_report = decode_full("full.s16le", untrimmed=True)
-            except (RuntimeError, ValueError):
-                # An ffmpeg too old to know the flag, rather than a broken file:
-                # the same decode already succeeded without it.
-                untrimmed_raw = None
+            if untrimmed_input:
+                full_raw, measured = decode_full("full.s16le", untrimmed=True)
             else:
-                offset = _encoder_delay(trimmed_raw, untrimmed_raw)
-            if offset is None:
-                # Staying on the separator's grid is what every release before
-                # this did, and it is right for a source declaring no padding.
-                aligned = False
-                full_raw, measured = trimmed_raw, trimmed_report
-                if untrimmed_raw is not None:
-                    untrimmed_raw.unlink()
-            else:
-                delay = offset
-                full_raw, measured = untrimmed_raw, untrimmed_report
-                trimmed_raw.unlink()
+                # The separator's grid, which its stem comes back on, and the
+                # deck's grid, which the stem is indexed against.
+                trimmed_raw, trimmed_report = decode_full("trimmed.s16le", untrimmed=False)
+                offset: int | None = None
+                try:
+                    untrimmed_raw, untrimmed_report = decode_full("full.s16le", untrimmed=True)
+                except (RuntimeError, ValueError):
+                    # An ffmpeg too old to know the flag, rather than a broken
+                    # file: the same decode already succeeded without it.
+                    untrimmed_raw = None
+                else:
+                    offset = _encoder_delay(trimmed_raw, untrimmed_raw)
+                if offset is None:
+                    # Staying on the separator's grid is what every release
+                    # before this did, and it is right for a source declaring
+                    # no padding.
+                    aligned = False
+                    full_raw, measured = trimmed_raw, trimmed_report
+                    if untrimmed_raw is not None:
+                        untrimmed_raw.unlink()
+                else:
+                    delay = offset
+                    full_raw, measured = untrimmed_raw, untrimmed_report
+                    trimmed_raw.unlink()
             target_frames = full_raw.stat().st_size // 4
 
             peak = _peak_amplitude(measured)

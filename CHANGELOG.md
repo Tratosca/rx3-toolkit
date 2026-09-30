@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Removing the vocals no longer leaves a doubled voice on MP3 files whose encoder info the separator and the deck read differently ([#25](https://github.com/Tratosca/rx3-toolkit/issues/25)): the separator now hears the track exactly as the deck plays it. Stems already prepared for those files are made again on the next run; every other stem is kept. Checked on the reported file (25 ms early before, aligned after); not yet run on hardware.
+
 - The mod now hands each hook its way back to the player before the hook goes live, so a player thread can never reach a half-installed hook (from Evan Purkhiser's [#35](https://github.com/Tratosca/rx3-toolkit/pull/35)); it also loads only inside the player itself, and a build refuses a hook that would silently fail to load. Checked in the emulator; not yet run on hardware.
 
 - The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.
