@@ -13,6 +13,7 @@ repository = pathlib.Path(SPECPATH).parent
 # environment on first launch, so it contributes only its notices.
 resources = [
     (str(repository / "app/stems/data/overcue-44100-96000.f32"), "stems"),
+    (str(repository / "app/stems/data/mac-intel-requirements.txt"), "stems"),
     (str(repository / "app/stems/worker.py"), "."),
     (str(repository / "app/stems/wave_worker.py"), "."),
     (str(repository / "app/stems/wave_memory.py"), "."),
