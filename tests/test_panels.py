@@ -116,7 +116,8 @@ static unsigned int keyshift_sync_range=1;
 static unsigned int keyshift_sync_harmonic;
 static unsigned int keyshift_match_rules;
 static int rx3_keyshift_semitones(unsigned d) { return shifts[d]; }
-""" + transitions.function(panel, "keyshift_base_key") + transitions.function(panel, "keyshift_current_key")
+""" + transitions.function(panel, "keyshift_base_key") + 'static int keyshift_tempo_semitones(unsigned deck){(void)deck;return 0;}\n' + transitions.function(panel, "keyshift_heard_base")
+            + transitions.function(panel, "keyshift_current_key")
             + transitions.function(panel, "keyshift_reference")
             + transitions.function(panel, "keyshift_sync_compatible")
             + transitions.function(panel, "keyshift_match_delta")

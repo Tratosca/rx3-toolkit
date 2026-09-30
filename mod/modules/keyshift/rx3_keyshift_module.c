@@ -55,6 +55,7 @@ static int block_is_silent(const Float2 *output, unsigned long frames)
 #include "rx3_keyshift.h"
 #include "rx3_keyshift_panel.h"
 #include "rx3_keyshift_metadata.h"
+#include "rx3_keyshift_effective.h"
 #include "rx3_keyshift_feature.h"
 const struct rx3_module rx3_keyshift_module = {
     .version=RX3_MODULE_API_VERSION, .size=sizeof(struct rx3_module),

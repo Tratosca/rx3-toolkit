@@ -440,7 +440,7 @@ static unsigned int keyshift_sync_harmonic;
 static unsigned int keyshift_match_rules;
 static int rx3_keyshift_semitones(unsigned d){return shifts[d];}
 static void rx3_keyshift_change(unsigned d,int delta){shifts[d]+=delta;}
-""" + function(panel,"keyshift_base_key") + function(panel,"keyshift_current_key")
+""" + function(panel,"keyshift_base_key") + 'static int keyshift_tempo_semitones(unsigned deck){(void)deck;return 0;}\n' + function(panel,"keyshift_heard_base") + function(panel,"keyshift_current_key")
             + function(panel,"keyshift_reference")
             + function(panel,"keyshift_sync_compatible")
             + function(panel,"keyshift_match_delta")

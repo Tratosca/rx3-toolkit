@@ -15,11 +15,12 @@ static int keyshift_feature_install(const struct rx3_services *services)
     keyshift_sync_harmonic=keyshift_parse_sync_mode(getenv("RX3_KEY_SYNC_MODE"));
     keyshift_match_rules=rx3_match_rules(getenv("RX3_KEY_MATCH_RULES"));
     rx3_keyshift_install();
-    if(rx3_keyshift_ready())keyshift_metadata_install();
+    if(rx3_keyshift_ready()){keyshift_metadata_install();keyshift_effective_install();}
     return rx3_keyshift_ready() && framework->panels->register_row(&keyshift_row);
 }
 static void keyshift_feature_remove(void)
 {
+    keyshift_effective_remove();
     keyshift_metadata_remove();
     framework->panels->unregister_row(&keyshift_row);
     if(framework->browse && framework->browse->deck_key) {
@@ -44,7 +45,7 @@ static void keyshift_feature_track_did_load(unsigned int deck, void *reader,
     (void)reader; (void)track_info;
     rx3_keyshift_reload(deck);
     if(deck<2 && framework->browse && framework->browse->deck_key)
-        framework->browse->deck_key(deck,keyshift_base_key(deck),0);
+        framework->browse->deck_key(deck,keyshift_heard_base(deck),0);
     __atomic_store_n(&keyshift_refresh_pending,1u,__ATOMIC_SEQ_CST);
 }
 #endif

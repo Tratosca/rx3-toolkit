@@ -76,6 +76,7 @@
     "rx3_pitch_shift.h",
     "rx3_keyshift_text.h",
     "rx3_keyshift_metadata.h",
+    "rx3_keyshift_effective.h",
     "rx3_keyshift_module.c"
   ]
 }
