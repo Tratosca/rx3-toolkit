@@ -46,6 +46,9 @@ class FrameworkTests(unittest.TestCase):
 #include <pthread.h>
 #include <unistd.h>
 extern int gettimeofday(void *, void *);
+extern int usleep(unsigned int);
+extern int setenv(const char *, const char *, int);
+extern int unsetenv(const char *);
 ''')
             source = directory / 'test.c'
             # Services link against the hook and log units. A test that links

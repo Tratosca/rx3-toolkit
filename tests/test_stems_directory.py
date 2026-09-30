@@ -12,6 +12,7 @@ These drive the real `stems_prepare` of the on-device module.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import unittest
@@ -120,6 +121,7 @@ class Deck:
         return state
 
 
+@unittest.skipIf(os.name == "nt", "device symlink behavior is POSIX-only")
 class ReinsertionTests(unittest.TestCase):
     def test_a_drive_that_comes_back_as_another_device_does_not_restart_rbp(self):
         """The exact sequence from the field: inserted as sda2, pulled, back as

@@ -28,7 +28,8 @@ static int oc_value(struct oc_json *j,unsigned int depth)
         while(j->pos<j->size) {
             unsigned char ch=(unsigned char)j->s[j->pos++];if(ch=='"'){closed=1;break;}if(ch<32)return -1;
             if(ch=='\\') {
-                if(j->pos>=j->size)return -1;char e=j->s[j->pos++];
+                if(j->pos>=j->size)return -1;
+                char e=j->s[j->pos++];
                 if(e=='u') {for(unsigned int k=0;k<4;k++) if(j->pos>=j->size||oc_hex(j->s[j->pos++])<0)return -1;}
                 else if(e!='"'&&e!='\\'&&e!='/'&&e!='b'&&e!='f'&&e!='n'&&e!='r'&&e!='t')return -1;
             }
@@ -60,17 +61,20 @@ static int oc_string(struct oc_json *j,int id,char *out,unsigned int cap)
                 if(c>=0xd800&&c<=0xdbff) {
                     if(p+6>end||j->s[p++]!='\\'||j->s[p++]!='u')return 0;
                     unsigned int lo=0;for(unsigned int k=0;k<4;k++)lo=(lo<<4)|(unsigned int)oc_hex(j->s[p++]);
-                    if(lo<0xdc00||lo>0xdfff)return 0;c=0x10000+((c-0xd800)<<10)+(lo-0xdc00);
+                    if(lo<0xdc00||lo>0xdfff)return 0;
+                    c=0x10000+((c-0xd800)<<10)+(lo-0xdc00);
                 } else if(c>=0xdc00&&c<=0xdfff)return 0;
                 if(c<32)return 0;
                 if(c>=0x80) {
                     unsigned int bytes=c<0x800?2:c<0x10000?3:4;if(n+bytes>=cap)return 0;
                     out[n++]=(char)((bytes==2?0xc0:bytes==3?0xe0:0xf0)|(c>>(6*(bytes-1))));
-                    for(unsigned int k=bytes-1;k;k--)out[n++]=(char)(0x80|((c>>(6*(k-1)))&63));continue;
+                    for(unsigned int k=bytes-1;k;k--)out[n++]=(char)(0x80|((c>>(6*(k-1)))&63));
+                    continue;
                 }
             } else if(c=='b'||c=='f'||c=='n'||c=='r'||c=='t')return 0;
         }
-        if(n+1>=cap||!c)return 0;out[n++]=(char)c;
+        if(n+1>=cap||!c)return 0;
+        out[n++]=(char)c;
     }
     out[n]=0;return 1;
 }
@@ -87,7 +91,8 @@ static int oc_key(struct oc_json *j,int object,const char *key)
 }
 static int oc_number(struct oc_json *j,int id,unsigned int *out)
 {
-    if(id<0)return 0;unsigned int v=0;
+    if(id<0)return 0;
+    unsigned int v=0;
     for(unsigned int k=j->t[id].start;k<j->t[id].end;k++) {
         char c=j->s[k];if(c<'0'||c>'9'||v>429496729u||(v==429496729u&&c>'5'))return 0;v=v*10+(unsigned int)(c-'0');
     }

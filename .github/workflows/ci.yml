@@ -121,7 +121,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -129,14 +128,18 @@ jobs:
           sudo apt-get update
           # The window uses the system webview. It cannot be bundled, so the
           # machine that builds and the machine that runs both need it.
-          sudo apt-get install -y clang lld file \
+          sudo apt-get install -y clang lld file ffmpeg \
             gir1.2-webkit2-4.1 python3-gi libcairo2-dev libgirepository1.0-dev
 
       - name: Install macOS build dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install lld
+          brew install ffmpeg lld
           echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+
+      - name: Install Windows build dependencies
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
 
       - name: Download ARM runtime hook
         uses: actions/download-artifact@v4
@@ -145,7 +148,12 @@ jobs:
           path: prebuilt
 
       - name: Install release dependencies
-        run: python -m pip install -r requirements-release.txt
+        env:
+          # Cryptography no longer publishes Intel macOS wheels. Its source
+          # build otherwise links Homebrew OpenSSL dynamically, which can put
+          # a different OpenSSL ABI beside the interpreter's copy.
+          OPENSSL_STATIC: ${{ runner.os == 'macOS' && '1' || '' }}
+        run: python -m pip install --no-cache-dir -r requirements-release.txt
 
       - name: Test portable build engine
         run: python -m unittest discover -s tests -p test_mod_generator.py
