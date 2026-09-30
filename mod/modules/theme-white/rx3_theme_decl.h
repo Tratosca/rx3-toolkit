@@ -1,21 +1,12 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Private light theme state and the player structures it reaches into.
+ * Which image table is shown, and the fill adapter, belong to the core's
+ * image service; this module supplies the policy and decides when to switch.
  */
 
 #ifndef RX3_THEME_DECL_H
 #define RX3_THEME_DECL_H
 
-static int theme_light_active;
-/* The display mode chosen at startup, distinct from the state above: the
-   toggle moves theme_light_active, this one never moves. The custom panels
-   read it, which is why a deck started dark keeps dark pad artwork even after
-   the stock chrome has been switched. */
-static int theme_light;
-/* Set while the custom panels are painting, so the fill substitution does not
-   land on a surface they have just drawn. It is declared here rather than
-   beside the fill hook because draw_custom_pad_half raises it, and that runs
-   from a part of the core compiled long before the theme's own header. */
-static int theme_suspend_fill;
 /* The global dark remap: the stock chrome taken down rather than inverted. It
    is a mode of its own, not the absence of the light one, and it runs the
    conversion in theme_pixel_dark over the same image table. */
@@ -24,12 +15,11 @@ static int theme_global_dark;
    put back to stock without a restart. */
 #define THEME_DARK_SENTINEL "/tmp/rx3-theme.off"
 
-/* The colour the player is about to fill a rectangle with. Three channels in
- * one word: blue at bits 0..4, green at 8..13, red at 16..20. Green carries
- * six bits where the others carry five, which is why a comparison across all
- * three shifts it down by one first.
+/* The fill colour the core's adapter hands over. Three channels in one word:
+ * blue at bits 0..4, green at 8..13, red at 16..20. Green carries six bits
+ * where the others carry five, which is why a comparison across all three
+ * shifts it down by one first.
  */
-#define THEME_FILL_REGISTER ((unsigned long)0x02459748)
 #define THEME_FILL_BLUE_SHIFT  0u
 #define THEME_FILL_GREEN_SHIFT 8u
 #define THEME_FILL_RED_SHIFT   16u
@@ -62,27 +52,15 @@ static int theme_global_dark;
 #define THEME_PANE_LOW      0x202u
 #define THEME_PANE_SHALLOW  0x1bcu
 
-/* A rectangle as the player describes it: the width and height are the only
- * fields read here, so the rest is left unnamed rather than guessed at.
+/* The key that completes SHIFT + SHORTCUT. The core's input service tracks
+ * SHIFT per channel, because the player reports it as an ordinary key.
  */
-#define THEME_RECT_WIDTH_OFFSET  8u
-#define THEME_RECT_HEIGHT_OFFSET 10u
-
-/* The two keys the live toggle watches. SHIFT is tracked per channel because
- * the player reports it as an ordinary key rather than as a modifier, so the
- * only way to know it is held when SHORTCUT arrives is to have seen it go down.
- */
-#define THEME_KEY_SHIFT 0x4103u
 #define THEME_KEY_SHORTCUT 0x0210u
 /* Key operations, as the player numbers them. A release arrives as either of
  * the two values above one, which is why the test masks the low bit away.
  */
 #define THEME_KEY_PRESS 0u
 #define THEME_KEY_RELEASE 2u
-/* More channels than the deck has, so an unexpected one cannot walk off the
- * end of the table that remembers whether SHIFT is down.
- */
-#define THEME_KEY_CHANNELS 4u
 
 /* The first two instructions are position-independent on firmware 1.19/1.20. */
 #define THEME_RENDER_PASS ((unsigned long)0x001d48a0)
@@ -196,5 +174,10 @@ static const uint8_t theme_dirty_windows_guard[8] = {
 #define REFRESH_DECK ((unsigned long)0x001856fc)
 
 #define THEME_HEADER_CONTROL ((unsigned long)0x02684400)
+/* Queue one glyph for repaint, from the render thread. */
+#define GET_HMI_MANAGER ((unsigned long)0x001d09b4)
+#define REFRESH_GLYPH   ((unsigned long)0x001d07b0)
+/* Stock records the conversion may be asked for. */
+#define STOCK_IMAGE_COUNT RX3_NATIVE_IMAGE_COUNT
 
 #endif /* RX3_THEME_DECL_H */

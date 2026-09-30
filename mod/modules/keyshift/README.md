@@ -7,7 +7,7 @@ When the player displays a recognised track key, the panel shows the current Cam
 
 The source port now attaches to the common time-stretch manager. Transport jumps, direction changes and a return from silence reset the pitch history. Raising pitch uses the runtime shifter; lowering uses the player's Pitch effect.
 
-The previous implementation's listening results are recorded in the [reference](../../../../REFERENCES.md#7-key-shift). The new attachment, track-key recognition and transport resets have not been tested on an RX3. Native tests cover the control state and labels, not sound quality or audio continuity on the player.
+The previous implementation's listening results are recorded in the [reference](../../../REFERENCES.md#7-key-shift). The new attachment, track-key recognition and transport resets have not been tested on an RX3. Native tests cover the control state and labels, not sound quality or audio continuity on the player.
 
 Enabled by default. Key Shift requires only the core and exposes manual -1/reset/+1 controls. Key Match is independent. Selecting Key Sync adds both modules and enables the sync action through `RX3_KEY_SYNC`. The Key Shift adapter derives that flag from the orchestrator's loaded module registry and honors the Key Sync and Key Match off switches. All three cards live in Harmonic mixing; the core appears under Advanced.
 
@@ -40,4 +40,4 @@ panel belong to the module. The core delivers track-load, audio-format and
 normalized text observations, and owns rendering and touch gestures.
 `rx3_keyshift_*.h` files are private implementation details, never core includes.
 The bundle remains one `librx3_core.so`; this boundary does not add hot unloading
-or binary isolation. See `docs/runtime-framework.md` for lifecycle constraints.
+or binary isolation. See the [runtime contract](../../../REFERENCES.md#doc-runtime-framework) for lifecycle constraints.

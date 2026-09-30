@@ -2,6 +2,7 @@
 #ifndef RX3_SAMPLES_AUDIO_H
 #define RX3_SAMPLES_AUDIO_H
 #include "../core/api/rx3_dsp.h"
+#include "../core/api/rx3_audio_api.h"
 
 static uint32_t samples_le32(const uint8_t *bytes)
 {
@@ -70,7 +71,7 @@ static const uint8_t *samples_wave_data(const uint8_t *wave, size_t size,
 /* The master buffer already contains the player. Add samples before its
    talkover attenuator runs, with the same squared volume and PCM16 scaling. */
 static void samples_mix(struct sample_slot voices[SAMPLES_PAD_COUNT],
-                         Float2 *output, int frames, unsigned int volume)
+                         struct rx3_stereo *output, int frames, unsigned int volume)
 {
     if (!output || frames <= 0)
         return;
@@ -80,10 +81,11 @@ static void samples_mix(struct sample_slot voices[SAMPLES_PAD_COUNT],
     gain = gain * gain * 0.5f * (1.0f / 32768.0f);
     for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++) {
         struct sample_slot *voice = &voices[pad];
-        unsigned int position = __atomic_load_n(&voice->position, __ATOMIC_SEQ_CST);
+        unsigned int state = __atomic_load_n(&voice->position, __ATOMIC_SEQ_CST);
+        unsigned int position = state & SAMPLE_CURSOR_MASK;
         const int16_t *data = voice->frames;
         unsigned int length = voice->length;
-        if (position == SAMPLE_SLOT_IDLE || !data || !length)
+        if (position == SAMPLE_CURSOR_MASK || !data || !length)
             continue;
         unsigned int mode = __atomic_load_n(&voice->mode, __ATOMIC_SEQ_CST);
         /* The pad's own trim, on top of the bank's volume. Read from the voice
@@ -115,8 +117,9 @@ static void samples_mix(struct sample_slot voices[SAMPLES_PAD_COUNT],
         }
         unsigned int next = mode == SAMPLE_MODE_LOOP ? at
             : (position + count >= length ? SAMPLE_SLOT_IDLE : position + count);
-        /* A pad can retrigger while this block is mixed. Keep its new cursor. */
-        __sync_bool_compare_and_swap(&voice->position, position, next);
+        /* A command changes the generation even when its cursor is unchanged. */
+        next = (state & ~SAMPLE_CURSOR_MASK) | (next & SAMPLE_CURSOR_MASK);
+        __sync_bool_compare_and_swap(&voice->position, state, next);
     }
 }
 

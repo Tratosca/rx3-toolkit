@@ -8,9 +8,17 @@
 extern const struct rx3_module *const rx3_bundle[];
 extern const unsigned int rx3_bundle_count;
 #define RX3_MODULE_LIMIT 32u
-static const struct rx3_services services = {
-    install_hook, uninstall_hook, log_line, rx3_mix_read, &rx3_notices, &rx3_dsp, &rx3_panels, rx3_wave_read, detach_hook, release_hook, &rx3_images, &rx3_browse
+/* Not const: the firmware writer is bound by the core at startup, so host
+   builds of this unit never link the ARM instruction adapter. */
+static struct rx3_services services = {
+    install_hook, uninstall_hook, log_line, rx3_mix_read, &rx3_notices, &rx3_dsp, &rx3_panels, rx3_wave_read, detach_hook, release_hook, &rx3_images, &rx3_browse, &rx3_titles,
+    &rx3_input, &rx3_audio, rx3_log_number, &rx3_memory, 0,
+    rx3_mix_claim, rx3_mix_release, rx3_wave_claim, rx3_wave_release, &rx3_loader
 };
+void rx3_modules_bind_writer(int (*writer)(unsigned long, const void *, const void *, unsigned int))
+{
+    services.write_guarded = writer;
+}
 static unsigned char active[RX3_MODULE_LIMIT];
 static unsigned int failures;
 static unsigned int notifications_enabled, notifications_active;

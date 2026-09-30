@@ -45,13 +45,37 @@ struct samples_config {
 struct sample_slot {
     const int16_t *frames;
     unsigned int length;
-    volatile unsigned int position;
+    volatile unsigned int position; /* Packed generation/cursor; use the accessors below. */
     /* Copied from the config when the pad is hit rather than read in the
        mixer. The loader republishes the config when a bank is reloaded, and a
        sound already playing must not change what it is halfway through. */
     volatile unsigned int mode;
     volatile unsigned int gain;
 };
+
+/* 19 cursor bits cover the eight-second bank limit; the remaining bits
+ * distinguish commands from an audio cursor update, including a retrigger at
+ * zero. One CAS compares both. Input commands are serialized by the player. */
+#define SAMPLE_CURSOR_MASK 0x7ffffu
+#define SAMPLE_GENERATION_STEP 0x80000u
+#if SAMPLES_MAX_FRAMES >= SAMPLE_CURSOR_MASK
+#error Sample cursor cannot represent the configured bank limit
+#endif
+static inline unsigned int samples_voice_position(const struct sample_slot *voice)
+{
+    unsigned int cursor = __atomic_load_n(&voice->position, __ATOMIC_SEQ_CST) & SAMPLE_CURSOR_MASK;
+    return cursor == SAMPLE_CURSOR_MASK ? SAMPLE_SLOT_IDLE : cursor;
+}
+static inline void samples_voice_command(struct sample_slot *voice, unsigned int cursor)
+{
+    unsigned int old = __atomic_load_n(&voice->position, __ATOMIC_SEQ_CST);
+    for (;;) {
+        unsigned int next = ((old + SAMPLE_GENERATION_STEP) & ~SAMPLE_CURSOR_MASK) |
+                            (cursor & SAMPLE_CURSOR_MASK);
+        if (__atomic_compare_exchange_n(&voice->position, &old, next, 0,
+                                         __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) return;
+    }
+}
 
 struct sample_bank_slot {
     const int16_t *frames;

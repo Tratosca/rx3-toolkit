@@ -41,3 +41,27 @@ void rx3_log_configure(void)
     const char *path = getenv("RX3_LOG_FILE");
     if (path && path[0]) log_file_path = path;
 }
+
+void rx3_log_number(const char *label, unsigned long value)
+{
+    char buffer[96];
+    size_t n = 0;
+    while (label[n] && n < sizeof(buffer) - 24) {
+        buffer[n] = label[n];
+        n++;
+    }
+    char digits[24];
+    int d = 0;
+    if (!value) {
+        digits[d++] = '0';
+    } else {
+        while (value && d < (int)sizeof(digits)) {
+            digits[d++] = (char)('0' + (value % 10u));
+            value /= 10u;
+        }
+    }
+    while (d > 0)
+        buffer[n++] = digits[--d];
+    buffer[n] = '\0';
+    log_line(buffer);
+}

@@ -8,8 +8,9 @@ static const uint16_t *samples_caption(unsigned int deck, unsigned int widget,
     (void)deck;
     (void)part;
     static uint16_t label[8] = {'V','O','L',' ',0};
+    static const uint16_t no_lettering[] = {0};
     if (widget == 0u)
-        return text_empty;              /* the track carries no lettering */
+        return no_lettering;            /* the track carries no lettering */
     unsigned int volume = __atomic_load_n(&samples_volume, __ATOMIC_SEQ_CST);
     if (volume >= 100u) {
         label[4] = '1'; label[5] = '0'; label[6] = '0'; label[7] = 0;
@@ -83,11 +84,16 @@ static const struct rx3_pad_widget samples_widgets[2] = {
     { RX3_PAD_SLIDER, 9 }, { RX3_PAD_BUTTON, 1 }
 };
 
+static void samples_activate(unsigned int active);
+
+/* Panel 3 is the status slot: it replaces the native STATUS tab. */
 static const struct rx3_pad_row samples_row = {
-    3u, TAB_IMAGE_KEY_NONE, RX3_PAD_SCOPE_SCREEN, 2u, samples_widgets,
-    0, samples_caption, samples_is_on, samples_fire,
-    samples_slider_max, samples_slider_get, samples_slider_set,
-    samples_panel_needs_refresh, 0, 0, 0, 0
+    .panel_id = 3u, .tab_image = 0u, .scope = RX3_PAD_SCOPE_SCREEN,
+    .count = 2u, .widgets = samples_widgets,
+    .caption = samples_caption, .is_on = samples_is_on, .fire = samples_fire,
+    .slider_max = samples_slider_max, .slider_get = samples_slider_get,
+    .slider_set = samples_slider_set, .needs_refresh = samples_panel_needs_refresh,
+    .activate = samples_activate
 };
 
 #endif /* RX3_SAMPLES_PANEL_H */

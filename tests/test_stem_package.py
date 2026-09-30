@@ -122,14 +122,39 @@ class PackageTests(unittest.TestCase):
 #include <unistd.h>
 #include <sys/mman.h>
 #include <assert.h>
+#define RX3_PLATFORM_H
+#include "core/api/rx3_module_api.h"
 #include "stems/rx3_stems_decl.h"
 static unsigned long memory_available_kb(void) { return 1024*1024; }
-static int read_exactly(int fd,void *p,size_t n) {return read(fd,p,n)==(ssize_t)n?0:-1;}
+static int mock_reserve(const void *o, unsigned long bytes, unsigned long floor_kb) {
+    (void)o; unsigned long kb = bytes / 1024u + (bytes % 1024u != 0u), have = memory_available_kb();
+    return !floor_kb || (have > floor_kb && have - floor_kb >= kb);
+}
+static void mock_move(const void *o, unsigned long b) { (void)o; (void)b; }
+static unsigned long mock_held(void) { return 0; }
+static const struct rx3_memory_service memory_mock={mock_reserve,mock_move,mock_move,mock_move,memory_available_kb,mock_held};
+static const struct rx3_services stem_services={.memory=&memory_mock};
+static const struct rx3_services *framework=&stem_services;
+static unsigned mapped,checks,cancel_at;
+static void *tracked_map(void *a,size_t n,int p,int f,int d,off_t o) {
+ void *result=mmap(a,n,p,f,d,o);if(result!=MAP_FAILED)mapped++;return result;
+}
+static int tracked_unmap(void *p,size_t n) {int result=munmap(p,n);if(!result)mapped--;return result;}
+static int cancel_load(const void *unused) {(void)unused;return ++checks==cancel_at;}
+#define mmap tracked_map
+#define munmap tracked_unmap
 #include "stems/rx3_stems_package.h"
 ''' + functions + r'''
 int main(int argc,char **argv) {
  (void)argc; int fd=open(argv[1],O_RDONLY);assert(fd>=0);
- struct stem_payload next[3]={0};unsigned count=stems_package_load(fd,next,0);
+ struct stems_io io={cancel_load,0};
+ if(argv[2][0]=='c')cancel_at=(unsigned)(argv[2][1]-'0');
+ struct stem_payload next[3]={0};unsigned count=stems_package_load(fd,next,0,cancel_at?&io:0);
+ if(cancel_at) {
+  assert(!count && !mapped && checks==cancel_at);
+  for(unsigned i=0;i<3;i++)assert(!next[i].data && !next[i].block);
+  close(fd);return 0;
+ }
  if(argv[2][0]=='0') {assert(!count);return 0;}
  if(argv[2][0]=='3') {
   assert(count==3 && !next[0].wave && next[0].block && !next[1].block);
@@ -195,6 +220,8 @@ int main(int argc,char **argv) {
 }''')
         subprocess.run(['cc','-std=c11','-I'+str(ROOT/'mod/modules'),str(source),'-o',str(exe)],check=True,capture_output=True)
         subprocess.run([str(exe),str(out),'1'],check=True,capture_output=True)
+        for checkpoint in range(1,10):
+            subprocess.run([str(exe),str(out),f'c{checkpoint}'],check=True,capture_output=True)
         wave=self.root/'combinations.rx3wave'
         combinations={mask:(bytes([mask,mask+1,mask+2,mask,mask+1,mask+2])*15,'22'*32) for mask in range(1,8)}
         waveform.write_combinations(wave,self.template,self.frames,'33'*32,combinations)

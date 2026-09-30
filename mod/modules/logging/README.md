@@ -29,4 +29,4 @@ Leave it off for normal use and you never have to think about any of that.
 
 ---
 
-On `STOP:` or `FAILED:`, delete `autoexec.bin` from the stick before using the player again, then see [Troubleshooting](../../../../docs/troubleshooting.md#the-session-log-says-stop-or-failed).
+On `STOP:` or `FAILED:`, delete `autoexec.bin` from the stick before using the player again, then see [Troubleshooting](../../../REFERENCES.md#doc-troubleshooting--the-session-log-says-stop-or-failed).

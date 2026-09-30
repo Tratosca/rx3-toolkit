@@ -49,10 +49,20 @@ LOADER = r'''
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#define RX3_PLATFORM_H
+#include "core/api/rx3_module_api.h"
 #include "stems/rx3_stems_decl.h"
 static unsigned long available_kb;
 static unsigned long memory_available_kb(void) { return available_kb; }
-static int read_exactly(int fd, void *p, size_t n) { return read(fd, p, n) == (ssize_t)n ? 0 : -1; }
+static int mock_reserve(const void *o, unsigned long bytes, unsigned long floor_kb) {
+    (void)o; unsigned long kb = bytes / 1024u + (bytes %% 1024u != 0u), have = available_kb;
+    return !floor_kb || (have > floor_kb && have - floor_kb >= kb);
+}
+static void mock_move(const void *o, unsigned long b) { (void)o; (void)b; }
+static unsigned long mock_held(void) { return 0; }
+static const struct rx3_memory_service memory_mock={mock_reserve,mock_move,mock_move,mock_move,memory_available_kb,mock_held};
+static const struct rx3_services stem_services={.memory=&memory_mock};
+static const struct rx3_services *framework=&stem_services;
 #include "stems/rx3_stems_package.h"
 %s
 int main(int argc, char **argv) {
@@ -61,7 +71,7 @@ int main(int argc, char **argv) {
     unsigned int other = (unsigned int)strtoul(argv[2], 0, 0);
     available_kb = strtoul(argv[3], 0, 0);
     struct stem_payload next[3] = {0};
-    unsigned int count = stems_package_load(fd, next, other);
+    unsigned int count = stems_package_load(fd, next, other, 0);
     printf("{\"roles\": %%u", count);
     if (count) {
         /* What the loader publishes once a package is accepted. */
@@ -253,12 +263,13 @@ class PadTests(unittest.TestCase):
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-typedef struct {float left,right;} Float2;
-typedef struct {int16_t left,right;} Short2;
+typedef struct rx3_stereo Float2;
 #include "core/api/rx3_panel_api.h"
 #include "stems/rx3_stems_decl.h"
 #define TAB_IMAGE_STEMS 0x1601u
 static int blink_phase_is_on(void){return 1;}
+static int stems_any_deck_loading(void){return 0;}
+static void stems_blink_idle(void){}
 static unsigned int now_ms(void){return 0;}
 #include "stems/rx3_stems_panel.h"
 int main(void){

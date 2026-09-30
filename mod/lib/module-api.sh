@@ -8,6 +8,131 @@
 # rather than repeating the path.
 CORE_OBJECT=/mnt/iso/modules/core/librx3_core.so
 
+# Core and startup artwork are staged on the same RAM filesystem as their
+# destinations. No live resource is replaced during prepare or media deferral.
+RUNTIME_STAGE_DIR=${RUNTIME_STAGE_DIR:-/root/pdj/.rx3-stage.$$}
+RUNTIME_STAGE_COUNT=0
+RUNTIME_STAGE_OWNED=0
+
+ensure_runtime_stage()
+{
+    [ "$RUNTIME_STAGE_OWNED" = 1 ] && return 0
+    mkdir "$RUNTIME_STAGE_DIR" 2>/dev/null || return 1
+    RUNTIME_STAGE_OWNED=1
+}
+
+stage_runtime_file()
+{
+    _rx3_source=$1
+    _rx3_target=$2
+    [ -r "$_rx3_source" ] || return 1
+    [ -f "$_rx3_target" ] && [ ! -L "$_rx3_target" ] &&
+        cmp -s "$_rx3_source" "$_rx3_target" 2>/dev/null && return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    cp "$_rx3_source" "$RUNTIME_STAGE_DIR/new$_rx3_next" 2>/dev/null || return 1
+    chmod 644 "$RUNTIME_STAGE_DIR/new$_rx3_next" || return 1
+    printf '%s\n' "$_rx3_target" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
+# Fixed native tab slots are a renderer contract; artwork belongs to its module.
+# The generic loader reads only paths explicitly published for this launch.
+stage_panel_asset()
+{
+    _rx3_panel_module=$1
+    _rx3_panel_slot=$2
+    _rx3_panel_name=$3
+    _rx3_panel_source=/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name.rgb565
+    _rx3_panel_target=/root/pdj/rx3-$_rx3_panel_name.rgb565
+    _rx3_panel_before=$RUNTIME_STAGE_COUNT
+    stage_runtime_file "$_rx3_panel_source" "$_rx3_panel_target" || return 1
+    if [ -r "/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name-light.rgb565" ]; then
+        stage_runtime_file "/mnt/iso/modules/$_rx3_panel_module/$_rx3_panel_name-light.rgb565" "/root/pdj/rx3-$_rx3_panel_name-light.rgb565" || return 1
+        module_export "RX3_TAB_LIGHT_$_rx3_panel_slot" "/root/pdj/rx3-$_rx3_panel_name-light.rgb565" "Panel artwork" || :
+    else
+        module_export "RX3_TAB_LIGHT_$_rx3_panel_slot" "" "Panel artwork" || :
+    fi
+    module_export "RX3_TAB_DARK_$_rx3_panel_slot" "$_rx3_panel_target" "Panel artwork" || :
+    [ "$RUNTIME_STAGE_COUNT" = "$_rx3_panel_before" ] || request_rbp_restart
+    return 0
+}
+
+stage_runtime_removal()
+{
+    _rx3_target=$1
+    [ -e "$_rx3_target" ] || [ -L "$_rx3_target" ] || return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    printf '%s\n' "$_rx3_target" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
+stage_runtime_symlink()
+{
+    _rx3_link_target=$1
+    _rx3_link_path=$2
+    [ -L "$_rx3_link_path" ] &&
+        [ "$(readlink "$_rx3_link_path")" = "$_rx3_link_target" ] && return 0
+    ensure_runtime_stage || return 1
+    _rx3_next=$((RUNTIME_STAGE_COUNT + 1))
+    ln -s "$_rx3_link_target" "$RUNTIME_STAGE_DIR/new$_rx3_next" || return 1
+    printf '%s\n' "$_rx3_link_path" > "$RUNTIME_STAGE_DIR/target$_rx3_next" || return 1
+    RUNTIME_STAGE_COUNT=$_rx3_next
+}
+
+commit_runtime_stage()
+{
+    _rx3_index=1
+    while [ "$_rx3_index" -le "$RUNTIME_STAGE_COUNT" ]; do
+        _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
+        [ ! -d "$_rx3_target" ] || [ -L "$_rx3_target" ] || return 1
+        # Mark before the first rename so even a partial commit can be undone.
+        : > "$RUNTIME_STAGE_DIR/started$_rx3_index" || return 1
+        if [ -e "$_rx3_target" ] || [ -L "$_rx3_target" ]; then
+            : > "$RUNTIME_STAGE_DIR/had$_rx3_index" || return 1
+            mv -f "$_rx3_target" "$RUNTIME_STAGE_DIR/old$_rx3_index" || return 1
+        fi
+        if [ -e "$RUNTIME_STAGE_DIR/new$_rx3_index" ] ||
+           [ -L "$RUNTIME_STAGE_DIR/new$_rx3_index" ]; then
+            mv -f "$RUNTIME_STAGE_DIR/new$_rx3_index" "$_rx3_target" || return 1
+        fi
+        _rx3_index=$((_rx3_index + 1))
+    done
+}
+
+restore_runtime_stage()
+{
+    _rx3_index=$RUNTIME_STAGE_COUNT
+    _rx3_failed=0
+    while [ "$_rx3_index" -gt 0 ]; do
+        if [ -f "$RUNTIME_STAGE_DIR/started$_rx3_index" ]; then
+            _rx3_target=$(cat "$RUNTIME_STAGE_DIR/target$_rx3_index") || return 1
+            if [ -e "$RUNTIME_STAGE_DIR/old$_rx3_index" ] ||
+               [ -L "$RUNTIME_STAGE_DIR/old$_rx3_index" ]; then
+                if [ -d "$_rx3_target" ] && [ ! -L "$_rx3_target" ]; then
+                    _rx3_failed=1
+                elif rm -f "$_rx3_target"; then
+                    mv -f "$RUNTIME_STAGE_DIR/old$_rx3_index" "$_rx3_target" || _rx3_failed=1
+                else
+                    _rx3_failed=1
+                fi
+            elif [ ! -f "$RUNTIME_STAGE_DIR/had$_rx3_index" ]; then
+                rm -f "$_rx3_target" || _rx3_failed=1
+            fi
+        fi
+        _rx3_index=$((_rx3_index - 1))
+    done
+    [ "$_rx3_failed" = 0 ]
+}
+
+discard_runtime_stage()
+{
+    [ "$RUNTIME_STAGE_OWNED" = 0 ] || rm -rf "$RUNTIME_STAGE_DIR"
+    RUNTIME_STAGE_OWNED=0
+    RUNTIME_STAGE_COUNT=0
+}
+
 module_begin()
 {
     _rx3_module_id=$1
@@ -121,6 +246,41 @@ register_runtime_preload()
     esac
 }
 
+# Keep a preload at its first position, collapse its duplicates, or append it.
+# Separately packaged modules must not reorder each other's interposers.
+ensure_preload_entry()
+{
+    _rx3_target=$1
+    [ -n "$_rx3_target" ] || return 1
+    _rx3_pending=$RBP_PRELOAD
+    _rx3_cleaned=""
+    _rx3_seen=0
+    while [ -n "$_rx3_pending" ]; do
+        case "$_rx3_pending" in
+            *:*) _rx3_entry=${_rx3_pending%%:*}; _rx3_pending=${_rx3_pending#*:} ;;
+            *)   _rx3_entry=$_rx3_pending; _rx3_pending="" ;;
+        esac
+        [ -n "$_rx3_entry" ] || continue
+        if [ "$_rx3_entry" = "$_rx3_target" ]; then
+            [ "$_rx3_seen" = 0 ] || continue
+            _rx3_seen=1
+        fi
+        if [ -n "$_rx3_cleaned" ]; then
+            _rx3_cleaned="$_rx3_cleaned:$_rx3_entry"
+        else
+            _rx3_cleaned=$_rx3_entry
+        fi
+    done
+    if [ "$_rx3_seen" = 0 ]; then
+        if [ -n "$_rx3_cleaned" ]; then
+            _rx3_cleaned="$_rx3_cleaned:$_rx3_target"
+        else
+            _rx3_cleaned=$_rx3_target
+        fi
+    fi
+    RBP_PRELOAD=$_rx3_cleaned
+}
+
 preload_without_runtime()
 {
     _rx3_pending=$1
@@ -228,6 +388,18 @@ rbp_environment_value()
     tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n "s/^$1=//p" | head -1
 }
 
+# A process named rbp may still be running an old or unrelated executable.
+# Guarded writes target the file at RBP, so its live executable mapping must
+# refer to that exact file before a transition is planned.
+rbp_executable_matches()
+{
+    _rx3_exe="$PROC_ROOT/$PID/exe"
+    [ "$(readlink "$_rx3_exe" 2>/dev/null)" = "$RBP" ] || return 1
+    _rx3_live_inode=$(ls -iL "$_rx3_exe" 2>/dev/null | awk '{print $1}')
+    _rx3_file_inode=$(ls -i "$RBP" 2>/dev/null | awk '{print $1}')
+    [ -n "$_rx3_live_inode" ] && [ "$_rx3_live_inode" = "$_rx3_file_inode" ]
+}
+
 # Export one setting for the core, and ask for a restart when the running player
 # does not already carry it.
 #
@@ -251,6 +423,20 @@ module_export()
     say "$_rx3_owner needs a restart: running rbp carries $_rx3_setting=[${_rx3_running:-none}]"
     request_rbp_restart
     return 0
+}
+
+# An absent module has no prepare hook to retract its old environment setting.
+# Record the ordered image selection and runtime switches as one startup value
+# so removing or disabling a module asks for a safe restart of the old player.
+reconcile_module_set()
+{
+    case " $LOADED_MODULES " in
+        *" core "*) ;;
+        *) return 0 ;;
+    esac
+    _rx3_selection="${LOADED_MODULES# }|${DISABLED_MODULES# }"
+    RUNNING_HOOK=module-set
+    module_export RX3_RUNTIME_MODULE_SET "$_rx3_selection" "Module set" || :
 }
 
 # Where a module's kill switch lives. One shape for every module, so an operator
@@ -277,6 +463,10 @@ module_disabled_by_switch()
 {
     _rx3_switch=$(module_switch_path "$1")
     [ -e "$_rx3_switch" ] || return 1
+    case " $DISABLED_MODULES " in
+        *" $1 "*) ;;
+        *) DISABLED_MODULES="$DISABLED_MODULES $1" ;;
+    esac
     say "$1 disabled: $_rx3_switch exists"
     return 0
 }
@@ -325,6 +515,24 @@ register_ready_file()
     RBP_READY_FILES="$RBP_READY_FILES $1"
 }
 
+register_pid_ready_file()
+{
+    register_ready_file "$1" || return 1
+    RBP_PID_READY_FILES="$RBP_PID_READY_FILES $1"
+}
+
+ready_file_matches_pid()
+{
+    _rx3_ready_file=$1
+    _rx3_ready_pid=$2
+    [ -s "$_rx3_ready_file" ] || return 1
+    case " $RBP_PID_READY_FILES " in
+        *" $_rx3_ready_file "*)
+            [ "$(cat "$_rx3_ready_file" 2>/dev/null)" = "$_rx3_ready_pid" ] ;;
+        *) return 0 ;;
+    esac
+}
+
 register_diagnostic_file()
 {
     validate_tmp_contract_path "$1" || {
@@ -358,7 +566,7 @@ wait_for_rbp()
         if [ -n "$RBP_READY_FILES" ]; then
             _rx3_pending=0
             for _rx3_ready in $RBP_READY_FILES; do
-                [ -s "$_rx3_ready" ] || _rx3_pending=1
+                ready_file_matches_pid "$_rx3_ready" "$_rx3_pid" || _rx3_pending=1
             done
             [ "$_rx3_pending" = "0" ] && break
         fi

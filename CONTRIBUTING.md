@@ -100,13 +100,13 @@ Static tests do not cover the device. Run this sequence before claiming a runtim
 
 It is one shared object, `librx3_core.so`, built from `mod/modules/core/rx3_core_hook.c` and preloaded into the player's application. Its code runs inside that application, so it can intercept what the application does while it plays: a track being loaded, audio being pulled, a pad being pressed, the screen being drawn. It installs those interceptions once and hands them to whichever features are switched on.
 
-A runtime module is compiled into that shared object through its own compilation unit and the public contract in `core/api/rx3_module_api.h`. Register its descriptor in `core/runtime/rx3_composition.c` and its source in the core manifest. Its shell module supplies configuration, while `requires` brings in the core automatically. Some older performance features still use the legacy panel/lifecycle contract while they migrate; do not copy their private includes into a new module. [The core README](mod/modules/core/README.md) describes the source layout.
+A runtime module is compiled into that shared object through its own compilation unit and the public contract in `core/api/rx3_module_api.h`. Register its descriptor in `core/runtime/rx3_composition.c` and its source in the core manifest. Its shell module supplies configuration, while `requires` brings in the core automatically. Every feature, Stems and Samples included, is built this way: pads, keys, pad lights, audio stages, image tables, memory and file loading all go through the services in that header. [The core README](mod/modules/core/README.md) describes the source layout.
 
 ### Saying something to the operator
 
 Call `services->notices->post(...)` through the public API. The framework copies and queues the text, then its firmware adapter calls rbp's native `ui::Caution::set` on the render thread. This is the mechanism used by native notices such as EMERGENCY LOOP; the toolkit uses a separate existing caution object, B051. No custom notification renderer is needed.
 
-Handle the returned queue status and check service availability; acceptance does not prove display. The [framework contract](docs/runtime-framework.md#notification-and-dsp-services-api-version-2) documents limits, priorities, cancellation and an example. `RX3_MESSAGES=0` or `/tmp/rx3-messages.off` disables toolkit messages, not rbp's own warnings.
+Handle the returned queue status and check service availability; acceptance does not prove display. The [framework contract](REFERENCES.md#doc-runtime-framework--notification-and-dsp-services-api-version-2) documents limits, priorities, cancellation and an example. `RX3_MESSAGES=0` or `/tmp/rx3-messages.off` disables toolkit messages, not rbp's own warnings.
 
 ### Which shape your idea has
 
@@ -129,7 +129,7 @@ make new-module ID=browse-lock CATEGORY=screen NAME="Browse lock" CORE=1
 
 `CORE=1` is the first row above. It also writes a separate C module using the public framework API and the `module.sh` that declines when the core is not selected. The other two rows take the plain form.
 
-It prints what to fill in and how to register the compilation unit and descriptor. New modules use the [shared framework contract](docs/runtime-framework.md), never private core state. It refuses to touch a module that already exists, so if you picked the wrong shape before filling anything in, delete the directory and run it again.
+It prints what to fill in and how to register the compilation unit and descriptor. New modules use the [shared framework contract](REFERENCES.md#doc-runtime-framework), never private core state. It refuses to touch a module that already exists, so if you picked the wrong shape before filling anything in, delete the directory and run it again.
 
 Nothing else needs editing. The application, the CLI and the release packager all discover the manifest; `make hook` treats the module's headers as prerequisites. No test names the modules, so no test has to be edited to admit a new one.
 

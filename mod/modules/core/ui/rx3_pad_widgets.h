@@ -210,11 +210,11 @@ static void pad_fill(void *render, const void *model, uint8_t window,
 
 static uint32_t pad_frame_colour(void)
 {
-    return theme_light_active ? PAD_FRAME_LIGHT : PAD_FRAME_DARK;
+    return rx3_image_is_light() ? PAD_FRAME_LIGHT : PAD_FRAME_DARK;
 }
 static uint32_t pad_track_colour(void)
 {
-    return theme_light_active ? PAD_TRACK_LIGHT : PAD_TRACK_DARK;
+    return rx3_image_is_light() ? PAD_TRACK_LIGHT : PAD_TRACK_DARK;
 }
 
 /* Full semantic colour, independent of theme. Pick contrasting atlas ink. */
@@ -222,7 +222,7 @@ static unsigned int pad_face_ink(uint32_t colour)
 {
     unsigned int r=(colour>>16)&255u, g=(colour>>8)&255u, b=colour&255u;
     unsigned int dark_text=(r*299u+g*587u+b*114u >= 140000u);
-    return dark_text == !!theme_light_active ? RX3_PAD_INK_PRESSED : RX3_PAD_INK_SELECTED;
+    return dark_text == !!rx3_image_is_light() ? RX3_PAD_INK_PRESSED : RX3_PAD_INK_SELECTED;
 }
 
 static void pad_draw_slider(void *render, const void *model, uint8_t window,
@@ -233,7 +233,7 @@ static void pad_draw_slider(void *render, const void *model, uint8_t window,
     unsigned int value = row->slider_get ? row->slider_get(deck, widget) : 0u;
     if (value > maximum) value = maximum;
     uint32_t accent = pad_widget_colour(row,deck,widget);
-    uint32_t gauge=(pad_face_ink(accent)==RX3_PAD_INK_PRESSED) == !theme_light_active
+    uint32_t gauge=(pad_face_ink(accent)==RX3_PAD_INK_PRESSED) == !rx3_image_is_light()
         ? 0xffffffu : 0x292829u;
     unsigned int text_ink=value ? pad_face_ink(accent) : RX3_PAD_INK_PRESSED;
     const uint16_t *caption = row->caption ? row->caption(deck,widget,0) : 0;
@@ -347,7 +347,7 @@ static void pad_row_paint(void *render, const void *model, uint8_t window,
             if (!neutral && (semantic || ink!=RX3_PAD_INK_INACTIVE)) caption_ink=pad_face_ink(face);
             uint32_t edge=accent;
             /* Pale Camelot colours need a darker contour on a light canvas. */
-            if (theme_light_active && neutral) edge=(accent & 0xfefefeu) >> 1;
+            if (rx3_image_is_light() && neutral) edge=(accent & 0xfefefeu) >> 1;
             unsigned int border=outlined ? (pressed ? 3u : 2u) : 1u;
             pad_fill(render,model,window,deck,parts[part].x1,RX3_PAD_CTRL_TOP,
                      parts[part].x2,RX3_PAD_CTRL_BOTTOM,

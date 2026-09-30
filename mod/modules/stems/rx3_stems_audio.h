@@ -2,6 +2,7 @@
 #ifndef RX3_STEMS_AUDIO_H
 #define RX3_STEMS_AUDIO_H
 #include "../core/api/rx3_dsp.h"
+#include "../core/api/rx3_audio_api.h"
 
 static unsigned int stems_available(const struct stems_deck_context *context)
 {
@@ -66,7 +67,7 @@ static void stems_reset_mix(struct stems_deck_context *context)
 }
 
 static void stems_mix(struct stems_deck_context *context, int position,
-                        Float2 *output, unsigned int frames)
+                        struct rx3_stereo *output, unsigned int frames)
 {
 #ifdef RX3_OVERCUE_PROTOTYPE
     if(context->overcue) {
@@ -109,7 +110,7 @@ static void stems_mix(struct stems_deck_context *context, int position,
                 context->gain[j] = rx3_dsp_lerp(context->from[j], context->target[j], alpha);
         }
         float residual = context->gain[0];
-        Float2 mixed = {output[i].left * residual, output[i].right * residual};
+        struct rx3_stereo mixed = {output[i].left * residual, output[i].right * residual};
         for (unsigned int j = 0; j < count; j++) {
             const Short2 *pcm = (const Short2 *)context->payloads[j].data + (unsigned int)index;
             float gain = (context->gain[j + 1u] - residual) * (1.0f / 32768.0f);

@@ -29,6 +29,7 @@
     }
   ],
   "build_files": [
+    "rx3_logo_module.c",
     "rx3_logo_decl.h",
     "rx3_logo_feature.h",
     "rx3_logo_geometry.h"

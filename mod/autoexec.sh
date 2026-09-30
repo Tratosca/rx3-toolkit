@@ -3,10 +3,28 @@
 # RX3 volatile runtime orchestrator. Feature logic lives in module directories.
 
 USB="$1"
+# Sample the held panel state before logs, module loading, locks or patching.
+# An unreadable frame is not evidence that SHIFT is released: fail closed.
+SAFE_MODE_PROBE=$(sh /mnt/iso/lib/safe-mode.sh)
+SAFE_MODE_RESULT=$?
+# This one small USB note is written even when the mods are bypassed. It lets
+# the operator distinguish a held SHIFT, an unreadable panel and an autoexec
+# that was never launched. It has no effect on rbp or module selection.
+if [ -d "$USB" ]; then
+    mkdir -p "$USB/RX3_RUNTIME" 2>/dev/null
+    printf 'result=%s %s\n' "$SAFE_MODE_RESULT" "$SAFE_MODE_PROBE" \
+        > "$USB/RX3_RUNTIME/startup-probe.txt" 2>/dev/null
+fi
+case "$SAFE_MODE_RESULT" in
+    0) ;;
+    10|11) exit 0 ;;
+    *) exit 0 ;;
+esac
 OUT="$USB/RX3_RUNTIME"
 LOG="$OUT/session.txt"
 RBP=/root/pdj/rbp
 TMP=/tmp/rx3-runtime
+LOCK=/tmp/rx3-runtime.lock
 # Named so the guards below can be run against a directory that is not /proc.
 PROC_ROOT=/proc
 PATCH_TABLE=""
@@ -18,6 +36,7 @@ POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
 RBP_PRELOAD=""
 RBP_READY_FILES=""
+RBP_PID_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 PREVIOUS_PRELOAD=""
@@ -25,6 +44,7 @@ NEED_RBP_RESTART=0
 RESTART_REQUESTED_BY=""
 RUNNING_HOOK=""
 LOADED_MODULES=""
+DISABLED_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -127,6 +147,7 @@ defer_for_unsafe_media()
     say "safe-load guard: $MEDIA_GUARD_REASON; not stopping rbp"
     say "playback continues; the mod is deferred until a safe restart."
     echo deferred > /tmp/rx3-patch.state
+    discard_runtime_stage
     rm -rf "$TMP"
     say "=== complete (mod deferred: unsafe USB topology) ==="
     sync
@@ -228,6 +249,17 @@ if awk '$2=="/root/pdj"' /proc/mounts | grep -q .; then
 fi
 [ -x "$RBP" ] || { say "FAILED: $RBP is missing"; sync; exit 1; }
 
+# The guarded-word workspace has a fixed path. An insertion already in flight
+# owns it until exit; a second one must not erase the first one's snapshots.
+# /tmp is volatile, so a SIGKILL-stale lock safely clears on reboot.
+if ! mkdir "$LOCK" 2>/dev/null; then
+    say "STOP: RX3 runtime already applying (or stale lock at $LOCK)"
+    exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' 0
+trap 'exit 1' 1 2 15
+# End exclusive workspace entry.
+
 rm -rf "$TMP"
 mkdir -p "$TMP" || { say "FAILED: /tmp is unavailable"; sync; exit 1; }
 
@@ -314,6 +346,10 @@ done
     say "FAILED: expected one live rbp, found $RBP_LIVE_COUNT"
     rm -rf "$TMP"; sync; exit 1
 }
+rbp_executable_matches || {
+    say "STOP: live rbp executable differs from the guarded $RBP file"
+    rm -rf "$TMP"; sync; exit 1
+}
 ARGS=$(tr '\0' ' ' < "/proc/$PID/cmdline" | cut -d' ' -f2-)
 CWD=$(readlink "/proc/$PID/cwd" 2>/dev/null)
 PREVIOUS_PRELOAD=$(tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n 's/^LD_PRELOAD=//p' | head -1)
@@ -321,14 +357,32 @@ RBP_PRELOAD=$PREVIOUS_PRELOAD
 say "rbp pid=$PID options=[$ARGS] cwd=$CWD"
 say "existing preload: ${PREVIOUS_PRELOAD:-none}"
 
+case " $LOADED_MODULES " in
+    *" core "*) ;;
+    *)
+        if preload_contains /root/pdj/librx3_core.so ||
+           preload_contains /root/pdj/librx3_stems.so; then
+            say "STOP: this image removes Core but rbp still preloads it; an explicit unload migration is required"
+            rm -rf "$TMP"; sync; exit 1
+        fi
+        ;;
+esac
+
 if defer_for_unsafe_media "$USB"; then
     exit 0
 fi
 
 run_hooks "$PREPARE_HOOKS" || {
     say "STOP: a prepare hook failed; no guarded word was written."
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 }
+reconcile_module_set
+
+if [ "$RUNTIME_STAGE_COUNT" != 0 ] && [ "$NEED_RBP_RESTART" = 0 ]; then
+    RUNNING_HOOK=runtime-resources
+    request_rbp_restart
+fi
 
 if [ "$NEED_RBP_RESTART" = "0" ]; then
     echo patched > /tmp/rx3-patch.state
@@ -337,6 +391,7 @@ if [ "$NEED_RBP_RESTART" = "0" ]; then
     run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
     run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"
     run_hooks "$REPORT_HOOKS" || say "WARNING: a report hook failed"
+    discard_runtime_stage
     rm -rf "$TMP"
     sync
     say "=== complete ==="
@@ -354,6 +409,7 @@ say "restart requested by:${RESTART_REQUESTED_BY:- unknown}"
 say "stopping rbp"
 if ! stop_rbp "$PID"; then
     say "STOP: the running rbp did not stop; no guarded word was written."
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 
@@ -419,29 +475,68 @@ launch_rbp()
     NEW=$!
 }
 
-# rbp learns that a drive exists from the hotplug event the kernel emits when it
-# appears. That event fired for this drive while the previous process was
-# running, so the replacement comes up blind to media that is still mounted, and
-# the operator has to pull the drive out and push it back to be seen - which is
-# exactly the reinsertion the identity check used to refuse. Asking the kernel to
-# re-emit the event puts the drive in front of the new process again without
-# unmounting anything.
+# The udev block "add" rule mounts the drive AND runs decrypt_autoexec.sh.
+# Re-emitting it after restart can therefore launch this runtime again. Instead
+# replay only the two procfs messages the vendor rules send to rbp: "connect"
+# and "mount <path>". Wait until the replacement process opened both channels;
+# a hook constructor's readiness marker alone precedes that initialization.
+rbp_has_usb_channels()
+{
+    _rx3_pid=$1
+    _rx3_slot=$2
+    _rx3_connect=0
+    _rx3_mount=0
+    for _rx3_fd in "$PROC_ROOT/$_rx3_pid/fd"/*; do
+        _rx3_target=$(readlink "$_rx3_fd" 2>/dev/null) || continue
+        case "$_rx3_target" in
+            /proc/udev_usbctn"$_rx3_slot") _rx3_connect=1 ;;
+            /proc/udev_usb"$_rx3_slot") _rx3_mount=1 ;;
+        esac
+    done
+    [ "$_rx3_connect" = 1 ] && [ "$_rx3_mount" = 1 ]
+}
+
 announce_media()
 {
-    media_device=$(awk -v mount="$USB" '$2 == mount {print $1}' /proc/mounts | tail -1)
+    case "$USB" in
+        /media/usb1/*) media_slot=1 ;;
+        /media/usb2/*) media_slot=2 ;;
+        *) say "media announce skipped: unsupported mount path $USB"; return 0 ;;
+    esac
+    media_name=${USB#/media/usb$media_slot/}
+    case "$media_name" in
+        ""|*/*|*[!a-zA-Z0-9._-]*)
+            say "media announce skipped: unsafe mount path $USB"; return 0 ;;
+    esac
+    media_device=$(awk -v mount="$USB" '$2 == mount {print $1}' "$PROC_ROOT/mounts" | tail -1)
     case "$media_device" in
         /dev/*) ;;
-        *) say "media re-announce skipped: $USB is not a block device mount"; return 0 ;;
+        *) say "media announce skipped: $USB is not a block device mount"; return 0 ;;
     esac
-    media_uevent=/sys/class/block/${media_device#/dev/}/uevent
-    [ -w "$media_uevent" ] || {
-        say "media re-announce skipped: $media_uevent is not writable"
+    media_connect=$PROC_ROOT/udev_usbctn$media_slot
+    media_mount=$PROC_ROOT/udev_usb$media_slot
+    if [ ! -w "$media_connect" ] || [ ! -w "$media_mount" ]; then
+        say "media announce skipped: USB notification channels unavailable"
         return 0
-    }
-    if echo add > "$media_uevent" 2>/dev/null; then
-        say "re-announced $media_device to the hotplug handler"
+    fi
+    media_wait=0
+    while ! rbp_has_usb_channels "$NEW" "$media_slot"; do
+        rbp_alive "$NEW" || {
+            say "media announce skipped: rbp pid $NEW exited"
+            return 0
+        }
+        if [ "$media_wait" -ge 80 ]; then
+            say "WARNING: media announce timed out waiting for rbp USB channels"
+            return 0
+        fi
+        usleep 100000
+        media_wait=$((media_wait + 1))
+    done
+    if printf connect > "$media_connect" &&
+       printf 'mount %s' "$USB" > "$media_mount"; then
+        say "announced mounted $media_device to rbp pid $NEW via USB$media_slot"
     else
-        say "WARNING: media re-announce failed for $media_device"
+        say "WARNING: media announce failed for $media_device"
     fi
 }
 
@@ -454,16 +549,52 @@ append_diagnostics()
     done
 }
 
+restore_resources_or_halt()
+{
+    restore_runtime_stage && return 0
+    say "STOP: resource restore failed; inspect $RUNTIME_STAGE_DIR before reboot"
+    : > "$LOCK/recovery-needed"
+    sync; exit 1
+}
+
+verify_recovery_words_or_halt()
+{
+    recovery_failed=$(verify_words "$1")
+    [ "$recovery_failed" = 0 ] && return 0
+    say "STOP: $recovery_failed recovery word(s) differ; player not relaunched"
+    : > "$LOCK/recovery-needed"
+    sync; exit 1
+}
+
+if ! commit_runtime_stage; then
+    say "FAILED: staged resource commit; restoring the previous generation"
+    restore_resources_or_halt
+    RBP_PRELOAD=$PREVIOUS_PRELOAD
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
+    say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
+    rm -rf "$TMP"; sync; exit 1
+fi
+for ready_file in $RBP_READY_FILES; do rm -f "$ready_file"; done
+for diagnostic_file in $RBP_DIAGNOSTIC_FILES; do rm -f "$diagnostic_file"; done
+
 write_words patched
 FAILED=$(verify_words patched)
 if [ "$FAILED" != "0" ]; then
     say "FAILED: $FAILED patch word write(s); restoring previous bytes"
     [ "$LOGGING" = "1" ] && cat "$TMP/failed" >> "$LOG" 2>&1
     write_words previous
+    restore_resources_or_halt
+    verify_recovery_words_or_halt previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
     say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 say "write verified: $PATCH_COUNT/$PATCH_COUNT words"
@@ -478,13 +609,13 @@ if [ ! -d "/proc/$NEW" ]; then
     say "FAILED: replacement rbp exited; restoring the stock binary"
     append_diagnostics
     write_words stock
-    STOCK_FAILED=$(verify_words stock)
-    [ "$STOCK_FAILED" = "0" ] || \
-        say "WARNING: $STOCK_FAILED stock word(s) could not be restored"
+    restore_resources_or_halt
+    verify_recovery_words_or_halt stock
     RBP_PRELOAD=$(preload_without_runtime "$PREVIOUS_PRELOAD")
     echo stock > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     say "stock rbp restarted, pid=$NEW, preload=${RBP_PRELOAD:-none}"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 # As soon as the process is alive the drive goes back in front of it. What
@@ -495,23 +626,32 @@ announce_media
 
 MISSING_READY=""
 for ready_file in $RBP_READY_FILES; do
-    [ -s "$ready_file" ] || MISSING_READY="$MISSING_READY $ready_file"
+    ready_file_matches_pid "$ready_file" "$NEW" ||
+        MISSING_READY="$MISSING_READY $ready_file"
 done
 if [ -n "$MISSING_READY" ]; then
     say "FAILED: replacement rbp missed readiness:${MISSING_READY}; restoring previous bytes"
     append_diagnostics
-    kill "$NEW" 2>/dev/null
+    if ! stop_rbp "$NEW"; then
+        say "STOP: replacement rbp survived; resources cannot be restored safely"
+        : > "$LOCK/recovery-needed"
+        sync; exit 1
+    fi
     write_words previous
+    restore_resources_or_halt
+    verify_recovery_words_or_halt previous
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     wait_for_rbp "$NEW"
     announce_media
     say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
 say "OK: rbp active, pid=$NEW"
 echo patched > /tmp/rx3-patch.state
+discard_runtime_stage
 
 run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
 run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"

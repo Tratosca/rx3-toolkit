@@ -77,16 +77,22 @@ class DocumentationHygieneTests(unittest.TestCase):
     def test_no_update_container_specification_in_prose(self):
         offences = []
         for document in DOCUMENTS:
+            integrated_source = None
             for number, line in enumerate(
                 document.read_text(encoding="utf-8").splitlines(), 1
             ):
+                if document == ROOT / "REFERENCES.md" and line.startswith("<!-- source: docs/"):
+                    integrated_source = line.split(" |", 1)[0].removeprefix("<!-- source: ")
                 if _is_exempt(line):
                     continue
                 for pattern, reason in FORBIDDEN:
                     # RX3PKG2 is our stems format, implemented and tested in
                     # this repository. Its checksum is unrelated to UPD.
                     # Keep every other guard active on that document.
-                    if document == ROOT / "docs/stem-package.md" and pattern is FORBIDDEN[0][0]:
+                    if pattern is FORBIDDEN[0][0] and (
+                        document == ROOT / "REFERENCES.md"
+                        and integrated_source == "docs/stem-package.md"
+                    ):
                         continue
                     found = pattern.search(line)
                     if found:

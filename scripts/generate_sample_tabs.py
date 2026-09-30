@@ -12,6 +12,7 @@ from app.preview.atlas import Atlas, INACTIVE
 
 def generate():
     assets = ROOT / 'mod/modules/core/assets'
+    output = ROOT / 'mod/modules/samples/assets'
     atlas = Atlas.load(assets / 'glyph-atlas-dark.rgb565')
     glyphs = Image.new('RGB', (atlas.width('SAMPLES') + 16, atlas.cell_height), atlas.ground(INACTIVE))
     atlas.draw(glyphs, 'SAMPLES', 8, 0, INACTIVE)
@@ -21,7 +22,10 @@ def generate():
     mask = mask.point(lambda p: min(255, p * 255 / peak))
     for suffix in ('', '-light'):
         def read(name):
-            return Image.frombytes('RGB', (180, 50), (assets / (name + suffix + '.rgb565')).read_bytes(), 'raw', 'BGR;16')
+            owner = {'key-selected': 'keyshift', 'none-selected': 'keyshift',
+                     'stems-selected': 'stems'}.get(name, 'core')
+            path = ROOT / 'mod/modules' / owner / 'assets' / (name + suffix + '.rgb565')
+            return Image.frombytes('RGB', (180, 50), path.read_bytes(), 'raw', 'BGR;16')
         neutral = read('status-none-selected')
         ground = neutral.getpixel((8, 8))
         ink = max((neutral.getpixel((x, y)) for y in range(8, 43) for x in range(5, 88)),
@@ -45,7 +49,7 @@ def generate():
             else:
                 out.paste(right, (93, 8))
             data = b''.join(struct.pack('<H', ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)) for r, g, b in (out.getpixel((x, y)) for y in range(50) for x in range(180)))
-            (assets / ('samples-' + state + suffix + '.rgb565')).write_bytes(data)
+            (output / ('samples-' + state + suffix + '.rgb565')).write_bytes(data)
 
 
 if __name__ == '__main__':

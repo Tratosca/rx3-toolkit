@@ -54,6 +54,16 @@ dispatch hook preserves the direction across the native signed-byte conversion,
 scoped to the current native task. The existing comparator performs the actual
 sort, including cached requests; the renderer never reorders a visible page.
 
+Overlapping row updates reuse raw metadata and track keys for up to thirty seconds
+in a fixed 32-entry cache (about 34 KiB). Identity includes the database context,
+connection, source index, navigation depth, sort and requested fields, plus the
+native track row. Track-key changes and provider removal invalidate it through
+an atomic generation. Expiry is absolute: repeated hits never keep a value alive
+indefinitely. Read failures are retried; colours and MASTER compatibility are
+not cached. This reduces redundant database work in host scenarios; hardware
+latency and cold-page costs still need measurement. See
+[the scrolling investigation](../../../REFERENCES.md#doc-browse-scroll-performance).
+
 Firmware entry points are guarded against the examined rbp 1.19 image:
 SHA-256 `60bcbd8876116bf09f0d8f747f95d7c7d3081ebd39d6fe14d56005a22f7f3b09`.
 Compilation or emulator validation does not establish physical RX3 validation.

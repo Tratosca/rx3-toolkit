@@ -129,7 +129,7 @@ static void paint(void *render,void *model){
     assert(half(m+0x18)==1126 && half(m+0x1c)==1258);
     assert(m[0x38]==3 && word(m+0x28)==0);
 }
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)g;assert((a==ROW_HOOK||a==0x11d9b0u||a==0x11d83cu||a==0x2596ccu||a==0x104edcu||a==0x171780u||a==0x153530u||a==0x2995c8u||a==0x2955d8u||a==0x29992cu)&&r);h->record=(void *)1;installed++;return a==ROW_HOOK?(void *)1:(void *)native_load;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)g;assert((a==ROW_HOOK||a==0x20805cu||a==0x207dd0u||a==0x11d9b0u||a==0x11d83cu||a==0x2596ccu||a==0x104edcu||a==0x171780u||a==0x153530u||a==0x2995c8u||a==0x2955d8u||a==0x29992cu)&&r);h->record=(void *)1;installed++;return a==ROW_HOOK?(void *)1:(void *)native_load;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
 int detach_hook(struct installed_hook *h){(void)h;detached++;return 1;}
 int release_hook(struct installed_hook *h){h->record=0;released++;return 1;}
@@ -139,7 +139,7 @@ int main(void){
     const unsigned char a=1,b=2,other=3;static const uint16_t caption[]={'B','P','M',0};
     const struct rx3_browse_column col={13,caption};const struct rx3_browse_marker mark={category,image};
     assert(rx3_browse.column(&a,&col) && rx3_browse.marker(&b,&mark));
-    assert(installed==10 && rx3_browse_count());
+    assert(installed==12 && rx3_browse_count());
     assert(list_load1(42)==0 && list_load2(42)==0 && loads==0);
     column=0;assert(list_load1(42)==42 && list_load2(42)==42 && loads==2);column=&col;
     uint32_t heading[21]={0};heading[2]=123;heading[4]=0x0801;
@@ -156,9 +156,9 @@ int main(void){
     assert(!rx3_browse.column(&other,&col) && !rx3_browse.marker(&other,&mark));
     rx3_browse.unregister_owner(&other);assert(column==&col && marker==&mark);
     rx3_browse.unregister_owner(&a);assert(!column && marker==&mark && detached==9);
-    rx3_browse.unregister_owner(&b);assert(!rx3_browse_count() && detached==10 && released==10);
-    assert(rx3_browse.column(&a,&col) && installed==20);
-    rx3_browse.unregister_owner(&a);assert(detached==20 && released==20);
+    rx3_browse.unregister_owner(&b);assert(!rx3_browse_count() && detached==12 && released==12);
+    assert(rx3_browse.column(&a,&col) && installed==24);
+    rx3_browse.unregister_owner(&a);assert(detached==24 && released==24);
     return 0;
 }
 ''',[])
@@ -185,7 +185,7 @@ int main(void){
     assert(!column && marker==&mark && original_rows);
     assert(!original_load[0] && !original_load[1] && detached==1 && released==1);
     rx3_browse.unregister_owner(&b);assert(marker==&mark && detached==1);
-    rx3_browse.unregister_owner(&a);assert(!rx3_browse_count() && detached==2 && released==2);
+    rx3_browse.unregister_owner(&a);assert(!rx3_browse_count() && detached==4 && released==4);
     return 0;
 }
 ''',[])
@@ -215,7 +215,7 @@ int main(void){
     assert(!column && marker==&mark && original_rows);
     assert(!original_load[0] && !original_load[1] && detached==expected && released==expected);
     rx3_browse.unregister_owner(&b);assert(marker==&mark && detached==expected);
-    rx3_browse.unregister_owner(&a);assert(!rx3_browse_count() && detached==expected+1 && released==expected+1);
+    rx3_browse.unregister_owner(&a);assert(!rx3_browse_count() && detached==expected+3 && released==expected+3);
     }
     return 0;
 }

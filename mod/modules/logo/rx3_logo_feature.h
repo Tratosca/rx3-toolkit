@@ -1,15 +1,11 @@
 /* SPDX-License-Identifier: MPL-2.0
- * Logo implementation of the core runtime-feature lifecycle.
+ * Logo artwork loading and placement, private to rx3_logo_module.c.
  */
 
 #ifndef RX3_LOGO_FEATURE_H
 #define RX3_LOGO_FEATURE_H
 #include "rx3_logo_geometry.h"
 
-/* Set in initialize() from RX3_LOGO, the way every other feature reads its
- * own flag; the module exports it only when the artwork reached the drive.
- */
-static int logo_enabled;
 static uint32_t main_logo_width;
 static uint32_t main_logo_height;
 static void *main_logo_pixels;
@@ -83,9 +79,6 @@ static void *load_logo(const char *path, uint32_t *width_out, uint32_t *height_o
 
 static int logo_feature_install(void)
 {
-    if (!logo_enabled)
-        return 0;
-
     main_logo_pixels = load_logo("/root/pdj/rx3-logo-main.rgb565",
                                  &main_logo_width, &main_logo_height);
     if (!main_logo_pixels)
@@ -119,8 +112,14 @@ static int logo_feature_install(void)
     return 1;
 }
 
-static void logo_feature_remove(void)
+/* Once a published image table references the artwork, it and its placement
+   stay for the life of the process. */
+static void logo_feature_remove(int release_pixels)
 {
+    if (!release_pixels) {
+        log_line("logo retained: the published image table references it");
+        return;
+    }
     logo_restore_position((uint32_t *)LOGO_PLACEMENT);
     if (main_logo_pixels)
         munmap(main_logo_pixels,
@@ -132,39 +131,6 @@ static void logo_feature_remove(void)
     main_logo_light_pixels = 0;
     main_logo_ready = 0;
     main_logo_light_ready = 0;
-}
-
-/* Point the stock wordmark record at the loaded artwork.
- *
- * The logo is not a new image: it is the record the player already draws in
- * the middle of the performance screen, so the size travels with the record
- * while logo_place updates its native position before rendering starts.
- *
- * The format byte is 2 here where the tab labels use 1. Both files are RGB565,
- * and the one thing the logo does that a tab label never does is leave parts of
- * itself unpainted, so 2 reads as the variant that honours the colour key. That
- * is a reading of one released build, not a measurement: if a logo arrives with
- * a magenta rectangle around it, this byte is the first thing to try.
- */
-static void install_logo_record(uint8_t *table)
-{
-    if (!main_logo_ready || !main_logo_pixels)
-        return;
-    uint8_t *record = table + LOGO_IMAGE_INDEX * 44u;
-    uint16_t width = (uint16_t)main_logo_width;
-    uint16_t height = (uint16_t)main_logo_height;
-    uint32_t pixels = (uint32_t)(unsigned long)main_logo_pixels -
-                      (uint32_t)(unsigned long)table;
-    uint32_t no_palette = 0u;
-    memcpy(record + 4u, &width, sizeof(width));
-    memcpy(record + 6u, &height, sizeof(height));
-    record[0x18u] = 2u;
-    record[0x19u] = 0u;
-    memcpy(record + 0x20u, &pixels, sizeof(pixels));
-    memcpy(record + 0x24u, &no_palette, sizeof(no_palette));
-    log_line("main logo replaces the stock wordmark");
-    log_number("  width  =", width);
-    log_number("  height =", height);
 }
 
 #endif /* RX3_LOGO_FEATURE_H */

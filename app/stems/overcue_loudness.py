@@ -3,7 +3,7 @@
 
 Measurements use FFmpeg EBU R128, not OverCue's Rust implementation. Metadata
 rounding is covered by conservative margins. Numerical equivalence to Desktop
-is a separate acceptance test; see docs/overcue-prototype.md.
+is a separate acceptance test; see REFERENCES.md, OverCue USB prototype.
 """
 from __future__ import annotations
 

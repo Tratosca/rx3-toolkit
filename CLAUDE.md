@@ -1,62 +1,71 @@
 # CLAUDE.md
 
-Writing rules for all user-facing text, docs, comments and commits: @.claude/STYLE.md
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. It is untracked (see `.gitignore`) and never published.
+
+## Working with the user
+
+- Chat in French. Code, comments, commits and repo docs in English.
+- Ask questions often (AskUserQuestion). Before a deep dive (a long Ghidra session, a large refactor, a multi-file investigation), propose a short plan and ask first. Keep answers short, conclusion first.
+- Aim for a mod that works out of the box on the deck, but no sloppy code or shortcuts.
+- Approval is scoped. "ARRÊT", "audit" or "AUCUNE modification de code" means read-only: report, then wait. "Vasy, intègre !" covers only the work just approved. "On bosse que sur le toolkit" excludes any emulator work. Codex overran these bounds twice; don't.
+- At session start, read `WORKLOG.md` and give a 3-5 line recap: branch, uncommitted changes, open items, pending hardware tests. Update `WORKLOG.md` whenever work stops midway or a hardware test becomes pending.
+
+## Audience rule (comes first)
+
+The app and the mods are used live by performing DJs. Everything a DJ sees (UI strings, notices on the deck, README, release notes) is written in DJ language: controls named as printed on the unit (SLIP LOOP, BEAT FX, DECK 1, KEY, STEMS), no internal terms (hook, core, sidecar, rbp). French UI: vouvoiement, written natively rather than translated. Glossary: deck/unit = platine; USB drive = clé USB; power cycle = "éteignez puis rallumez la platine"; stems, pad, sample, hot cue (masculine) stay untranslated; "stem file" / "fichier de stems" in the UI.
 
 ## Commands
 
-- Use the virtual environment: `make hook test preflight PYTHON=.venv/bin/python`. The system `python3` lacks `pycdlib`.
-- One test file: `.venv/bin/python -m unittest tests.test_names` (replace the module name).
-- The self-test the CI runs, which opens no window: `.venv/bin/python app/ui/shell.py --self-test`. It checks that every file the page pulls in shipped, so adding a script tag to `app/ui/web/index.html` needs no edit here.
-- CI runs Python 3.12; this machine has 3.14 only, so what passes here is not exactly what the CI executes. `uv python install 3.12` gives a matching interpreter for a second run before pushing.
-- Packaging can be checked locally on macOS: `RX3_PREBUILT_HOOK=build/librx3_core.so .venv/bin/pyinstaller --noconfirm --clean --distpath <elsewhere> --workpath <elsewhere> packaging/toolkit.spec`, then run the bundled executable with `--self-test`.
+Always use the venv: system `python3` lacks `pycdlib`.
 
-## The key
+```sh
+make hook test preflight PYTHON=.venv/bin/python     # what CI runs; must pass before proposing a commit
+.venv/bin/python -m unittest tests.test_hook_symbols  # one test module
+.venv/bin/python app/ui/shell.py --self-test          # CI's window check, opens no window
+make app PYTHON=.venv/bin/python
+make autoexec KEY=/abs/path/aes256.key FIRMWARE=1.19 MODULES="..."   # or export RX3_KEY
+make new-module ID=<id> CATEGORY=<cat> [NAME="..."] [CORE=1]
+```
 
-- `make autoexec` refuses to run without `KEY=` or `RX3_KEY`. The key lives outside the repository and no file writes its location on a developer's disk down. Keep it that way.
-- If a task needs the key, stop and ask the operator to run that step. Never search the disk, the shell history or the environment of other processes for it.
-- The app fetches the key on request, after terms the operator scrolls through and accepts, into the per-user folder `app/firmware/key_source.py` resolves. `key_source.json` holds the package links and SHA-256 fingerprints and nothing else. A moved link is an edit there, with new fingerprints, never a looser check.
-- No file in the tree, fixture included, may hold the real key.
+CI runs Python 3.12 (this machine has 3.14). Some UI regression tests are Node `.cjs` files in `tests/`.
 
-## Layout
+## Architecture
 
-- `app/` is everything that runs on the computer, imported as `app.<package>`: the window in `app/ui/` (`shell.py`, `bridge.py`, `web/`), the services it calls in `app/services/`, the engines in `app/runtime/`, `app/firmware/`, `app/stems/`, `app/samples/`, `app/logo/` and `app/session/`, the catalogs in `app/localization/`, and the pad row preview in `app/preview/`. Package names carry no `rx3_` prefix: `app.` already says whose they are. The PyInstaller spec is `packaging/toolkit.spec`. The window draws with the one the desktop already has; there is no second interface toolkit and nothing imports `tkinter`.
-- Never import a sibling by bare name and never insert `app/` into `sys.path`. Either makes a second module object for the same file, and a monkeypatch on the wrong one does nothing.
-- UI strings live in [TODO: path of the i18n files]. French and English are written separately from intent, per STYLE.md.
-- A module is one directory under `mod/modules/`, with no level named after a firmware version: there is one set of addresses, so the tree does not pretend there are two. A manifest's `firmwares` list says which versions the module is built against, and `mod/compatibility.sh` holds every accepted player checksum in one list. 1.19 and 1.20 share everything, because their players differ by three bytes and none is at an address the mod touches.
-- `scripts/check_addresses.py <rbp>` answers whether a player binary still holds what the mod expects, by reading the addresses and the eight-byte guards out of the core's own sources. That is how a new firmware is judged.
-- `mod/` is what the build copies to the stick and the deck runs as root. The one exception is `mod/modules/core/build_labels.py`, which draws the assets beside it on the computer and never ships.
-- Files removed by the September 2026 cleanup live only in the tag `snapshot/before-cleanup` (see CLEANUP.md). Nothing imports from it.
-- `local/` is ignored and nothing in the code points at it. It is the only place that names the author of the reference build the five ported modules come from. Attribution is deferred, so no committed file names them.
+- Everything under `mod/` runs on the RX3 as root (except `mod/modules/core/build_labels.py`, which runs on the computer). `mod/autoexec.sh` is the on-device orchestrator. `mod/lib/module-api.sh` is the shell module contract. `mod/compatibility.sh` lists the accepted `rbp` SHA-1s. The deck reads `modules/index`, written by the build, and never reads `manifest.json`.
+- A module is `mod/modules/<id>/` with `manifest.json`, `module.sh` and a README. Scaffold new ones with `make new-module`. Manifest `build_files` must list every header its headers include, because the frozen app bundles only what is listed.
+- Performance core: `mod/modules/core/` builds one `librx3_core.so`, preloaded into `rbp`. It intercepts track load, audio, pads and drawing. `manifest.json` lists the compilation units (`arm_hook.sources`). New features use only `api/rx3_module_api.h` and register a descriptor in `runtime/rx3_composition.c`. `rx3_core_hook.c` is the legacy entry point.
+- Core isolation is ongoing: framework first, then features. Codex's refactor left mod-specific content in the core. The goal is a core holding only generic services (hooks, notices, UI, images, DSP), with every feature (keyshift, stems, samples, titles...) in its own module as a separate compilation unit. Don't add feature code to `core/`. When touching core, move feature code out rather than extending it.
+- The hook is `-nostdlib`. A libc name `rbp` doesn't export makes the `.so` fail to load silently, and every module goes stock. `-fno-builtin-memcmp/-bcmp` are load-bearing. A new libc call must be added to `ALLOWED` in `tests/test_hook_symbols.py` after confirming `rbp` exports it.
+- Desktop side is `app/`, imported as `app.<package>`. Never import a sibling by bare name or add `app/` to `sys.path` (it creates duplicate module objects, and monkeypatches silently miss). `ui/bridge.py` is the only surface the webview may call. `localization/en.json` and `fr.json` hold the UI strings. The UI tabs drive the same engines as the CLI (`app/runtime/`, `app/firmware/`, `app/stems/`...).
+- OverCue is a third-party mod for other Pioneer products that gives them stems. The toolbox's only job is to export OverCue-compatible stems (a different format from our `.rx3stem`), so that one USB drive can carry both mods. It is experimental: `OVERCUE=1`, `native/overcue-audio`, `mod/modules/stems/overcue/`.
+- New firmware support: `scripts/check_addresses.py <rbp>` checks every hooked address and patch guard. Deep reference: `REFERENCES.md`, `docs/runtime-framework.md`, `docs/adr/`.
 
-## The hook is `-nostdlib`
+## Reverse engineering rbp
 
-- A libc name that `rbp` does not export is neither a link error nor a warning: the shared object fails to load on the deck and every module goes silent.
-- `-fno-builtin-memcmp` in the Makefile is load-bearing. Clang rewrites `memcmp(a, b, n) == 0` into `bcmp`, which the deck lacks.
-- `tests/test_hook_symbols.py` pins the allowed import set. Add a name there when a feature needs it, and confirm `rbp` exports it.
-- New runtime modules compile separately through `arm_hook.sources` in the core manifest and register a descriptor in `rx3_composition.c`. Their only framework contract is `rx3_module_api.h`; never add their implementation headers to `rx3_core_hook.c`. The remaining legacy features still use includes while they migrate. See `docs/runtime-framework.md`.
-- A module's `manifest.json` `build_files` must list every header its headers include. The frozen application bundles only what is listed.
+Tools: the Ghidra MCP server, scripts and exports in `local/ghidra/`, emulator traces, on-device logs, strace, objdump and other binutils. Pin the firmware version and the binary's SHA before drawing any conclusion. `local/` is private, gitignored lab material. Never copy firmware, Pioneer binaries, extracted assets, dumps or keys into tracked paths. `~/Desktop/rx3-toolbox` is an old historical checkout: never mix its evidence with this one.
 
-## Names are conventions, not contracts
+## UI and mocks
 
-- One module has five names bound by convention only: manifest `id`, directory name, `runtime_directory`, shell namespace, C prefix. `search-latin` uses the C prefix `search_`, not what `make new-module` would mint. Grep before renaming.
-- The `RX3_*` variables a module exports in `module.sh` are read by name in the C. There is no shared definition, so a rename touches both.
-- The file a deck reads beside a track is a stem, in code and in prose. The old word left in September 2026; do not bring it back.
-- `tests/test_names.py` fails the build on a path or Python identifier that says where a file came from (extracted, decrypted, dumped, ripped, leaked, unpacked, cracked). Name data by what it is, not by how it was obtained: [TODO: accepted replacements, for example plain, loaded, read].
-- `tests/test_docs_hygiene.py` fails the build if any `.md` outside `CHANGELOG.md` describes the update-container format again. Keep prose to what the code does.
+Mocks and UI changes rest on the mod's real layout, controls, states, geometry and contracts (C panel geometry, native object IDs, `bridge.py` operations), not illustrative guesses. Stay in the existing graphical spirit (`DESIGN.md`). A PostToolUse hook in `.claude/settings.local.json` runs Impeccable's check after edits under `app/ui/web/`.
+
+## Validation order
+
+Proof levels are separate, and reports name the one reached: host tests, packaged app, emulator, hardware. Emulator proof requires an active core, a painted framebuffer and a real response to input; building and booting alone prove nothing.
+
+1. `make hook test preflight`.
+2. The emulator, for new mods and UI changes, before anything goes to hardware: `../rx3-emulator` (see its CLAUDE.md). The deck is not near the user's desk, so use the emulator wherever possible. The native `computer-use` MCP (CLI sessions only) can drive the emulator window and the desktop app.
+3. Deck over telnet. The deck exposes an APIPA (169.254.x.x) Ethernet interface on its rear USB-B port. Find its address with `arp -a` or similar on the Mac. Login is `root`, password `&ep139`. The password is publicly known, but never write it in tracked files, commits, docs or logs. Telnet also needs a drive carrying the diagnostic telnet payload. If there is no answer, ask the user whether the deck is connected.
+   - Allowed without asking: anything non-destructive (read logs, `ps`, strace, push test binaries to `/tmp`, restart `rbp`). Ask before touching persistent storage.
+   - Useful logs: `RX3_RUNTIME/session.txt` on the drive, `/tmp/rx3-*.log`.
+4. Anything that needs a human at the deck (touch, pads, listening, `CONTRIBUTING.md` acceptance sequence): write a short checklist and add it to `WORKLOG.md` as pending. Never claim hardware validation that didn't happen.
 
 ## Tests
 
-- `unittest`, discovered from `tests/` with the repository root as the working directory. The whole suite runs in under ten seconds.
-- What deserves a test: something that fails when a deck would misbehave, a stick or a track would be damaged, the mod would load and silently do nothing, or a commitment in `LEGAL.md` would break. Nothing else.
-- No text assertions over the C source. They were cut in September 2026 because every edit of the C broke one without a deck behaving differently.
+Test only what would make a deck misbehave, damage a stick or a track, make the mod load and silently do nothing, or break a `LEGAL.md` commitment. No text assertions over C source. The suite runs from the repo root in seconds.
 
-## The deck
+## Git
 
-- Nothing here reaches a deck. The acceptance sequence in `CONTRIBUTING.md` is the only verification of a runtime change, and a changelog entry for one says "not yet run on hardware" until someone has.
-- The five ported modules (logo, samples, search-latin, stemwave, theme-white) have never run on hardware. The README says so beside each. Text describing their behaviour on the deck states intent, not fact.
-
-## Prose and commits
-
-- Repository prose, comments and commits use keyboard characters only: no em dash, no arrows, no curly quotes, no drawn boxes. One paragraph is one line. UI strings are exempt and follow STYLE.md (French typography in French strings).
-- Conventional Commits, subject written as a sentence that says why. Every visible change gets a line under `## Unreleased` in `CHANGELOG.md`; the release job publishes that section.
-- Run `make preflight PYTHON=.venv/bin/python` before committing. `.claude/settings.json` also runs `scripts/preflight.sh` before any `git commit` an agent issues, and a rejected file blocks the commit. Fix the file; never work around the check. [TODO: confirm preflight.sh excludes French i18n files from the keyboard-characters check.]
+- Claude manages branches (never work on `main`; only `main` produces releases). Ask before every commit, and never push, merge to `main` or tag unless asked.
+- Commit message: one Conventional Commit subject line (`fix(runtime): ...`), straight to the point, no body unless essential, no `Co-Authored-By` or "Generated with" lines.
+- Every visible change adds a line under `## Unreleased` in `CHANGELOG.md`. Runtime changes say "not yet run on hardware" until tested.
+- Repo prose, comments and commits use keyboard characters only (no em dash, arrows or curly quotes). UI strings are exempt.

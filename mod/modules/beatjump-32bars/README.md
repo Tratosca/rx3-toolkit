@@ -15,4 +15,4 @@ The jog display is untouched: it is driven by a separate controller with its own
 
 ---
 
-What actually changes in the binary, and the floating-point trick the ±32 value needs: [Reference → A worked example](../../../../REFERENCES.md#a-worked-example-longer-beat-jumps).
+What actually changes in the binary, and the floating-point trick the ±32 value needs: [Reference → A worked example](../../../REFERENCES.md#a-worked-example-longer-beat-jumps).

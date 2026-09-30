@@ -17,6 +17,14 @@ class FrameworkTests(unittest.TestCase):
     def run_units(self, body, units, flags=()):
         if 'core/runtime/rx3_modules.c' in units and 'core/services/rx3_images.c' not in units:
             units = [*units, 'core/services/rx3_images.c']
+        if 'core/runtime/rx3_modules.c' in units and 'core/services/rx3_titles.c' not in units:
+            units = [*units, 'core/services/rx3_titles.c']
+        if 'core/runtime/rx3_modules.c' in units:
+            # The service table names every shared service.
+            for unit in ('core/services/rx3_input.c', 'core/services/rx3_audio.c',
+                         'core/services/rx3_memory.c', 'core/services/rx3_loader.c'):
+                if unit not in units:
+                    units = [*units, unit]
         compiler = shutil.which('clang') or shutil.which('cc')
         if not compiler:
             self.skipTest('native C compiler required')
@@ -34,6 +42,7 @@ class FrameworkTests(unittest.TestCase):
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
 extern int gettimeofday(void *, void *);
@@ -42,13 +51,27 @@ extern int setenv(const char *, const char *, int);
 extern int unsetenv(const char *);
 ''')
             source = directory / 'test.c'
+            # Services link against the hook and log units. A test that links
+            # the real units, or defines its own doubles, replaces these weak
+            # ones, which live in a unit of their own for that reason.
+            stubs = directory / 'weak_services.c'
+            stubs.write_text(r'''
+struct installed_hook;
+__attribute__((weak)) void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
+__attribute__((weak)) void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
+__attribute__((weak)) int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
+__attribute__((weak)) int detach_hook(struct installed_hook *h) { (void)h; return 1; }
+__attribute__((weak)) int release_hook(struct installed_hook *h) { (void)h; return 1; }
+__attribute__((weak)) void log_line(const char *s) { (void)s; }
+__attribute__((weak)) void rx3_log_number(const char *s, unsigned long v) { (void)s; (void)v; }
+''')
             if 'core/runtime/rx3_modules.c' in units:
                 body += '\n#include \"core/api/rx3_browse_api.h\"\nconst struct rx3_browse_service rx3_browse={0};\n'
             source.write_text(body)
             binary = directory / 'test'
             subprocess.run([compiler, '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-include', str(header), '-I', str(MODULES), *flags,
-                            str(source), *(str(MODULES / unit) for unit in units),
+                            str(source), str(stubs), *(str(MODULES / unit) for unit in units),
                             '-o', str(binary)], check=True, capture_output=True, text=True)
             subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
@@ -105,7 +128,7 @@ static int release(struct installed_hook *h){(void)h;released++;return 1;}
 static void log_message(const char *s){assert(s);}
 static int add(const struct rx3_pad_row *r){if(reject_row)return 0;row=r;return 1;}
 static void remove_row(const struct rx3_pad_row *r){if(row==r)row=0;}
-static const struct rx3_panel_service panels={add,remove_row,0};
+static const struct rx3_panel_service panels={add,remove_row,0,0};
 static struct rx3_harmonic_reference reference(void) {
     return (struct rx3_harmonic_reference){1,14,(1u<<12)|(1u<<14)|(1u<<15)|(1u<<16)};
 }
@@ -265,14 +288,14 @@ static void *install(struct installed_hook *h,unsigned long a,const uint8_t g[8]
 static int remove_hook(struct installed_hook *h) { assert(h); removed++; return 1; }
 static void log_message(const char *s) { assert(s); }
 int main(void) {
-    struct rx3_services services={.install_hook=install,.uninstall_hook=remove_hook,.log_line=log_message};
+    struct rx3_services services={.install_hook=install,.detach_hook=remove_hook,.release_hook=remove_hook,.log_line=log_message};
     assert(!rx3_search_module.configured());
     setenv("RX3_SEARCH_LATIN","1",1); assert(rx3_search_module.configured());
     assert(rx3_search_module.start(&services));
     uint16_t text[]={0x00e0,0x0178,0x00f7,0};
     shape(text,0,4); assert(calls==1 && text[0]=='E' && text[1]=='Y' && text[2]==0x00f7);
     shape(0,0,0); assert(calls==2);
-    rx3_search_module.stop(); assert(removed==1);
+    rx3_search_module.stop(); assert(removed==2);
     return 0;
 }
 ''', ['search-latin/rx3_search_module.c'], ['-D_POSIX_C_SOURCE=200809L'])
@@ -399,9 +422,10 @@ int main(void) {
             generated = scaffold(root, 'framework-example', 'Framework example', ['1.19'], True, 'diagnostics')
             core = root / 'mod/modules/core'
             core.mkdir()
-            for name in ('api/rx3_module_api.h', 'api/rx3_platform.h', 'api/rx3_hook_types.h', 'api/rx3_mix_types.h', 'api/rx3_notice_api.h', 'api/rx3_dsp.h', 'api/rx3_panel_api.h', 'api/rx3_image_api.h', 'api/rx3_browse_api.h'):
-                (core / name).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(MODULES / 'core' / name, core / name)
+            # The whole public contract and nothing else from the core.
+            (core / 'api').mkdir()
+            for header in (MODULES / 'core/api').glob('*.h'):
+                shutil.copy2(header, core / 'api' / header.name)
             source = next(p for p in generated if p.suffix == '.c')
             output = root / 'module.so'
             compile_arm_hook(source, output)

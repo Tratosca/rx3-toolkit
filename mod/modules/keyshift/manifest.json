@@ -26,6 +26,46 @@
       "source": "module.sh",
       "target": "module.sh",
       "executable": false
+    },
+    {
+      "source": "assets/key-selected.rgb565",
+      "target": "key-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/key-selected-light.rgb565",
+      "target": "key-selected-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/none-selected.rgb565",
+      "target": "none-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/none-selected-light.rgb565",
+      "target": "none-selected-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-key-none.rgb565",
+      "target": "single-key-none.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-key-none-light.rgb565",
+      "target": "single-key-none-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-key-selected.rgb565",
+      "target": "single-key-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-key-selected-light.rgb565",
+      "target": "single-key-selected-light.rgb565",
+      "executable": false
     }
   ],
   "build_files": [

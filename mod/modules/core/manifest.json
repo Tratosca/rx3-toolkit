@@ -26,21 +26,6 @@
       "executable": false
     },
     {
-      "source": "assets/key-selected.rgb565",
-      "target": "key-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/stems-selected.rgb565",
-      "target": "stems-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/none-selected.rgb565",
-      "target": "none-selected.rgb565",
-      "executable": false
-    },
-    {
       "source": "assets/status-none-selected.rgb565",
       "target": "status-none-selected.rgb565",
       "executable": false
@@ -56,98 +41,12 @@
       "executable": false
     },
     {
-      "source": "assets/key-selected-light.rgb565",
-      "target": "key-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/stems-selected-light.rgb565",
-      "target": "stems-selected-light.rgb565",
-      "executable": false
-    },
-    {
       "source": "assets/status-none-selected-light.rgb565",
       "target": "status-none-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/none-selected-light.rgb565",
-      "target": "none-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-selected.rgb565",
-      "target": "samples-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-none-selected.rgb565",
-      "target": "samples-none-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-beatfx-selected.rgb565",
-      "target": "samples-beatfx-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-selected-light.rgb565",
-      "target": "samples-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-none-selected-light.rgb565",
-      "target": "samples-none-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/samples-beatfx-selected-light.rgb565",
-      "target": "samples-beatfx-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-key-none.rgb565",
-      "target": "single-key-none.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-key-none-light.rgb565",
-      "target": "single-key-none-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-key-selected.rgb565",
-      "target": "single-key-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-key-selected-light.rgb565",
-      "target": "single-key-selected-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-stems-none.rgb565",
-      "target": "single-stems-none.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-stems-none-light.rgb565",
-      "target": "single-stems-none-light.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-stems-selected.rgb565",
-      "target": "single-stems-selected.rgb565",
-      "executable": false
-    },
-    {
-      "source": "assets/single-stems-selected-light.rgb565",
-      "target": "single-stems-selected-light.rgb565",
       "executable": false
     }
   ],
   "build_files": [
-    "api/rx3_feature_api.h",
     "diagnostics/rx3_probe_format.h",
     "ui/rx3_pad_layout.h",
     "ui/rx3_pad_atlas.h",
@@ -183,7 +82,23 @@
     "services/rx3_images.c",
     "api/rx3_browse_api.h",
     "services/rx3_browse.h",
-    "services/rx3_browse.c"
+    "services/rx3_browse.c",
+    "api/rx3_title_api.h",
+    "services/rx3_titles.h",
+    "services/rx3_titles.c",
+    "ui/rx3_title_visibility.h",
+    "api/rx3_input_api.h",
+    "api/rx3_audio_api.h",
+    "services/rx3_input.h",
+    "services/rx3_input.c",
+    "services/rx3_audio.h",
+    "services/rx3_audio.c",
+    "services/rx3_memory.h",
+    "services/rx3_memory.c",
+    "api/rx3_memory_api.h",
+    "api/rx3_loader_api.h",
+    "services/rx3_loader.h",
+    "services/rx3_loader.c"
   ],
   "arm_hook": {
     "source": "rx3_core_hook.c",
@@ -205,7 +120,17 @@
       "core/services/rx3_images.c",
       "key-match/rx3_key_match_module.c",
       "core/services/rx3_browse.c",
-      "browse-columns/rx3_browse_columns_module.c"
+      "browse-columns/rx3_browse_columns_module.c",
+      "core/services/rx3_titles.c",
+      "asshole-mode/rx3_asshole_module.c",
+      "core/services/rx3_input.c",
+      "core/services/rx3_audio.c",
+      "core/services/rx3_memory.c",
+      "logo/rx3_logo_module.c",
+      "theme-white/rx3_theme_module.c",
+      "stems/rx3_stems_module.c",
+      "samples/rx3_samples_module.c",
+      "core/services/rx3_loader.c"
     ]
   },
   "advanced": true

@@ -9,6 +9,47 @@ function, MODULES = transitions.function, transitions.MODULES
 
 class StartupTests(unittest.TestCase):
     run_c = transitions.RuntimeTransitionTests.run_c
+
+    def test_ready_marker_identifies_the_player_that_installed_hooks(self):
+        source = MODULES/'core/rx3_core_hook.c'
+        code = function(source, 'self_pid') + function(source, 'publish_ready')
+        self.run_c(r'''
+#define READY_FILE "/tmp/rx3-performance.ready"
+#define O_WRONLY 1
+#define O_CREAT 0100
+#define O_TRUNC 01000
+static char marker[16];
+static unsigned marker_length;
+static int ready_open(const char *path, int flags, ...) {
+    if (!strcmp(path, "/proc/self/stat")) { assert(flags == 0); return 4; }
+    assert(!strcmp(path, READY_FILE));
+    assert(flags == (O_WRONLY | O_CREAT | O_TRUNC)); return 3;
+}
+static long ready_read(int fd, void *data, size_t length) {
+    assert(fd == 4 && length >= 7);
+    memcpy(data, "4242 (x)", 8);
+    return 8;
+}
+static long ready_write(int fd, const void *data, size_t length) {
+    assert(fd == 3 && length < sizeof(marker));
+    memcpy(marker, data, length);
+    marker_length = (unsigned)length;
+    return (long)length;
+}
+static int ready_close(int fd) { assert(fd == 3 || fd == 4); return 0; }
+#define open ready_open
+#define read ready_read
+#define write ready_write
+#define close ready_close
+#define O_RDONLY 0
+''' + code + r'''
+int main(void) {
+    publish_ready();
+    assert(marker_length == 5 && !memcmp(marker, "4242\n", 5));
+    return 0;
+}
+''')
+
     def test_logo_placement_and_guarded_restore(self):
         self.run_c('''
 #include "logo/rx3_logo_decl.h"
@@ -52,36 +93,21 @@ int main(void) {
         decl += [f'#define {name} {i+1}' for i,name in enumerate(constants)]
         self.run_c('''
 #include <stdlib.h>
-#include "keyshift/rx3_keyshift_text.h"
-static unsigned int keyshift_sync_range=1;
-static unsigned int keyshift_sync_harmonic;
-static unsigned int keyshift_match_rules;
 #define READY_FILE "ready"
-#define THEME_DARK_SENTINEL "off"
 #define RENDER_PROBE_FILE "probe"
-#define TRANSITION_FRAMES 256u
 #define O_WRONLY 1
 #define O_TRUNC 2
-static const char *stems_dir;
-static int keyshift_enabled,samples_enabled,messages_enabled,theme_enabled;
-static int theme_light,theme_light_active,theme_global_dark,theme_light_armed;
-static int logo_enabled,main_logo_ready,render_probe_enabled;
-static uint64_t theme_start_light_not_before_us,tab_install_not_before_us;
+static int messages_enabled,render_probe_enabled;
+static uint64_t tab_install_not_before_us;
 static int state_thread_running,state_thread_started,state_thread;
-static struct { unsigned selection,transition_cursor; } stems_decks[2];
-static unsigned selection,ready,hook_calls,reject_hook,feature_fail,standalone_fail;
-static unsigned stops,cleanup,standalone_started,logo_fail;
+static unsigned selection,ready,hook_calls,reject_hook,module_fail;
+static unsigned stops,cleanup,modules_started,bound;
 static int player_process_initialized,player_process=1;
 static int is_player_process(void){return player_process;}
-/* bits: logo=1, keyshift=2, stems=4, theme=8, samples=16, search=32. */
-static char *setting(const char *s) {
-    if(!strcmp(s,"RX3_LOGO"))return selection&1?"1":0;
-    if(!strcmp(s,"RX3_KEYSHIFT"))return selection&2?"1":0;
-    if(!strcmp(s,"RX3_STEMS_DIR"))return selection&4?"stems":0;
-    if(!strcmp(s,"RX3_THEME"))return selection&8?"s":0;
-    if(!strcmp(s,"RX3_SAMPLES_DIR"))return selection&16?"samples":0;
-    return 0;
-}
+/* What each selected module registers when it starts: logo=1 and theme=8
+   contribute images, keyshift=2, stems=4, samples=16 and 64 register panels,
+   keyshift also listens for the audio device, search=32 needs no display. */
+static char *setting(const char *s){(void)s;return 0;}
 #define getenv setting
 static int marker_open(const char *p,int f,int m){(void)p;(void)f;(void)m;ready=0;return 1;}
 #define open marker_open
@@ -91,45 +117,52 @@ static void log_line(const char *s){(void)s;}
 static void log_number(const char *s,unsigned long n){(void)s;(void)n;}
 static int rx3_message_allowed(void){return 1;}
 static uint64_t monotonic_enough_us(void){return 1;}
-static int logo_feature_install(void){main_logo_ready=!logo_fail;return main_logo_ready;}
-static void logo_feature_remove(void){main_logo_ready=0;}
-static unsigned configure_features(void){return !!stems_dir+!!theme_enabled+!!samples_enabled;}
-static unsigned install_features(void){return configure_features()-(feature_fail?1:0);}
-static unsigned rx3_modules_start(void){standalone_started++;return selection&(32|2)?1:0;}
+static void rx3_input_trace_keys(unsigned n){(void)n;}
+static void leave_performance_panel(void){}
+static void refresh_performance_ui(void){}
+static int rx3_write_guarded(unsigned long a,const void *e,const void *r,unsigned n){(void)a;(void)e;(void)r;(void)n;return 1;}
+static void rx3_input_bind_mode_keys(void (*f)(void)){bound+=f==leave_performance_panel;}
+static void rx3_panels_bind_refresh(void (*f)(void)){bound+=f==refresh_performance_ui;}
+static void rx3_modules_bind_writer(int (*f)(unsigned long,const void *,const void *,unsigned)){bound+=f==rx3_write_guarded;}
+static unsigned rx3_modules_start(void){modules_started++;return __builtin_popcount(selection&127);}
+static unsigned rx3_modules_failures(void){return module_fail;}
 static int rx3_modules_uses_audio(void){return !!(selection&2);}
-static unsigned rx3_modules_failures(void){return standalone_fail;}
-static unsigned rx3_image_count(void){return 0;}
+static unsigned rx3_image_contributions(void){return !!(selection&(1|8));}
+static int rx3_titles_enabled(void){return 0;}
 static unsigned rx3_browse_count(void){return 0;}
-static unsigned rx3_panel_count(void){return (selection&(64|2))?1:0;}
+static unsigned rx3_panel_count(void){return !!(selection&(2|4|16|64));}
 static void rx3_modules_stop(void){stops++;}
-static void uninstall_performance_hooks(void){cleanup++;logo_feature_remove();}
+static void uninstall_performance_hooks(void){cleanup++;}
 static void publish_ready(void){ready=1;}
 static void *install_hook(void *h,unsigned long a,const void *g,void *r){
     (void)h;(void)a;(void)g;(void)r;hook_calls++;return hook_calls==reject_hook?0:(void *)1;
 }
 #define pthread_create(a,b,c,d) (0)
 ''' + '\n'.join(decl) + '\n' + code + '''
-static void run(unsigned mask,unsigned hook,unsigned feature,unsigned standalone) {
-    selection=mask;reject_hook=hook;feature_fail=feature;standalone_fail=standalone;
-    ready=1;hook_calls=0;stops=0;cleanup=0;standalone_started=0;main_logo_ready=0;
+static void run(unsigned mask,unsigned hook,unsigned failure) {
+    selection=mask;reject_hook=hook;module_fail=failure;
+    ready=1;hook_calls=0;stops=0;cleanup=0;modules_started=0;bound=0;
     initialize();
 }
 int main(void) {
-    player_process=0;run(4|32,0,0,0);
-    assert(ready && !hook_calls && !stops && !cleanup && !standalone_started);
+    player_process=0;run(4|32,0,0);
+    assert(ready && !hook_calls && !stops && !cleanup && !modules_started);
     assert(!player_process_initialized);player_process=1;
-    run(1,0,0,0);assert(ready && hook_calls && main_logo_ready);
-    run(1|32,0,0,0);assert(ready && hook_calls && standalone_started==1);
-    for(unsigned mask=2;mask<=16;mask<<=1){run(mask,0,0,0);assert(ready);}
-    run(32,0,0,0);assert(ready && !hook_calls);
-    run(32|64,0,0,0);assert(ready && hook_calls);
-    run(32|64,1,0,0);assert(!ready && stops && cleanup);
-    run(0,0,0,0);assert(!ready && !hook_calls);
-    run(4|32,1,0,0);assert(!ready && cleanup && !standalone_started);
-    run(4|32,0,1,0);assert(!ready && cleanup && !standalone_started);
-    run(4|32,0,0,1);assert(!ready && cleanup && stops);
-    run(32,0,0,1);assert(!ready && stops);
-    logo_fail=1;run(1|32,0,0,0);assert(!ready && !hook_calls && !standalone_started);
+    /* Every display contribution installs the performance hooks. */
+    for(unsigned mask=1;mask<=64;mask<<=1){
+        run(mask,0,0);assert(ready && modules_started==1 && bound==3);
+        assert(mask==32 ? !hook_calls : hook_calls>0);
+    }
+    run(0,0,0);assert(!ready && !hook_calls);
+    /* A rejected firmware hook stops every module and removes what was put in. */
+    run(4|32,1,0);assert(!ready && stops && cleanup);
+    run(1|16,3,0);assert(!ready && stops && cleanup);
+    /* The audio-device hook comes last and is part of the same all-or-nothing. */
+    run(2,0,0);unsigned all=hook_calls;assert(ready);
+    run(2,all,0);assert(!ready && stops && cleanup);
+    /* A module that fails leaves nothing installed and nothing ready. */
+    run(4|32,0,1);assert(!ready && stops && !hook_calls && !cleanup);
+    run(32,0,1);assert(!ready && stops);
     return 0;
 }
 ''')
@@ -166,27 +199,27 @@ int main(void) {
         code = code.replace('__attribute__((destructor)) ', '')
         self.run_c('''
 static int player_process_initialized,state_thread_running=1,state_thread_started,state_thread;
-static unsigned cleanup,stops,destroyed;
+static unsigned cleanup,stops;
 static void join_thread(int t,void *p){(void)t;(void)p;assert(0);}
 #define pthread_join join_thread
+/* Modules release their own resident state from stop(). */
 static void rx3_modules_stop(void){stops++;}
 static void uninstall_performance_hooks(void){cleanup++;}
-static void destroy(unsigned deck){assert(deck<2);destroyed++;}
-#define RUNTIME_FEATURE_COUNT 1u
-static struct {void (*destroy_deck)(unsigned);} runtime_features[1]={{destroy}};
 ''' + code + '''
 int main(void) {
-    finalize();assert(state_thread_running && !cleanup && !stops && !destroyed);
+    finalize();assert(state_thread_running && !cleanup && !stops);
     player_process_initialized=1;finalize();
-    assert(!state_thread_running && cleanup==1 && stops==1 && destroyed==2);
+    assert(!state_thread_running && cleanup==1 && stops==1);
     return 0;
 }
 ''')
 
     def test_light_tab_assets_are_shipped_complete(self):
-        root=MODULES/'core'
-        manifest=json.loads((root/'manifest.json').read_text())
-        files={row['target']:root/row['source'] for row in manifest['files']}
+        files={}
+        for module in ('core','keyshift','stems','samples'):
+            root=MODULES/module
+            manifest=json.loads((root/'manifest.json').read_text())
+            files.update({row['target']:root/row['source'] for row in manifest['files']})
         for name in ('key-selected','stems-selected','status-none-selected','none-selected','samples-selected','samples-none-selected','samples-beatfx-selected'):
             light=files[name+'-light.rgb565'].read_bytes()
             self.assertEqual(len(light),180*50*2)

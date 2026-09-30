@@ -53,6 +53,7 @@ class KeySyncSettingsTests(unittest.TestCase):
                     ('core key-match keyshift key-sync', 'key-match', '0')]:
                 prefix=f'CORE_OBJECT="{core}"\nLOADED_MODULES="{loaded}"\nDISABLED="{disabled}"\n' + r'''
 module_begin(){ :; }
+stage_panel_asset(){ :; }
 register_prepare_hook(){ :; }
 register_after_launch_hook(){ :; }
 module_disabled_by_switch(){ [ "$1" = "$DISABLED" ]; }
@@ -72,6 +73,7 @@ module_export(){ printf '%s=%s\n' "$1" "$2"; }
             mode=pathlib.Path(temp)/'mode'
             script=script.replace('/mnt/iso/modules/key-sync/sync-mode.txt',str(mode))
             prefix=f'CORE_OBJECT="{core}"\n' + '''module_begin(){ :; }
+stage_panel_asset(){ :; }
 register_prepare_hook(){ :; }
 register_after_launch_hook(){ :; }
 module_disabled_by_switch(){ return 1; }

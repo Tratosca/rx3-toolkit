@@ -53,7 +53,7 @@ static unsigned int theme_luma(unsigned int red, unsigned int green,
  * what separates a sleeve or a waveform from a button. Chrome is what the
  * theme exists to repaint, and repainting a picture would be vandalism.
  */
-static int theme_is_artwork(const uint16_t *pixels, unsigned int count)
+static inline int theme_is_artwork(const uint16_t *pixels, unsigned int count)
 {
     unsigned int opaque = 0;
     unsigned int vivid = 0;

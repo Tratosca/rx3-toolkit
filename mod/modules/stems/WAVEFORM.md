@@ -13,7 +13,7 @@ Legacy stems retain the display filter, as does the Blue overview.
 
 Validated with a real exported track under QEMU (firmware 1.19), including
 play/pause and restoration of the full mix. See the [package specification
-and evidence](../../../docs/stem-package.md). Hardware validation remains pending.
+and evidence](../../../REFERENCES.md#doc-stem-package). Hardware validation remains pending.
 
 Included automatically in Stems. There is no separate waveform module to select.
 

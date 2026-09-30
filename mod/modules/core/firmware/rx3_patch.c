@@ -13,6 +13,11 @@ void clear_instruction_cache(unsigned long first, unsigned long last)
 
 int write_code(unsigned long address, const void *bytes, size_t length)
 {
+    /* Every caller writes a four-byte literal or an eight-byte detour. Keep
+       the previous bytes until permissions have been restored successfully. */
+    uint8_t previous[8];
+    if (!address || !bytes || !length || length > sizeof(previous) ||
+        address + length - 1u < address) return -1;
     long page_size = sysconf(_SC_PAGESIZE);
     if (page_size <= 0)
         page_size = 4096;
@@ -21,11 +26,29 @@ int write_code(unsigned long address, const void *bytes, size_t length)
     unsigned long last  = (address + length - 1u) & ~mask;
     size_t span = (size_t)(last - first) + (size_t)page_size;
 
-    if (mprotect((void *)first, span, PROT_READ | PROT_WRITE))
+    memcpy(previous, (const void *)address, length);
+    /* Retain execute permission: other native code can share this page.
+       This does not make instruction replacement safe against live callers. */
+    if (mprotect((void *)first, span, PROT_READ | PROT_WRITE | PROT_EXEC))
         return -1;
     memcpy((void *)address, bytes, length);
     clear_instruction_cache(address, address + length);
-    if (mprotect((void *)first, span, PROT_READ | PROT_EXEC))
+    if (mprotect((void *)first, span, PROT_READ | PROT_EXEC)) {
+        memcpy((void *)address, previous, length);
+        clear_instruction_cache(address, address + length);
+        /* Even if this retry fails, the old code remains executable. */
+        (void)mprotect((void *)first, span, PROT_READ | PROT_EXEC);
         return -1;
+    }
     return 0;
+}
+
+int rx3_write_guarded(unsigned long address, const void *expected,
+                      const void *replacement, unsigned int length)
+{
+    if (!address || !expected || !replacement || !length || length > 8u)
+        return 0;
+    if (memcmp((const void *)address, expected, length))
+        return 0;
+    return write_code(address, replacement, length) == 0;
 }

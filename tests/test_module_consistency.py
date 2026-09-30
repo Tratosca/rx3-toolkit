@@ -179,7 +179,8 @@ class DisplayModeTests(unittest.TestCase):
     """
 
     MODULE = REPOSITORY / "mod/modules/theme-white/module.sh"
-    CORE = REPOSITORY / "mod/modules/core/rx3_core_hook.c"
+    # The module reads its own letter now; the core never sees it.
+    CORE = REPOSITORY / "mod/modules/theme-white/rx3_theme_feature.h"
 
     def exported(self):
         """Every letter the module can export."""
@@ -187,7 +188,7 @@ class DisplayModeTests(unittest.TestCase):
         return set(re.findall(r"letter=([a-z])\b", source))
 
     def understood(self):
-        """Every letter the core compares the mode against."""
+        """Every letter the runtime compares the mode against."""
         source = self.CORE.read_text(encoding="utf-8")
         return set(re.findall(r"theme\[0\]\s*==\s*'([a-z])'", source))
 
@@ -406,7 +407,7 @@ class ImageTableBoundTests(unittest.TestCase):
         bound in the hook, the glyph ids beside the artwork that uses them."""
         return "\n".join(
             (self.core() / name).read_text(encoding="utf-8")
-            for name in ("rx3_core_hook.c", "ui/rx3_pad_atlas.h")
+            for name in ("rx3_core_hook.c", "ui/rx3_pad_atlas.h", "api/rx3_image_api.h")
         )
 
     def patch_words(self):
@@ -430,8 +431,8 @@ class ImageTableBoundTests(unittest.TestCase):
         patched_bound, patched_register = _movw(patched)
         self.assertEqual(stock_register, patched_register,
                          "the patch writes to a different register than it read")
-        self.assertEqual(stock_bound, self.define("STOCK_IMAGE_COUNT") - 1,
-                         "the stock word no longer matches STOCK_IMAGE_COUNT")
+        self.assertEqual(stock_bound, self.define("RX3_NATIVE_IMAGE_COUNT") - 1,
+                         "the stock word no longer matches RX3_NATIVE_IMAGE_COUNT")
         self.assertEqual(
             patched_bound, self.define("EXTENDED_IMAGE_COUNT") - 1,
             "module.sh admits a different number of private ids than the core "

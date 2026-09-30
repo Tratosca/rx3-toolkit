@@ -71,8 +71,7 @@ class GainTests(unittest.TestCase):
 #include <assert.h>
 #include <math.h>
 #include <pthread.h>
-typedef struct {float left,right;} Float2;
-typedef struct {short left,right;} Short2;
+typedef struct rx3_stereo Float2;
 #include "stems/rx3_stems_decl.h"
 #define RX3_PLATFORM_H
 #include "stems/rx3_stems_audio.h"

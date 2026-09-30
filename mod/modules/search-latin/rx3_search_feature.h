@@ -6,6 +6,7 @@
 #define RX3_SEARCH_FEATURE_H
 
 static int search_latin_enabled;
+static unsigned int search_callbacks;
 
 /* Fold the query the player is about to search with.
  *
@@ -20,18 +21,21 @@ static int search_latin_enabled;
  */
 static void hooked_search_shape(uint16_t *text, void *context, int length)
 {
+    __atomic_add_fetch(&search_callbacks, 1u, __ATOMIC_SEQ_CST);
     original_search_shape(text, context, length);
     if (!text || length <= 0)
-        return;
+        goto done;
     for (int index = 0; index < length; index++) {
         uint16_t glyph = text[index];
         if (!glyph)
-            return;
+            break;
         if (glyph >= SEARCH_FOLD_FIRST && glyph <= SEARCH_FOLD_LAST)
             text[index] = search_fold_table[glyph - SEARCH_FOLD_FIRST];
         else if (glyph == SEARCH_FOLD_Y_DIAERESIS)
             text[index] = SEARCH_FOLD_Y;
     }
+done:
+    __atomic_sub_fetch(&search_callbacks, 1u, __ATOMIC_SEQ_CST);
 }
 
 static int search_latin_feature_configured(void)
@@ -58,7 +62,9 @@ static int search_latin_feature_install(void)
 
 static void search_latin_feature_remove(void)
 {
-    if (framework->uninstall_hook(&search_shape_hook))
+    if (!framework->detach_hook(&search_shape_hook)) return;
+    while (__atomic_load_n(&search_callbacks, __ATOMIC_SEQ_CST)) usleep(1000u);
+    if (framework->release_hook(&search_shape_hook))
         original_search_shape = 0;
 }
 

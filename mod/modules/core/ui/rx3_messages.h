@@ -31,32 +31,28 @@
 
 #define RX3_TEXT(s) ((const uint16_t *)u##s)
 
-/* The drive is in, the player has come back, and the loaders are still working.
-   The operator sees the wait whatever we do; what they cannot see is that this
-   is the window in which pulling the drive costs them a folder on a FAT stick.
-   So the notice spends its one line on the warning rather than on narrating the
-   wait. It does not promise that removal becomes safe when it clears: the
-   player keeps its output file open for as long as it plays whenever logging is
-   on, which is why the README says eject and never pull. */
+/* Shown only after the native core starts drawing on the normal load path.
+   The notice identifies the mod while keeping the USB warning. Its absence
+   alone cannot prove safe mode: rendering or notice delivery may fail. */
 static const uint16_t *const message_loading_table[RX3_LANGUAGE_COUNT] = {
-    /*  1 ENGLISH             */ RX3_TEXT("DO NOT REMOVE THE USB KEY"),
-    /*  2 FRANCAIS            */ RX3_TEXT("NE PAS RETIRER LA CLÉ USB"),
-    /*  3 DEUTSCH             */ RX3_TEXT("USB-STICK NICHT ENTFERNEN"),
-    /*  4 ITALIANO            */ RX3_TEXT("NON RIMUOVERE LA CHIAVE USB"),
-    /*  5 NEDERLANDS          */ RX3_TEXT("USB-STICK NIET VERWIJDEREN"),
-    /*  6 ESPANOL             */ RX3_TEXT("NO RETIRAR LA MEMORIA USB"),
-    /*  7 Russian             */ RX3_TEXT("НЕ ИЗВЛЕКАЙТЕ USB-НАКОПИТЕЛЬ"),
-    /*  8 Korean              */ RX3_TEXT("USB를 분리하지 마십시오"),
-    /*  9 Chinese simplified  */ RX3_TEXT("请勿拔出 USB 存储器"),
-    /* 10 Chinese traditional */ RX3_TEXT("請勿拔出 USB 隨身碟"),
-    /* 11 Japanese            */ RX3_TEXT("USB を抜かないでください"),
-    /* 12 PORTUGUES           */ RX3_TEXT("NÃO REMOVER A PEN USB"),
-    /* 13 SVENSKA             */ RX3_TEXT("TA INTE BORT USB-MINNET"),
-    /* 14 CESTINA             */ RX3_TEXT("NEVYJÍMEJTE USB DISK"),
-    /* 15 MAGYAR              */ RX3_TEXT("NE TÁVOLÍTSA EL AZ USB-T"),
-    /* 16 DANSK               */ RX3_TEXT("FJERN IKKE USB-NØGLEN"),
-    /* 17 Greek               */ RX3_TEXT("ΜΗΝ ΑΦΑΙΡΕΙΤΕ ΤΟ USB"),
-    /* 18 TURKCE              */ RX3_TEXT("USB BELLEĞİ ÇIKARMAYIN")
+    /*  1 ENGLISH             */ RX3_TEXT("MODS LOADING - KEEP USB"),
+    /*  2 FRANCAIS            */ RX3_TEXT("MODS EN COURS - USB EN PLACE"),
+    /*  3 DEUTSCH             */ RX3_TEXT("MODS LADEN - USB BELASSEN"),
+    /*  4 ITALIANO            */ RX3_TEXT("CARICO MOD - TENERE USB"),
+    /*  5 NEDERLANDS          */ RX3_TEXT("MODS LADEN - USB LATEN"),
+    /*  6 ESPANOL             */ RX3_TEXT("CARGANDO MODS - DEJAR USB"),
+    /*  7 Russian             */ RX3_TEXT("ЗАГРУЗКА МОДОВ - НЕ ТРОГАТЬ USB"),
+    /*  8 Korean              */ RX3_TEXT("모드 로딩 중 - USB 유지"),
+    /*  9 Chinese simplified  */ RX3_TEXT("正在加载模组 - 请勿拔出USB"),
+    /* 10 Chinese traditional */ RX3_TEXT("正在載入模組 - 請勿拔出USB"),
+    /* 11 Japanese            */ RX3_TEXT("MOD読込中 - USBを抜かない"),
+    /* 12 PORTUGUES           */ RX3_TEXT("A CARREGAR MODS - MANTER USB"),
+    /* 13 SVENSKA             */ RX3_TEXT("MODDAR LADDAS - BEHÅLL USB"),
+    /* 14 CESTINA             */ RX3_TEXT("NAČÍTÁNÍ MODŮ - NECHAT USB"),
+    /* 15 MAGYAR              */ RX3_TEXT("MODOK TÖLTÉSE - USB MARAD"),
+    /* 16 DANSK               */ RX3_TEXT("MODS INDLÆSES - BEHOLD USB"),
+    /* 17 Greek               */ RX3_TEXT("ΦΟΡΤΩΣΗ MOD - ΚΡΑΤΗΣΤΕ USB"),
+    /* 18 TURKCE              */ RX3_TEXT("MODLAR YÜKLENİYOR - USB KALSIN")
 };
 
 static const struct rx3_message message_drive_loading = {

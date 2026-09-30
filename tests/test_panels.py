@@ -47,12 +47,13 @@ int main(void){
 
     def test_stem_hybrid_and_pcm_share_one_volume(self):
         self.run_c('''
-typedef struct {float left,right;} Float2;
-typedef struct {int16_t left,right;} Short2;
+typedef struct rx3_stereo Float2;
 #include "core/api/rx3_panel_api.h"
 #include "stems/rx3_stems_decl.h"
 #define TAB_IMAGE_STEMS 0x1601u
 static int blink_phase_is_on(void){return 1;}
+static int stems_any_deck_loading(void){return 0;}
+static void stems_blink_idle(void){}
 static unsigned int tick;
 static unsigned int now_ms(void){return tick;}
 #include "stems/rx3_stems_panel.h"

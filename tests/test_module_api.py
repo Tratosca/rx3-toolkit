@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import subprocess
+import shlex
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,9 +23,11 @@ AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
 RBP_READY_FILES=""
+RBP_PID_READY_FILES=""
 RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 LOADED_MODULES=""
+DISABLED_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -45,6 +49,157 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_removed_or_switched_off_module_requests_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            switch = Path(directory) / "stems.off"
+            switch.write_text("")
+            result = run_shell(
+                'module_begin core core || exit 10\n'
+                'module_begin stems stems || exit 11\n'
+                'running="core stems|"\n'
+                'rbp_environment_value() { printf %s "$running"; }\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 0 ] || exit 12\n'
+                f'module_switch_path() {{ printf %s {shlex.quote(str(switch))}; }}\n'
+                'module_disabled_by_switch stems || exit 13\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 1 ] || exit 14\n'
+                '[ "$RX3_RUNTIME_MODULE_SET" = "core stems|stems" ] || exit 15\n'
+                'NEED_RBP_RESTART=0\n'
+                'DISABLED_MODULES=""\n'
+                'LOADED_MODULES=" core"\n'
+                'reconcile_module_set\n'
+                '[ "$NEED_RBP_RESTART" = 1 ] || exit 16\n'
+                '[ "$RX3_RUNTIME_MODULE_SET" = "core|" ] || exit 17\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_live_player_executable_must_be_the_guarded_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guarded = root / "rbp"
+            guarded.write_bytes(b"player")
+            old = root / "old-rbp"
+            old.write_bytes(b"player")
+            proc = root / "proc" / "4242"
+            proc.mkdir(parents=True)
+            exe = proc / "exe"
+            exe.symlink_to(guarded)
+            body = (
+                f'PROC_ROOT={shlex.quote(str(root / "proc"))}\n'
+                'PID=4242\n'
+                f'RBP={shlex.quote(str(guarded))}\n'
+                'rbp_executable_matches\n'
+            )
+            self.assertEqual(run_shell(body).returncode, 0)
+            exe.unlink()
+            exe.symlink_to(old)
+            self.assertNotEqual(run_shell(body).returncode, 0)
+            # /proc can retain the old inode while reporting the original
+            # executable path after an atomic replacement.
+            same_path = body.replace('rbp_executable_matches\n',
+                                     f'readlink() {{ printf %s {shlex.quote(str(guarded))}; }}\n'
+                                     'rbp_executable_matches\n')
+            self.assertNotEqual(run_shell(same_path).returncode, 0)
+
+    def test_pid_bound_readiness_rejects_an_earlier_player(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
+            marker = Path(directory) / "ready"
+            marker.write_text("1234\n")
+            body = (
+                'module_begin core core\n'
+                f'register_pid_ready_file {shlex.quote(str(marker))} || exit 10\n'
+                f'ready_file_matches_pid {shlex.quote(str(marker))} 1234 || exit 11\n'
+                f'ready_file_matches_pid {shlex.quote(str(marker))} 5678 && exit 12\n'
+                'exit 0\n'
+            )
+            result = run_shell(body)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            marker.write_text("5678\n")
+            result = run_shell(body)
+            self.assertEqual(result.returncode, 11, result.stderr)
+
+    def test_resident_core_requires_pid_marker_and_matching_executable_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / "librx3_core.so"
+            core.write_bytes(b"first core")
+            proc = root / "proc" / "4242"
+            proc.mkdir(parents=True)
+            marker = root / "performance.ready"
+            marker.write_text("4242\n")
+            maps = proc / "maps"
+            maps.write_text(
+                f"0000-1000 r-xp 00000000 00:00 {core.stat().st_ino} {core}\n"
+            )
+            body = (
+                '. "${1%/lib/module-api.sh}/modules/core/module.sh"\n'
+                'PID=4242\n'
+                f'PROC_ROOT={shlex.quote(str(root / "proc"))}\n'
+                f'CORE_LIB={shlex.quote(str(core))}\n'
+                f'CORE_READY={shlex.quote(str(marker))}\n'
+                'core_running_ready\n'
+            )
+
+            def check(expected):
+                result = run_shell(body)
+                self.assertEqual(result.returncode == 0, expected, result.stderr)
+
+            check(True)
+            marker.write_text("old marker\n")
+            check(False)
+            marker.write_text("4242\n")
+            maps.write_text(f"0000-1000 r-xp 00000000 00:00 99999 {core}\n")
+            check(False)
+            maps.write_text(
+                f"0000-1000 r-xp 00000000 00:00 {core.stat().st_ino} "
+                f"{core} (deleted)\n"
+            )
+            check(False)
+
+    def test_reinsertion_keeps_unchanged_core_and_logo_assets_in_place(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.rgb565"
+            target = Path(directory) / "installed.rgb565"
+            source.write_bytes(b"same artwork")
+            target.write_bytes(source.read_bytes())
+
+            for module, function in (("core", "core_install_asset"),
+                                     ("logo", "logo_install_file")):
+                with self.subTest(module=module):
+                    before = target.stat()
+                    call = (
+                        f'RUNTIME_STAGE_DIR={shlex.quote(str(Path(directory) / "stage"))}\n'
+                        f'. "${{1%/lib/module-api.sh}}/modules/{module}/module.sh" || exit 10\n'
+                        f'{function} {shlex.quote(str(source))} {shlex.quote(str(target))} || exit 11\n'
+                        'commit_runtime_stage || exit 12\n'
+                        'discard_runtime_stage\n'
+                        'printf "%s" "${LOGO_CHANGED:-0}"\n'
+                    )
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, "0")
+                    after = target.stat()
+                    self.assertEqual((after.st_ino, after.st_mtime_ns),
+                                     (before.st_ino, before.st_mtime_ns))
+
+                    source.write_bytes(b"new artwork")
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(target.read_bytes(), b"new artwork")
+                    self.assertEqual(result.stdout, "1" if module == "logo" else "0")
+
+                    # Matching bytes through a symlink must not preserve an
+                    # unexpected link under the player's runtime directory.
+                    target.unlink()
+                    target.symlink_to(source)
+                    result = run_shell(call)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertFalse(target.is_symlink())
+                    self.assertEqual(target.read_bytes(), b"new artwork")
+                    source.write_bytes(b"same artwork")
+                    target.write_bytes(source.read_bytes())
+
     def test_namespaced_lifecycle_hook_is_registered_and_run(self):
         result = run_shell(
             r'''
@@ -87,6 +242,40 @@ kept=$(preload_without_runtime \
 [ -z "$(preload_without_runtime /root/pdj/librx3_core.so)" ] || exit 16
 [ -z "$(preload_without_runtime "")" ] || exit 17
 [ "$(preload_without_runtime /opt/a.so:/opt/b.so)" = "/opt/a.so:/opt/b.so" ] || exit 18
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_preload_insertion_keeps_first_position_and_collapses_duplicates(self):
+        result = run_shell(
+            r'''
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/pcm.so"
+ensure_preload_entry /root/pdj/core.so || exit 10
+ensure_preload_entry /root/pdj/pcm.so || exit 11
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so" ] || exit 12
+ensure_preload_entry /root/pdj/new.so || exit 13
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/new.so" ] || exit 14
+ensure_preload_entry /root/pdj/new.so || exit 15
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/pcm.so:/root/pdj/core.so:/root/pdj/new.so" ] || exit 16
+ensure_preload_entry "" && exit 17
+exit 0
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_core_preload_keeps_order_and_retires_legacy_library(self):
+        result = run_shell(
+            r'''
+. "${1%/lib/module-api.sh}/modules/core/module.sh" || exit 9
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so"
+core_normalize_preload || exit 10
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 11
+RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_stems.so"
+core_normalize_preload || exit 12
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 13
+RBP_PRELOAD=""
+core_normalize_preload || exit 14
+[ "$RBP_PRELOAD" = "/root/pdj/librx3_core.so" ] || exit 15
 '''
         )
         self.assertEqual(result.returncode, 0, result.stderr)

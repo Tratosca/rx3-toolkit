@@ -29,9 +29,11 @@
     }
   ],
   "build_files": [
+    "rx3_theme_module.c",
     "rx3_theme_decl.h",
     "rx3_theme_feature.h",
     "rx3_theme_pixels.h",
+    "rx3_theme_conversion.h",
     "rx3_theme_utility.h"
   ]
 }

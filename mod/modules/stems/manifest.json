@@ -26,15 +26,47 @@
       "source": "module.sh",
       "target": "module.sh",
       "executable": false
+    },
+    {
+      "source": "assets/stems-selected.rgb565",
+      "target": "stems-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/stems-selected-light.rgb565",
+      "target": "stems-selected-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-stems-none.rgb565",
+      "target": "single-stems-none.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-stems-none-light.rgb565",
+      "target": "single-stems-none-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-stems-selected.rgb565",
+      "target": "single-stems-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/single-stems-selected-light.rgb565",
+      "target": "single-stems-selected-light.rgb565",
+      "executable": false
     }
   ],
   "build_files": [
+    "rx3_stems_module.c",
     "rx3_stems_decl.h",
     "rx3_stems_feature.h",
     "rx3_stems_panel.h",
     "rx3_stems_audio.h",
     "rx3_stems_loader.h",
     "rx3_stems_package.h",
+    "rx3_stems_io.h",
     "rx3_stems_limits.h",
     "rx3_stemwave_render.h",
     "rx3_stemwave_decl.h",

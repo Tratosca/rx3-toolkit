@@ -46,4 +46,18 @@ unsigned int rx3_panel_count(void)
     for(unsigned int i=1; i<=PANEL_LIMIT; i++) count += rx3_panel_find(i)!=0;
     return count;
 }
-const struct rx3_panel_service rx3_panels = {register_row, unregister_row, open_panel};
+/* Every row but `id` hears it is left, then `id` hears it is shown. Zero
+   leaves them all. Rows are resident, so a concurrent unregister is safe. */
+void rx3_panel_activate(unsigned int id)
+{
+    for (unsigned int i = 1; i <= PANEL_LIMIT; i++) {
+        const struct rx3_pad_row *row = rx3_panel_find(i);
+        if (row && row->activate && i != id) row->activate(0u);
+    }
+    const struct rx3_pad_row *shown = rx3_panel_find(id);
+    if (shown && shown->activate) shown->activate(1u);
+}
+static void (*refresh_action)(void);
+void rx3_panels_bind_refresh(void (*action)(void)) { refresh_action = action; }
+static void refresh(void) { if (refresh_action) refresh_action(); }
+const struct rx3_panel_service rx3_panels = {register_row, unregister_row, open_panel, refresh};

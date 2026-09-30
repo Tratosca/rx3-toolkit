@@ -73,3 +73,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# Local Claude Code setup
+/CLAUDE.md
+/WORKLOG.md
+/.claude/

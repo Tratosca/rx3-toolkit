@@ -41,8 +41,34 @@ fi
 cat > "$HELPER" <<'DEBUG_HELPER'
 #!/bin/bash
 exec 3<>/dev/udp/127.0.0.1/20000 || exit 1
-printf '%s\n' "$*" >&3
-IFS= read -r -d '' -t 5 -u 3 response || true
+printf '%s\n' "$*" >&3 || exit 1
+# Bash read consumes one byte at a time; on UDP that discards the rest of the
+# datagram. Receive one whole packet, with a bounded wait and owned child.
+umask 077
+reply=${TMPDIR:-/tmp}/rx3-debug-reply.$$
+receiver=
+cleanup_reply()
+{
+    if [ -n "$receiver" ]; then
+        kill "$receiver" 2>/dev/null || :
+        wait "$receiver" 2>/dev/null || :
+    fi
+    rm -f "$reply"
+}
+trap cleanup_reply EXIT
+trap 'exit 1' HUP INT TERM
+dd bs=4096 count=1 <&3 > "$reply" 2>/dev/null &
+receiver=$!
+attempt=0
+while kill -0 "$receiver" 2>/dev/null && [ "$attempt" -lt 5 ]; do
+    sleep 1
+    attempt=$((attempt+1))
+done
+kill -0 "$receiver" 2>/dev/null && exit 1
+wait "$receiver" || exit 1
+receiver=
+response=$(tr -d '\000' < "$reply")
+[ -n "$response" ] || exit 1
 printf '%s\n' "$response"
 DEBUG_HELPER
 chmod 700 "$HELPER"
@@ -58,4 +84,4 @@ for deck in 0 1; do
 done
 
 [ "$failed" -eq 0 ] || exit 1
-log "decoder sleep applied to both decks"
+log "decoder sleep: responses received for both decks; setting not verified"

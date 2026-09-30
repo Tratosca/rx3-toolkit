@@ -26,9 +26,40 @@
       "source": "module.sh",
       "target": "module.sh",
       "executable": false
+    },
+    {
+      "source": "assets/samples-selected.rgb565",
+      "target": "samples-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/samples-selected-light.rgb565",
+      "target": "samples-selected-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/samples-none-selected.rgb565",
+      "target": "samples-none-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/samples-none-selected-light.rgb565",
+      "target": "samples-none-selected-light.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/samples-beatfx-selected.rgb565",
+      "target": "samples-beatfx-selected.rgb565",
+      "executable": false
+    },
+    {
+      "source": "assets/samples-beatfx-selected-light.rgb565",
+      "target": "samples-beatfx-selected-light.rgb565",
+      "executable": false
     }
   ],
   "build_files": [
+    "rx3_samples_module.c",
     "rx3_samples_decl.h",
     "rx3_samples_feature.h",
     "rx3_samples_config.h",

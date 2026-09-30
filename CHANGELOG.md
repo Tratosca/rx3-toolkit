@@ -3,7 +3,23 @@
 
 ## Unreleased
 
+- The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.
+
 - Stem preparation installs again on Intel Macs ([#21](https://github.com/Tratosca/rx3-toolkit/issues/21)). PyTorch no longer publishes Intel builds, so the app installs the last versions that have them, with Python 3.10 to 3.12; 3.11 and 3.12 need the Xcode Command Line Tools. Checked under Rosetta with vocals, 3-part and every preset; not yet run on a real Intel Mac.
+
+- Hold SHIFT on either deck while you plug in the USB drive to start without the mod for that session: the deck then works stock. Not yet run on hardware.
+
+- When the mod restarts the player, the USB drive is announced again, so it appears in SOURCE without unplugging it. Not yet run on hardware.
+
+- Complete the core/module separation. Stems, Samples, Logo and Theme are separate compilation units that use the public API only; the core includes no module file and names no feature. New shared services (API 18): input (pad chain by priority, SHIFT, declarative pad lights on one blink clock, pad-mode keys), typed audio stages (deck stream, master bus), image tables with native replacements and light variants, guarded firmware writes, one RAM reservation ledger and one background loader. Behaviour, assets and limits are meant to be unchanged. Host tests only; not yet run in the emulator or on hardware.
+
+- Fix the startup notification crash by drawing notices through the active native header renderer. The previous caution API belongs to an uninitialized UI branch. Tested in the emulator; not yet run on hardware.
+
+- Correct Asshole mode’s native object IDs after the first RX3 test; replace the temporary STATUS round trip on return from KEY/STEMS with a full native-layer refresh and explicit tab selection. Add BROWSE timing/cache counters because the first scroll optimisation remained slow on hardware. Retest pending; see [hardware findings](REFERENCES.md#doc-hardware-feedback-20260929).
+
+- Add optional **Asshole mode**: tap each deck’s eye to hide or restore its track title. Decks are independent; the choice survives track changes and resets at startup. Other deck information and BROWSE remain available. ARM build and host tests cover the implementation; real RX3 validation is pending.
+
+- Reduce BROWSE pauses on local rekordbox USB libraries by reusing artist, duration, BPM and key metadata while the firmware prepares each page. Returning to an unchanged list after a pause no longer triggers a timed reload of every visible track. Sorting and harmonic markers remain active. Tested in the emulator; not yet run on hardware.
 
 - Fix pad-preview asset lookup after the core directory reorganization.
 
@@ -44,7 +60,7 @@
 - Extend the experimental OverCue exporter with manual provenance and measured full-mix loudness ceilings; vectorize the reader with NEON and add per-block CPU/cache diagnostics. Not yet run on hardware.
 
 
-- Add an opt-in OverCue stems prototype: read the original seven 96 kHz paged roles through a bounded 44.1 kHz cache, and export existing VOCAL/DRUMS packages to the shared USB format without rerunning separation. Emulator and synthetic format checks are documented in `docs/overcue-prototype.md`; physical RX3 and CDJ-3000 interoperability remains unverified.
+- Add an opt-in OverCue stems prototype: read the original seven 96 kHz paged roles through a bounded 44.1 kHz cache, and export existing VOCAL/DRUMS packages to the shared USB format without rerunning separation. Emulator and synthetic format checks are documented in [REFERENCES.md](REFERENCES.md#doc-overcue-prototype); physical RX3 and CDJ-3000 interoperability remains unverified.
 
 - Cancel separation, decoding, waveform filtering and runtime installation with their owned child processes. Closing the window waits for job cleanup; an interrupted installation remains unavailable until completed. Automatic PCM reuse now records inference package versions as well as model hashes. Managed installs fix audio-separator at 0.44.5, librosa at 0.11.0 and imageio-ffmpeg at 0.6.0.
 - macOS builds accept a Developer ID signing identity with hardened runtime and timestamps. A local notarization command verifies the signature, submits to Apple using a Keychain profile, staples the accepted ticket and checks Gatekeeper before creating the archive. No release is published by that command.

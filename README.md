@@ -1,18 +1,16 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
-<h1 align="center">
-  XDJ-RX3 Toolkit
-</h1>
+<h1 align="center">XDJ-RX3 Toolkit</h1>
 
 <p align="center">
-  <b>Vocal &amp; instrumental stems, longer beat jumps, and more on your XDJ-RX3.</b><br>
-  No flashing. No firmware surgery. Pull the USB stick out and your player is stock again.
+  <b>More ways to play your XDJ-RX3, straight from your rekordbox USB drive.</b><br>
+  Prepare stems, add sample pads, mix in key and make Beat Jump go further. No firmware flashing.
 </p>
 
 <p align="center">
-  <a href="../../releases"><img alt="Release" src="https://img.shields.io/github/v/release/Tratosca/rx3-toolkit?style=flat-square&color=ff5c00"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square"></a>
-  <img alt="Firmware" src="https://img.shields.io/badge/XDJ--RX3%20firmware-1.19%20%7C%201.20-black?style=flat-square">
-  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square">
+  <a href="../../releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Tratosca/rx3-toolkit?style=flat-square&color=ff5c00"></a>
+  <a href="LICENSE"><img alt="MPL-2.0 license" src="https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square"></a>
+  <img alt="RX3 firmware 1.19 and 1.20" src="https://img.shields.io/badge/XDJ--RX3%20firmware-1.19%20%7C%201.20-black?style=flat-square">
+  <img alt="macOS, Windows and Linux" src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square">
 </p>
 
 <p align="center">
@@ -25,43 +23,45 @@
   <a href="#documentation">Docs</a>
 </p>
 
-<!-- Add a demo GIF or a photo of the pads here: ![demo](docs/assets/demo.gif) -->
+> [!IMPORTANT]
+> This README describes the **current development version**. The latest [public release](../../releases), **v0.5.2**, is older and does not contain every feature below. Check the release notes for what your download actually includes. Several newer modules have passed local or emulator checks but still need a complete test on a physical RX3.
 
 ---
 
 ## What you get
 
+Choose the features you want in the desktop app. It prepares your USB drive; your music stays where rekordbox put it.
+
+| For your set | What the current development version adds |
+| --- | --- |
+| **Stems** | Prepare vocals and drums on your computer. On the RX3, bring **VOCAL**, **DRUMS** or **INST** in and out, or adjust their levels. INST includes the bass. The screen can follow your stem selection with Blue, RGB or 3Band waveforms. |
+| **Harmonic mixing** | Shift either deck by up to 12 semitones. Optional **Key Sync** proposes a shift against the MASTER deck; **Enhanced Key Match** adds selected harmonic suggestions in BROWSE. You choose whether to apply the shift. |
+| **Samples** | Put your own sounds on eight pads. Trigger once, hold, loop or latch; up to four voices can play at the same time across both decks. |
+| **Beat Jump** | Jump 32 beats with pads 7 and 8. Optional immediate repeat makes consecutive jumps respond without waiting for another quantized step. |
+| **Finding tracks** | Add a third BROWSE column for BPM, Camelot key, artist or duration; tap a heading to sort. Optional search without accents finds titles such as “NIÑO” when you type “NINO”. |
+| **Display and broadcast** | Add a logo, choose a light screen, hide either deck title, or send Now Playing information to a computer over the rear USB-B connection. These are separate optional modules. |
+
+The usual RX3 controls remain available unless a selected feature needs their screen space. **Key Shift or Stems uses the touchscreen positions normally occupied by ZOOM and GRID.** You can still use the player's normal playback, cueing and mixing controls. The [module guides](mod/modules) explain individual controls and limits.
+
+Stems, Samples, the newer screen controls and Browse changes have **not yet passed full physical RX3 acceptance**. Browse with the extra metadata column has also felt slower than stock on hardware; work on that is under way. Try the exact USB drive and tracks at home before relying on them in a set.
+
 ### 🎤 Stems in standalone mode
 
-Prepare stems of your tracks on your computer, load them on the RX3 the usual way, and the **Slip Loop** PADs mode or **STEM** on screen tab turns into stem control:
+The computer does the separation before your set. The RX3 plays your original track and the prepared stem package together; it does not separate music live. One `.rx3stem` package per track lives in `RX3_STEMS` on the USB drive. The current preparation flow makes **VOCAL + DRUMS + INST**; INST is the part of the original mix left after the prepared vocal and drums are removed. Older vocal-only packages still load. There is no separate bass pad in the current layout.
 
-| Pad | Colour | What it does |
-| :--: | :--: | --- |
-| **5** | Light blue | Drums on / off, with vocals and drums prepared. Not yet run on hardware |
-| **6** | Yellow | Bass on / off, with vocals, drums and bass prepared. Not yet run on hardware |
-| **7** | Red | Instrumental, or remaining instruments after subtracting prepared roles. Not yet run on hardware |
-| **8** | Green | Vocal on / off. Not yet run on hardware |
+On a prepared track, the intended **Slip Loop** pad layout is **5 INST** (red), **6 VOCAL** (green), **7 DRUMS** (blue); **8** keeps its native loop. The **STEMS** touchscreen panel shows the parts available for that track. Tap a part to turn it off or back on; hold and drag to set its level. On a track without a valid stem package, Slip Loop stays native. This mapping is verified in code and the emulator, **not yet accepted on hardware**. [Stem controls and limits](mod/modules/stems/README.md).
 
-### 🎹 Key shift
+### 🎹 Key Shift and Key Sync
 
-Tune the key of your songs to mix harmonically (or play for Alvin & the Chipmunks). A **KEY** tab shows up on the screen:
-
-| Control | What it does |
-| --- | --- |
-| **KEY −** / **KEY +** | One semitone down or up, twelve either way |
-| **The number in the middle** | Tap it and the deck goes back to `0` |
-
-Pioneer actually shipped a pitch shifter for the Beat FX "PITCH". While it sounds gorgeous going down, the audio quality is like a broken fax going up. Our brand new AI-generated pitch shifter algorithm is exactly the opposite kind of bad. So the mod uses whichever one wins the direction you asked for.
+Tap **KEY** on the touchscreen to move either deck up or down by semitones. The centre key returns that deck to its original key. **Key Sync** uses the MASTER deck and your chosen harmonic rules to propose a shift; it does not force every track into the same key. **Enhanced Key Match** can mark additional candidates in BROWSE. These functions can be selected separately; Key Sync needs Key Shift and Key Match.
 
 ### ⏭️ 32-beat Beat Jump
 
-Beat Jump gets a new **32-beat** mode. Repeated presses also fire straight away instead of waiting for the grid to catch up.
+Choose **Beat Jump** and use pads **7** and **8** for −32 and +32 beats. The separate **Immediate Beat Jump** option changes how repeated jumps respond. It does not change your Hot Cues, loops or Beat FX.
 
-### 🔌 Lives on the USB stick, not in the player
+### 🔌 The mod lives on your USB drive
 
-Everything runs from the stick and disappears when the power goes off. Any RX3 you plug your stick on will be modded. Nothing is written to the player's internal memory, so there is no firmware to back up and nothing to uninstall.
-
-**Power off → pull the stick → power on → stock RX3.**
+The Toolkit puts `autoexec.bin` on the drive and runs the selected modules in the RX3's memory. It does not flash the player. To return to the stock RX3, **stop playback, power off, remove the mod drive, then power on**. A mod already running in memory remains active until that restart.
 
 ---
 
@@ -69,339 +69,229 @@ Everything runs from the stick and disappears when the power goes off. Any RX3 y
 
 | | |
 | --- | --- |
-| 🎛️ **Player** | Pioneer DJ XDJ-RX3, firmware `1.19` or `1.20` |
-| 💻 **Computer** | macOS (Intel or Apple Silicon), Windows x64, or Linux x64 |
-| 💾 **USB stick** | A normal Rekordbox export, FAT32 or exFAT |
-| 🔑 **The deck's key** | Fetched by the app from Pioneer's published GPL sources, on your request - [see below](#4-getting-the-key) |
-| 📀 **Disk space** | ~1.5 GB, only if you want stems |
+| 🎛️ **Player** | XDJ-RX3 running firmware **1.19 or 1.20**. Other versions are not supported by this build. |
+| 💻 **Computer** | macOS, Windows or Linux to prepare the drive. Stem preparation also needs a supported Python installation and room for its separation tools. **Intel Mac stem setup has an open compatibility issue** ([#21](https://github.com/Tratosca/rx3-toolkit/issues/21)). |
+| 💾 **USB drive** | A normal rekordbox export on FAT32 or exFAT. Start with a spare drive and a short playlist. |
+| 🔑 **First installation** | The app can obtain the required key from the manufacturer's published source package, after you read and accept its terms. |
+| 🎤 **For stems** | Internet access for the initial separation-tools installation, about **1.5 GB** of computer storage, and enough free space on the USB drive for the prepared tracks. |
 
-About **20 minutes** to set everything up. After that, stems take from a few seconds to a few minutes per track. A GPU (NVIDIA, AMD, or Apple Silicon) makes that dramatically faster.
+The app runs locally. Stem separation happens on your computer; the time and available acceleration depend on your tracks and machine.
 
 ---
 
 ## Before you start
 
-**Read this bit.** It is short.
+**Treat this as an experimental set-up.** Test the USB drive, the features you selected and several prepared tracks on your own RX3 before a performance. Keep a clean rekordbox drive ready to use. The current development version still has open physical acceptance work, especially around screen transitions, Browse speed and startup notices.
 
-- **Nothing is flashed.** The toolkit does not write to the player's internal storage. It uses the maintenance mechanism Pioneer built into the RX3 to run software from a USB stick, and everything lives in memory until you power off.
-- **There is a safety net.** If the modified player does not survive the first few seconds, the original one is put back automatically.
-- **It can still crash.** Modified software on a live machine is modified software on a live machine. That matters rather a lot when the thing is plugged into a 20 kW PA. **Test at home. Test the actual stick, the actual tracks, several times. Keep a clean Rekordbox stick in the bag.**
-- **Warranty.** Running unofficial software on consumer hardware may affect what the manufacturer is willing to do for you. Nothing here is permanent, but that is not a promise about anyone's warranty decisions.
-- **Liability.** This is an educational and experimental project. If it crashes during your $50,000 set, that would be unfortunate. I do wish you the $50,000 set.
-- **Music.** Separation happens on your computer, on your files. What you are allowed to copy, process and perform depends on your licences and your jurisdiction, not on this tool.
-- **Affiliation.** Not affiliated with, endorsed by, or connected to Pioneer DJ or AlphaTheta. Product names identify compatible gear and nothing more.
+- **Your music is not replaced.** Stems and sample banks are additional files. Check the destination shown in the app before writing to the drive.
+- **The player can still crash.** The mod runs in memory, but a crash during a set is still a crash during a set. Stop playback and restart without the mod drive if the RX3 behaves unexpectedly.
+- **Warranty and music rights still matter.** An unofficial mod may affect warranty support. You are responsible for the rights to copy, process and play your music.
+- **This is an independent project.** It is not affiliated with or endorsed by Pioneer DJ or AlphaTheta.
 
 ---
 
 ## Quick start
 
-Do these in order. For your first go, I'd suggest you use a spare USB stick and two or three tracks.
+The steps below describe the **current development app**. If you downloaded v0.5.2, follow that release's notes for its available screens and features.
 
 ### 1. Check your firmware
 
-Remove every USB stick, power the RX3 on, hold **MENU (UTILITY)** for a second, scroll to the bottom.
+With the USB drive removed, start the RX3. Hold **MENU (UTILITY)**, then scroll to the version number. This project recognises **1.19** and **1.20**. If you have another version, stop here; do not try to force the mod onto it. [AlphaTheta's firmware instructions](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
+
+Power the player off before preparing the drive.
+
+### 2. Open the app and choose your USB drive
+
+Check the [Releases page](../../releases) for the latest published build. The features described here are in the development version until a newer release is published; developers can run that version from this checkout using [Contributing](CONTRIBUTING.md). Do not assume the v0.5.2 download has the screens or features described below.
+
+Export a few tracks or a playlist from rekordbox to your USB drive, wait for export to finish, then close rekordbox. Open XDJ-RX3 Toolkit and choose **the drive itself** in the USB screen, not `PIONEER`, `Contents` or a playlist folder. The drive name remains visible at the bottom of the sidebar. **Tutorial** in the app walks through the same preparation.
+
+The app has **Modules**, **Samples**, **Logo**, **Stems**, **Install the mod** and **Settings**. Settings changes the app's language and appearance; **Light theme** in Modules changes the RX3's screen. The app works in English and French.
+
+### 3. Prepare stems *(optional)*
+
+You can install the mod without preparing stems. To use the stem pads:
+
+1. Open **Stems**. The app can read the selected USB drive's rekordbox export or a rekordbox **Library XML** export. Choose the playlist you want to prepare. The prepared files go to the USB drive selected in the sidebar.
+2. If prompted, choose **Install stem preparation tools**. This is a one-time download to your computer. The app shows whether the tools are ready and which processing hardware it will use.
+3. Click **Prepare stems**. The current flow prepares vocals and drums, then lets the RX3 reconstruct INST from the original mix. It also prepares Blue, RGB and 3Band waveforms. Keep the computer awake until the playlist finishes.
+4. Choose a track in the Stems preview, listen to each part and check its timing. If a track fails, read its result; completed tracks remain available. A reported vocal cancellation mismatch is still being investigated ([#25](https://github.com/Tratosca/rx3-toolkit/issues/25)).
+
+Older compatible stem files can be completed or migrated without separating the audio again when their source and checks pass. The app keeps a backup of replaced v0.5.2 files. The separate **OverCue** export checkbox is experimental and is only for users who deliberately want files for a modded CDJ-3000; RX3 preparation does not require it. [Stem migration details](REFERENCES.md#doc-stems-migration).
+
+Your drive will contain a folder like this:
 
 ```text
-VERSION No. 1.19
+USB drive/
+├── Contents/       rekordbox music
+├── PIONEER/        rekordbox library
+└── RX3_STEMS/      one .rx3stem package per prepared track
 ```
 
-`1.19` and `1.20` both work, and the toolkit builds the same drive either way: the two differ by three bytes of the player, none of them anywhere the mod touches. Anything else and you should stop here, because the toolkit checks the player it is looking at and refuses rather than guessing. AlphaTheta documents updating [in its support article](https://support.alphatheta.com/en-US/articles/5097637194137?product=4416587179673).
+### 4. Choose the features and prepare your extras
 
-Power the RX3 back off.
+In **Modules**, turn on the features you want. The app selects required companion modules for you. Choices here are **not yet written** to the USB drive.
 
-### 2. Download the app
-
-Grab the build for your computer from the [**Releases page**](../../releases) and unpack it wherever you keep applications.
-
-The app draws its window with the one your desktop already has, rather than carrying a second one around. macOS and Windows always have it, and need nothing else.
-
-On **Linux** most desktops have it too, but not all of them. If the window never appears, install it:
-
-```sh
-sudo apt install gir1.2-webkit2-4.1    # Debian, Ubuntu, Mint
-sudo dnf install webkit2gtk4.1         # Fedora
-```
-
-<details>
-<summary><b>macOS says the app is damaged / Windows shows a warning</b></summary>
-
-The app is not code-signed yet, which means your computer suspects it could be malicious.
-
-**macOS** — clear the quarantine flag your browser put on the download. Open the Terminal application (in the Utilities folder), type `xattr -rc` followed by a space, then drag the app into the window to fill in the path:
-
-```sh
-xattr -rc "/Applications/XDJ-RX3 Toolkit.app"
-```
-
-`No such file or directory` means the path is wrong: it must point at the unpacked `.app` itself, not the `.zip` and not the folder around it.
-
-**Windows** — SmartScreen will complain. Choose **More info → Run anyway**.
-
-**Linux** — unpack and run; you may need to mark the file executable first.
-
-</details>
-
-### 3. Prepare your stems *(optional)*
-
-Skip this if you only want the longer beat jumps.
-
-1. In Rekordbox, make a playlist with the tracks you want stems for. Two or three, for a first run.
-2. Export the playlist to your USB drive and close the library application. If the drive contains `PIONEER/rekordbox/export.pdb`, choose the drive directly: no XML export is needed. Alternatively, export the collection as XML to prepare audio stored on the computer. Not yet run on hardware.
-3. Open the app, go to the **Stems preparation** tab, and hit **Set up… → Install**. Separation needs a lot of software that is too big to ship in the download, so it gets installed once into its own private folder. You need an internet connection, ~1.5 GB free, and Python 3.10–3.13 ([python.org](https://www.python.org/downloads/) if you have none — take 3.13). If it stops halfway, press **Install** again; it picks up where it left off.
-4. Select the library drive or XML file, the playlist, and the destination USB drive. Vocals are required; drums and bass are optional, and bass also requires drums. Review the estimated size per role and track before starting. Not yet run on hardware.
-5. Pick a quality:
-
-   | Preset | Use it when |
-   | --- | --- |
-   | **High quality** | The stems are going in a set |
-   | **Normal** | Most of the time |
-   | **Very fast** | Auditioning a playlist, or a long queue has to finish tonight |
-
-The top two are the same model at two settings, so switching between them downloads nothing and costs you no quality — only time. Only **Very fast** swaps the model itself. What the app can actually reach depends on your graphics card, and the line under the selector tells you what *your* machine resolves to rather than what is true in general.
-
-6. Start it. The app estimates how long the run will take, then corrects itself after the first track and remembers your machine's speed for next time. If it works out at more than ten minutes it asks first, because it will occupy the machine — keep the computer plugged in and awake.
-
-Each track produces a vocal `.rx3stem`, plus `.rx3drums` and `.rx3bass` when selected, in `RX3_STEMS` at the output root. If preparing elsewhere, copy that directory to the USB drive root. Files are loaded into RAM; the size warning is guidance, and the player can reject additional roles when memory is insufficient. Not yet run on hardware.
-
-```text
-Your USB stick
-├── Contents    ← this holds your exported Rekordbox audio files
-├── PIONEER
-└── RX3_STEMS   ← the new one
-```
-
-> [!NOTE]
-> The stem playlist itself does **not** need to go on the stick, but it totally can. The player matches stems automatically — by filename, so a stem sits next to the track it came from and neither has to be renamed.
-
-Keep the laptop plugged in and awake. If one track fails the queue carries on — read the log at the end. If *every* track fails, the install is incomplete: run **Install** again. See [Troubleshooting](docs/troubleshooting.md#every-track-fails).
-
-An interrupted run picks up where it stopped: stems already made are kept.
-
-<details>
-<summary><b>Where does all that software actually go?</b></summary>
-
-Not into the app, and not into your system. It lives in one folder you can delete:
-
-| | |
+| Want to… | Where to do it |
 | --- | --- |
-| **macOS** | `~/Library/Application Support/RX3 Stem Studio` |
-| **Windows** | `%LOCALAPPDATA%\RX3 Stem Studio` |
-| **Linux** | `~/.local/share/rx3-stem-studio` |
+| **Play samples** | Open **Samples**. Make a bank, add sounds to the eight pads, set each pad's excerpt, level, colour and playback mode, then try it in **Play pads**. Changes are saved on this computer as you work. Choose the active bank and click **Save to USB drive** to send it to the stick; also select the Samples module. Samples are limited to eight seconds each and four simultaneous voices. |
+| **Put your logo on the screen** | Open **Logo**, choose an image and adjust its framing in the preview. Selecting artwork turns on the Logo module; **Install the mod** writes it to the USB drive. |
+| **Mix in key** | In **Modules**, choose Key Shift, Enhanced Key Match and/or Key Sync. Set the Key Sync range and harmonic rules there. Key Sync pulls in what it needs. |
+| **See more in BROWSE** | Select **Third BROWSE column**, then choose BPM, Camelot key, artist or duration in its settings. Use the physical **LOAD** buttons with this layout. |
+| **Change the screen or search** | Select **Light theme**, **Accent-insensitive search** or **Asshole mode** (hide track titles) in **Modules**. The title-eye controls are still awaiting physical RX3 acceptance. |
+| **Send track info to a computer** | Select **Now playing**. Its [module guide](mod/modules/now-playing/README.md) explains the rear USB-B connection and the receiver. Integrated hardware validation is pending. |
+| **Collect a troubleshooting report** | Select **Troubleshooting report** to write `RX3_RUNTIME/session.txt` when you insert the drive. The detailed report and Telnet access are technical options; leave them off for ordinary sets. |
 
-The folder keeps the name an earlier, separate stems application used, so that if you had it, its runtime is found instead of downloaded all over again. `RX3_STEM_STUDIO_HOME` moves it somewhere else.
+Beat Jump, Immediate Beat Jump, Key Shift, Key Sync and Stems are selected by default in the development app. Samples, Browse Columns, Search Latin, Now Playing, Logo, Light theme and the other optional modules start off. You can see and change the exact selection in **Modules**.
 
-**Advanced options…** is where you uninstall it, pick a different graphics accelerator, or browse the model list. Changing accelerator means installing again — a processor-only build cannot be accelerated afterwards.
+### 5. Install the mod on the USB drive
 
-If you already have `audio-separator` and `ffmpeg` on your machine, they get used as they are and nothing is installed. `RX3_SEPARATOR` and `RX3_FFMPEG` point at specific ones.
+Open **Install the mod**. Check the drive name, selected modules, logo and whether your sample bank and stems have actually been saved to that drive. **Installing the mod does not prepare stems or save your sample bank for you.**
 
-</details>
+On first installation, the app asks you to read and accept the terms before it retrieves the required key from the manufacturer's published source package. This may download roughly 250 MB. The key stays on your computer; the app checks the package against known fingerprints and removes the downloaded archive afterward. You can manage or delete the key under **Installation options**. [Key details](REFERENCES.md#doc-extract-initramfs).
 
-### 4. Getting the key
-
-The player only loads the file we are about to build if it is encrypted with the key its own maintenance path expects. That key is not in this repository or in the app. It is inside the XDJ-RX3 source package Pioneer publishes under the GPL on its [open source distribution page](https://www.pioneerdj.com/en/support/open-source-code-distribution/gnu-open-source-license/).
-
-The first time you open the app without a key, it offers to get it for you. Read the terms to the end, tick the box, and it downloads that package (about 250 MB) from Pioneer's own servers, checks every file against known fingerprints, keeps only the key in your application folder, and deletes the rest. Nothing is sent anywhere else. Next time, the app finds the key on its own.
-
-| | Where the key is kept |
-| --- | --- |
-| **macOS** | `~/Library/Application Support/XDJ-RX3 Toolkit` |
-| **Windows** | `%LOCALAPPDATA%\XDJ-RX3 Toolkit` |
-| **Linux** | `~/.local/share/xdj-rx3-toolkit` |
-
-`RX3_TOOLKIT_HOME` moves it somewhere else. **Delete the key**, beside the key path in the app, removes it and anything half downloaded; deleting that folder does the same.
-
-Prefer to do it by hand? [Getting a root filesystem](docs/extract-initramfs.md) walks through the same archives yourself, and **Browse** points the app at the key file you produced. A key you choose is never replaced by a download.
-
-### 5. Build the file for your stick
-
-Now that the hard part is done, in the **Modules installation** tab: pick the firmware your deck reported in step 1, choose the modules you want, check the key from step 4 is filled in, pick the **root of your Rekordbox stick** as the destination, then **Mod your RX3!**.
-
-Here is what you are choosing from:
-
-| Module | What it does | On by default |
-| --- | --- | :--: |
-| **Stems control** | SLIP LOOP pads 5/6/7/8 control drums, bass, remaining instruments and vocals when prepared. Waveform adaptation is included automatically. Not yet run on hardware | Yes |
-| **Per-deck key shift** | A **KEY** tab on screen, twelve semitones either way, independently per deck | ✅ |
-| **Beat Jump ±32** | Beat Jump pads 7 and 8 become −32 and +32 instead of −8 and +8 | ✅ |
-| **Immediate Beat Jump** | Repeated jumps fire straight away instead of waiting for the grid. Quantize, Hot Cues, loops and Beat FX are untouched | ✅ |
-| **No more wait between beatjumps** | Makes the player access audio files faster when beatjumping, so big jumps can be repeated sooner. Nothing to see, it just helps the two above | ✅ |
-| **Sample pads** | Fire your own sounds from the performance pads, each with its own colour and its own way of playing: once, only while you hold it, looping until you press it again, or right through with the same pad to stop it early. Touch SAMPLES to assign the pads; touch it again to return to STATUS without stopping playing sounds. Your stored hot cues stay unchanged. SHIFT can stop them all. Prepared on the computer. Not yet run on hardware | ❌ |
-| **Light display** | A light interface for bright rooms. The waveform stays dark so it remains readable. Not yet run on hardware | ❌ |
-| **Accent-insensitive search** | Find a track without typing its accents, which the on-screen keyboard makes slow. Not yet run on hardware | ❌ |
-| **Logo** | Replace the wordmark in the middle of the performance screen with your own artwork. Not yet run on hardware | ❌ |
-| **Session logging** | Writes what happened to `RX3_RUNTIME/session.txt` on the stick. Tick it when something went wrong and you want to know why | ❌ |
-| **Diagnostic Telnet access** | Opens a shell for inspection. You do not need this | ❌ |
-
-Some boxes tick and untick themselves, and that is on purpose: a few modules genuinely need another one to work.
-
-> [!WARNING]
-> **Session logging** closes USB diagnostics after each line and keeps continuous player output in RAM. **Verbose USB logging** is a separate opt-in for debugging; it keeps the drive open, so stop the player before removing it.
-
-> [!WARNING]
-> **Diagnostic Telnet** is off by default and should stay that way unless you know why you want it. The traffic is unencrypted, and it is reachable through the rear computer USB port. The root password won't be provided here.
-
-Eject the stick properly. It should now look like:
+When the recap and destination are right, click **Install the mod** and wait for it to finish. Eject the USB drive properly. It should now have `autoexec.bin` at its root:
 
 ```text
-USB stick/
-├── autoexec.bin      ← the mod, this is the whole thing
-├── RX3_STEMS/
+USB drive/
+├── autoexec.bin    the selected mod
+├── RX3_STEMS/      if you prepared stems
 ├── Contents/
 └── PIONEER/
 ```
 
-### 6. Put it on the player
+Your saved sample bank is also on the drive if you used **Save to USB drive** in Samples. The app can inspect the drive and remove the mod later without deleting your music, stems or sample banks.
 
-**Order matters.**
+### 6. Try it on the RX3
 
-1. Power the RX3 on with the stick **out**.
-2. Wait until the interface is fully loaded and responsive.
-3. *Now* insert the stick.
+1. Start the RX3 **without** the mod drive inserted. Wait for its screen and controls to respond.
+2. Insert the drive. Keep it in place while the player restarts its interface. A normal load may briefly show **MODS LOADING – KEEP USB**. The absence of that message alone does not tell you whether the mod loaded.
+3. Load a track, check its normal playback first, then try one selected feature at a time. Check both decks and the return to BEAT FX and BROWSE before depending on the set-up.
 
-The screen freezes, goes away for a few seconds and comes back. While that happens, do not pull the stick, do not cut power, and do not mash the controls because patience has apparently become obsolete.
+If you need to **skip the mod for this insertion**, hold **SHIFT** on either deck while inserting the USB drive and keep it held until the RX3 recognises it. This is a startup bypass, not a way to remove a mod already running. To return to stock after a mod has loaded, power off and restart without the mod drive. The latest startup result is written to `RX3_RUNTIME/startup-probe.txt` on the drive; this bypass has local checks, with physical retest still pending.
 
 <details>
-<summary><b>Did it work?</b></summary>
+<summary><b>How can I tell whether it loaded?</b></summary>
 
-The honest answer is: load a track and try the pads. There is no log by default, on purpose — see **Session logging** in the module list above.
-
-**Interface did not come back?** Pull the stick and power cycle — unplug the mains lead if you have to. The RX3 boots stock.
-
-**Something is off and you want to know why?** Build the stick again with **Session logging** ticked and reproduce it. That writes `RX3_RUNTIME/session.txt`, whose last line should read:
-
-```text
-=== complete ===
-```
-
-The other lines worth recognising:
-
-| Line | What it means |
-| --- | --- |
-| `=== complete ===` | The run finished. This is what a good run ends on. |
-| `OK: rbp active` | The player was restarted and came back. |
-| `nothing to apply: ...` | Everything you picked was already running. Not an error. |
-| `STOP: ...` | Something was not as expected, so **nothing was touched**. |
-| `FAILED: ...` | Something went wrong partway, and the previous state was put back. |
-
-On `STOP:` or `FAILED:`, delete `autoexec.bin` from the stick, then see [Troubleshooting](docs/troubleshooting.md#the-session-log-says-stop-or-failed).
+Try a selected feature with a suitable track. **Session logging** is off by default; turn it on in Modules if you need a report. It writes `RX3_RUNTIME/session.txt` to the drive. `=== complete ===` means installation finished; it does not prove every audio and control path works on hardware. A `STOP:` or `FAILED:` line calls for [Troubleshooting](REFERENCES.md#doc-troubleshooting), followed by a clean restart without the mod drive if the player is misbehaving.
 
 </details>
-
-Putting the stick back in later costs nothing: anything already running is recognised and left alone, so the interface does not freeze a second time.
 
 ---
 
 ## Playing with it
 
-Load one of your prepared tracks and open **Slip Loop**.
+On a track you prepared, open **STEMS** or the matching **Slip Loop** pad page. Tap **VOCAL** or **DRUMS** to take that part out and tap again to restore it. Use **INST** for the remaining instruments and bass. On the touchscreen, hold and drag a part to set its level. A track without prepared stems keeps its normal Slip Loop controls.
 
-Available stem controls act as independent switches for INST, VOCAL and, when prepared, DRUMS. On the touchscreen, tap a stem to mute or enable it; hold, then drag to adjust its volume. With no valid vocal file the player retains its native controls. The numerical pad mapping still needs hardware validation; it is not specified here.
+Tap **KEY** for manual Key Shift. The left and right controls move the selected deck one semitone at a time; tap its centre key to reset. If you enabled Key Sync, check the proposed shift against the MASTER deck before applying it. Key Match suggestions in BROWSE are suggestions for a transition, not a guarantee that two melodies will sound good together.
 
-Open **Beat Jump** on the same track: pads 7 and 8 now read `32`.
+In **Beat Jump**, pads 7 and 8 give you the longer jumps. In **Samples**, play the bank you saved as active on the USB drive; changing screens does not intentionally stop a playing loop or latch. The sample panel and the stored Hot Cues are separate.
 
-Open the **KEY** tab on the screen and press `KEY +` a few times: the deck climbs a semitone at a time, up to twelve. The other deck does not follow — each one has its own key. Tap the number in the middle to come straight back to `0`.
-
-Load a track with no stem and Slip Loop behaves exactly like stock. That is the intended fallback, not a failure — if a track you *did* prepare has no stem controls, then either you did something wrong, or I did. See [Troubleshooting](docs/troubleshooting.md#a-prepared-track-has-no-stem-controls) first, and open an issue only after that.
+With **Third BROWSE column**, tap a column heading to sort, tap it again to reverse, and use the physical **LOAD 1 / LOAD 2** buttons. The extra metadata can currently slow scrolling on a real RX3; the investigation remains open in [#15](https://github.com/Tratosca/rx3-toolkit/issues/15). If something does not respond as described, use the [troubleshooting guide](REFERENCES.md#doc-troubleshooting) and test again without the mod drive.
 
 ---
 
 ## Back to stock
 
 1. Stop playback.
-2. Power off.
-3. Pull the stick.
+2. Power off the RX3.
+3. Remove the mod drive.
 4. Power on.
 
-Done. Nothing to uninstall, nothing to restore, nothing to reflash.
-
-Leaving the stick in re-applies the mod at the next power-on. To turn it back into an ordinary Rekordbox stick for good, delete `autoexec.bin` from it — your music and your stems can stay.
+The RX3 starts with its stock software. To keep using that USB drive for ordinary rekordbox playback, remove the mod through the app's **USB drive** screen, or delete `autoexec.bin` from the drive. Your music, prepared stems and sample banks can stay. **Removing the file while the RX3 is already running does not undo the live mod**; restart the player.
 
 ---
 
 ## FAQ
 
 <details>
-<summary><b>How does it work?</b></summary><br>
+<summary><b>Is this custom firmware?</b></summary>
 
-The RX3 runs Linux. By Pioneer's own design, it looks at every USB stick you insert for a file named `autoexec.bin`. If that file decrypts with a key held inside the player, the player runs the script in it. That is the manufacturer's maintenance mechanism, not a way in that anyone found. It runs the script as **root**, the account that is allowed to do anything, which is why a stick can change what the player does.
+No. The USB drive starts a mod that runs in memory. The Toolkit does not flash the RX3 or write its internal storage. A clean restart without the mod drive restores the stock player. [How it works](REFERENCES.md#2-how-a-mod-runs-without-flashing-anything).
 
-The whole interface is one program, `rbp` (Rekordbox Portable?). At every start-up the player copies it into memory and runs it from there. Our script edits that copy, in memory. The new features are code running inside the player, using its own fonts, images and pads. Nothing touches permanent storage. Cut the power and the memory forgets all of it; the next start-up copies the stock `rbp` again.
-
-"Patching" means two things. A few precise bytes are rewritten in place — a beat jump of 32 instead of 8 is nothing more than that. Anything bigger arrives as a *shared library*, loaded beside `rbp` and hooked into it from the inside. That is where vocals, instrumentals and the key shifter come from, in a player that shipped with none of the three.
-
-The `KEY` and `STEMS` tabs are the same trick applied to the screen. Touch works because two native Beat FX zones were politely repurposed and handed back on the way out. The pads and the on-screen toggles blink in step because they both count from the same clock.
-
-If anything goes wrong in the seconds after the patch, the original bytes go back, the stock player starts again, and a log on your stick says what happened.
-
-Details for the curious: [how a mod runs without flashing anything](REFERENCES.md#2-how-a-mod-runs-without-flashing-anything).
 </details>
 
 <details>
-<summary><b>Does this flash custom firmware?</b></summary><br>
+<summary><b>Can it crash or affect a gig?</b></summary>
 
-No. Everything runs in memory and is gone the moment you power off without the stick.
+Yes. It is experimental software on the player you use to perform. Test your actual drive and tracks at home, keep a clean rekordbox drive ready, and use the stock restart procedure if anything feels wrong. A successful desktop test or emulator run is not the same as a full RX3 set.
+
 </details>
 
 <details>
-<summary><b>Can it brick my RX3?</b></summary><br>
+<summary><b>Does every track need stems? Are originals changed?</b></summary>
 
-The project does not write to the player's permanent storage, which removes the usual reason custom firmware bricks things. That is not a mathematical proof that nothing can ever go wrong. Unofficial software, own risk.
+No. Ordinary and prepared tracks can share the drive. Stem packages are separate from the original audio. A prepared track can still be refused if its package is corrupt, too large for the available memory or mismatched with the source. The app reports known size limits before preparation; the actual free memory on both decks can still differ during a set. [Stem limits](mod/modules/stems/README.md).
+
 </details>
 
 <details>
-<summary><b>Can it crash?</b></summary><br>
+<summary><b>Where does the separation software go?</b></summary>
 
-Yes. Test it at home before you rely on it. Using a show as your first test would be an admirably efficient way of turning software testing into performance art.
+It stays on your computer, in a folder named `RX3 Stem Studio` under your account's application data. The **Advanced settings** section in Stems shows the installed preparation tools and processing hardware. The RX3 does not need those models; it only reads the finished stem packages on your USB drive.
+
 </details>
 
 <details>
-<summary><b>Does every track need stems?</b></summary><br>
+<summary><b>Why are stems prepared before the set?</b></summary>
 
-No. Prepared and unprepared tracks live happily on the same stick.
+Separation models are too large and slow for this job on the RX3. Your computer prepares the files; the player only needs to load and mix them. The original audio remains your normal rekordbox track.
+
 </details>
 
 <details>
-<summary><b>Are my original files modified?</b></summary><br>
+<summary><b>What if I update the RX3 firmware?</b></summary>
 
-No. The stem is a separate file sitting next to the track.
+Check this project's supported versions again before using the mod. The player software can change between firmware versions, so an old `autoexec.bin` is not a safe assumption. After updating, start once without the mod drive before trying a newly prepared one.
+
 </details>
 
 <details>
-<summary><b>Why only these firmware versions?</b></summary><br>
+<summary><b>What information leaves the RX3?</b></summary>
 
-The mod patches the player software at very specific places, and a firmware update can move that code around. So the toolkit checks it is looking at a player it recognises, by its checksum, and refuses if it is not. Support for another version is added deliberately: the addresses are checked one by one against that version's own player binary before anything is claimed. That is how `1.20` was added, and it turned out to be `1.19` with three bytes changed, none of them at an address the mod reads or writes.
-</details>
+Ordinary stem preparation runs locally on your computer. The optional **Now playing** module sends track and deck status to a computer connected to the rear USB-B port; it is off by default. It does not require rekordbox running on that computer. See its [module guide](mod/modules/now-playing/README.md) for exactly what it sends and its untested hardware limits.
 
-<details>
-<summary><b>Why are stems made on the computer and not on the player?</b></summary><br>
-
-Because separation models are big and expensive to run. Doing the heavy work on your laptop means better models, GPU acceleration, no waiting on the RX3, and untouched originals. Improving the model later does not mean rewriting anything on the player. The computer does the absurdly expensive maths; the DJ player gets to carry on being a DJ player.
-</details>
-
-<details>
-<summary><b>Can I update my firmware while this is installed?</b></summary><br>
-
-There is nothing installed. Pull the stick and the unit is stock. But after a firmware change, do not assume the toolkit still works — only use versions listed as supported. **If you do update, do one clean boot cycle without the mod stick first, just in case**.
 </details>
 
 ---
 
 ## Roadmap
 
-What is being worked on next. No dates, no promises but this is the direction.
+The list is grouped by what you can play, what needs fixing, then ways to make the Toolkit easier and safer to use. It is not a release schedule. Open issues and PRs may describe work already in the development version; the remaining task is often to test it on the RX3.
 
-| | What it would give you | Status |
-| --- | --- | :--: |
-| **FX equalization** | The FX equalization of a DJM-900NXS2 to make your echoes and delays not go bang bang | 💡 Planned |
-| **Key sync between decks** | The player reads both keys and nudges a deck for you, so you can stop doing musical theory at 2am | 🚧 In progress |
-| **Proper STEMS / KEY on the display** | The stem and key-shift on the screen are properly integrated and perfectly working | 🚧 In progress |
-| **Polished interface** | Icons and lettering on every button the mod adds, close enough to the player's own that you stop noticing which is which | 🚧 In progress |
-| **CPU and memory monitoring** | Headroom monitoring so heavier features stay safe to use for a whole set | 💡 Planned |
-| **Real key with Master Tempo off** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)) | The screen shows the key the track is actually playing in once the pitch has moved it, not the key it was analysed in | 💡 Planned |
-| **CDJ-3000 style browsing** ([#15](https://github.com/Tratosca/rx3-toolkit/issues/15)) | Track, artist, BPM and key in one browse list, instead of one column at a time | 💡 Planned |
-| **Now playing** ([#20](https://github.com/Tratosca/rx3-toolkit/pull/20), [#32](https://github.com/Tratosca/rx3-toolkit/issues/32)) | The track on each deck, sent to a computer over USB for overlays, VJ screens or track ID logs, with no rekordbox and no PRO DJ LINK | 💡 Planned |
+### Mods
 
-Want one of these sooner? Or something else? Say so in an issue, or build it yourself (see [Contributing](#contributing)).
+| Mod | What it would give you | Where it stands |
+| --- | --- | --- |
+| **Key Sync and effective key** | Finish Key Sync and show the key you actually hear when Master Tempo is off, as requested in [#28](https://github.com/Tratosca/rx3-toolkit/issues/28). | Key Sync is in the development version; the changing key display is planned. |
+| **Hide track titles** | An eye for each deck so you can hide its title without affecting the other deck. | Implemented locally; RX3 input and display retest pending. |
+| **Quantized stems** | Optionally bring a stem in or out on the next beat or bar. The current immediate response stays the default. | Planned; needs a reliable beat position in the audio path. |
+| **LOW / MID / HIGH CUT for Beat FX** | Choose which frequencies enter an effect while leaving the dry track alone. Planned controls use SPACE, DUB ECHO and SWEEP, with an active light and adjustable cutoff. | Planned; audio and controls need testing. |
+| **Connected RX3 ideas** | Explore Link Export over USB or Wi-Fi, live audio streaming and remote control from [#32](https://github.com/Tratosca/rx3-toolkit/issues/32) and [#37](https://github.com/Tratosca/rx3-toolkit/issues/37). | Contributor proposals, not supported features. SSH and screen streaming are research tools. |
+| **Waveforms for tracks without rekordbox analysis** | Investigate a moving waveform for an unanalysed track, separate from the Browse request in [#15](https://github.com/Tratosca/rx3-toolkit/issues/15). | Research only. |
+
+### Fixes
+
+| Fix | What it would change | Where it stands |
+| --- | --- | --- |
+| **Ready-to-release builds** | Finish the checks needed to publish the next app and RX3 mod. [#39](https://github.com/Tratosca/rx3-toolkit/pull/39) proposes fixes to those checks. | PR open; the full release gate needs a fresh run. |
+| **Fast, stable BROWSE and screen changes** | Remove the pause when Browse reloads track details; retest KEY/STEMS/BEAT FX transitions, title eyes and startup messages on a physical RX3. The third column and sorting from [#15](https://github.com/Tratosca/rx3-toolkit/issues/15) already exist. | Hardware tests found slow scrolling and screen faults; physical retest pending. |
+| **Stem timing** | Resolve the source/stem alignment complaint in [#25](https://github.com/Tratosca/rx3-toolkit/issues/25), so removing vocals does not leave a doubled voice on affected tracks. | Reproduction and codec-specific cause still to confirm. |
+| **Intel Mac stem setup** | Make tool installation and model selection work on affected Intel Macs ([#21](https://github.com/Tratosca/rx3-toolkit/issues/21)). | Open compatibility issue. |
+| **Safe module loading** | Review the shared runtime changes in [#34](https://github.com/Tratosca/rx3-toolkit/pull/34) and [#35](https://github.com/Tratosca/rx3-toolkit/pull/35) before adding more modules. | PRs open upstream; final integration and device tests pending. |
+| **Prove the features on the RX3** | Finish physical checks for STEMS/drums ([#13](https://github.com/Tratosca/rx3-toolkit/issues/13), [#17](https://github.com/Tratosca/rx3-toolkit/issues/17)), Samples ([#14](https://github.com/Tratosca/rx3-toolkit/issues/14)), Search Latin ([#29](https://github.com/Tratosca/rx3-toolkit/issues/29), [#30](https://github.com/Tratosca/rx3-toolkit/pull/30)) and Now Playing ([#20](https://github.com/Tratosca/rx3-toolkit/pull/20), [#32](https://github.com/Tratosca/rx3-toolkit/issues/32)). | Implemented in source; integrated hardware acceptance incomplete. |
+
+### Improvements
+
+| Improvement | What it would give you | Where it stands |
+| --- | --- | --- |
+| **More headroom in a long set** | Show CPU and memory use before a demanding combination of features affects playback. | Planned. |
+| **Stem files that take less room** | Investigate the storage concern in [#18](https://github.com/Tratosca/rx3-toolkit/issues/18) while keeping stems in time with the track. | Research; no smaller format chosen. |
+| **Easier app updates** | Improve the desktop update and signing experience raised in [#4](https://github.com/Tratosca/rx3-toolkit/issues/4). | Some setup improvements are already in the app; updating remains open. |
+| **A base for future modules** | Review repeatable builds and rollback proposed in [#36](https://github.com/Tratosca/rx3-toolkit/pull/36) for selected [#37](https://github.com/Tratosca/rx3-toolkit/issues/37) ideas. | Infrastructure PR open; downstream features are on a contributor fork. |
+| **A place to talk about the project** | Consider GitHub Discussions as requested in [#38](https://github.com/Tratosca/rx3-toolkit/issues/38). | Open suggestion. |
+
+Have a request or a repeatable problem? Open an [issue](../../issues) with the RX3 firmware version, the app version and what happened.
 
 ---
 
@@ -409,39 +299,31 @@ Want one of these sooner? Or something else? Say so in an issue, or build it you
 
 | | |
 | --- | --- |
-| [Getting the RX3 filesystem](docs/extract-initramfs.md) | Getting a Linux filesystem out of the published GPL sources |
-| [Troubleshooting](docs/troubleshooting.md) | Symptoms, errors, fixes |
-| [Reference](REFERENCES.md) | How it all works: the platform, patching, the display, stems, the build, everything |
-| [Contributing](CONTRIBUTING.md) | Build from source, run the tests, write a module |
-| [Legal position](LEGAL.md) | What this project does, what it does not distribute, and on what basis |
-| [Changelog](CHANGELOG.md) | What changed |
+| [Troubleshooting](REFERENCES.md#doc-troubleshooting) | What to check when a track, USB drive or module behaves unexpectedly |
+| [Module guides](mod/modules) | Pad controls, settings and limits for each feature |
+| [How the mod works](REFERENCES.md) | The player, USB start-up, audio and display details |
+| [Contributing](CONTRIBUTING.md) | Building, testing and adding modules |
+| [Legal position](LEGAL.md) | Software, sources, keys and distribution |
+| [Changelog](CHANGELOG.md) | Changes in the development version |
 
 ---
 
 ## Contributing
 
-Pull requests welcome: new modules, support for future firmware, reverse-engineering notes, UI work, faster separation, testing on other systems, or just better docs. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Want to test a module, improve the DJ-facing wording or add a feature? Start with [Contributing](CONTRIBUTING.md). A repeatable report is especially useful: give the RX3 firmware, the exact USB drive set-up, the app version, the selected modules, the track type and the buttons you pressed. If you enabled **Troubleshooting report**, include `RX3_RUNTIME/session.txt`.
 
-A new module starts with one command, `make new-module ID=your-module`, which writes the files it is made of. `make hook test preflight` then runs everything CI will.
-
-**Reporting a bug?** Enable the logging module on the mod, reproduce the bug, include your firmware version, your OS, the toolkit version, `RX3_RUNTIME/session.txt` log, and the steps to reproduce. For stem problems, add the model, the quality preset, your CPU/GPU, and whether it affects one track or all of them.
-
-Please do **not** attach encryption keys, manufacturer firmware or binaries, or copyrighted material.
+For development work, `make new-module ID=your-module` creates a module starting point; `make hook test preflight` runs the local build and checks. Those checks do not replace a real RX3 test. Do **not** attach your encryption key, manufacturer firmware, copyrighted music or private library data to an issue.
 
 ---
 
 ## License
 
-[Mozilla Public License 2.0](LICENSE). Changes to MPL-covered files stay under the MPL; separate files may be combined into a larger work under other terms, as the licence permits. Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Mozilla Public License 2.0](LICENSE). Third-party software and assets are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Keys, manufacturer binaries and copyrighted music are not included in this repository or its releases.
 
-Keys, firmware, manufacturer binaries and copyrighted music are not in this repository and are never release assets.
-
-Pioneer DJ, AlphaTheta, Rekordbox and XDJ-RX3 are trademarks of their respective owners, used here descriptively only.
+Pioneer DJ, AlphaTheta, rekordbox and XDJ-RX3 are trademarks of their respective owners, used here to identify compatible products.
 
 ---
 
 ## Acknowledgements
 
-The open-source software running inside the RX3, the GPL/LGPL sources Pioneer published, the reverse-engineering community, the people who build the audio-separation models — and everyone who has ever looked at a perfectly functional DJ player and asked:
-
-> *"Yes, but what else can it do?"*
+Thanks to the people who documented the RX3, shared tests and module ideas, built audio separation tools, and tried the early versions on their own decks. Their reports are what turn a promising demo into a mod a DJ can actually use.
