@@ -38,8 +38,10 @@ class RuntimeTransitionTests(unittest.TestCase):
             self.skipTest("a native C compiler is required")
         with tempfile.TemporaryDirectory() as directory:
             source = pathlib.Path(directory) / "transitions.c"
-            source.write_text('#define RX3_PLATFORM_H\n#include <stdint.h>\n#include <stddef.h>\n#include <string.h>\n'
-                              '#include <assert.h>\n#include <pthread.h>\n' + body)
+            # glibc hides usleep and ssize_t under strict C11 unless asked for them.
+            source.write_text('#define _DEFAULT_SOURCE\n#define RX3_PLATFORM_H\n#include <stdint.h>\n#include <stddef.h>\n'
+                              '#include <string.h>\n#include <assert.h>\n#include <pthread.h>\n'
+                              '#include <sys/types.h>\nextern int usleep(unsigned int);\n' + body)
             binary = source.with_suffix("")
             subprocess.run([compiler, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                             "-Wno-unused-function", "-Wno-unused-variable", "-pthread",
