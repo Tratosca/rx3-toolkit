@@ -8,6 +8,18 @@
 #define MAX_MESSAGE 8192u
 /* Lib_Obj_CTRL_LIST_BROWSE property index 55, not the generated name suffix 220. */
 #define COLUMN_HEADING_ID 55
+/* UI-independent counters: the watcher logs snapshots, never the DB worker. */
+static struct rx3_browse_metrics metrics;
+#define METRIC_ADD(field,n) __atomic_fetch_add(&metrics.field,(unsigned)(n),__ATOMIC_RELAXED)
+void rx3_browse_get_metrics(struct rx3_browse_metrics *out)
+{
+    if(!out)return;
+#define METRIC_COPY(field) out->field=__atomic_load_n(&metrics.field,__ATOMIC_RELAXED)
+    METRIC_COPY(pages);METRIC_COPY(native_ms);METRIC_COPY(added_ms);
+    METRIC_COPY(hits);METRIC_COPY(misses);METRIC_COPY(expiries);METRIC_COPY(scopes);
+    METRIC_COPY(key_queries);METRIC_COPY(field_queries);METRIC_COPY(local_hits);METRIC_COPY(local_ms);METRIC_COPY(local_records);
+#undef METRIC_COPY
+}
 static const void *column_owner,*marker_owner;
 static const struct rx3_browse_column *column;
 static const struct rx3_browse_marker *marker;
@@ -66,6 +78,13 @@ static int native_browse_visible(void)
 /* One atomic word couples the native key set, source key and local MASTER.
  * The music ID's device byte identifies storage, never the playing deck. */
 static unsigned harmonic_snapshot,deck_keys[2];
+/* Only the database worker owns cache entries. Other callbacks invalidate by
+ * generation, never by clearing storage underneath an in-flight row stream. */
+static unsigned metadata_epoch;
+static void invalidate_metadata(void)
+{
+    __atomic_add_fetch(&metadata_epoch,1u,__ATOMIC_SEQ_CST);
+}
 #if defined(__arm__)
 static unsigned (*master_on)(unsigned)=(void *)0x18579cu;
 #else
@@ -100,7 +119,8 @@ static void publish_key(unsigned deck,int key,int shift)
     if(deck>1)return;
     unsigned value=key>=0 && key<24 && shift>=-12 && shift<=12?
         (unsigned)(key+1)|((unsigned)(shift+12)<<5):0;
-    __atomic_store_n(&deck_keys[deck],value,__ATOMIC_SEQ_CST);
+    unsigned previous=__atomic_exchange_n(&deck_keys[deck],value,__ATOMIC_SEQ_CST);
+    if((previous&31u)!=(value&31u))invalidate_metadata();
     if(!value) {
         unsigned snapshot=__atomic_load_n(&harmonic_snapshot,__ATOMIC_SEQ_CST);
         if((snapshot>>29)==deck+1)__atomic_compare_exchange_n(&harmonic_snapshot,&snapshot,0u,0,__ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST);
@@ -169,24 +189,28 @@ static void key_text(unsigned key,uint16_t *out)
 /* Runs on the native database task after its existing row stream is consumed.
  * The renderer never performs I/O. Stream records and strings retain native
  * allocator ownership; only bounded UTF-16 copies cross into the UI message. */
-static void values_for(void *db,unsigned id,unsigned key,unsigned field,uint16_t out[128],
+static int values_for(void *db,unsigned id,unsigned key,unsigned field,uint16_t out[128],
                        unsigned second,uint16_t other[128])
 {
     out[0]=other[0]=0;
     if(field==15)key_text(key,out);
     if(second==15)key_text(key,other);
-    if((!field || field==15) && (!second || second==15))return;
+    if((!field || field==15) && (!second || second==15))return 1;
+    METRIC_ADD(field_queries,1);
     unsigned total=(unsigned)metadata(db,2,id),first=0;
-    if(!total || total>64)return;
+    if(!total || total>64)return 0;
     uint8_t *connection=(void *)(unsigned long)word(db);
     unsigned traffic=connection?word(connection+0xb94u):0;
+    unsigned consumed=0,formatted=1;
     if(records(db,2,&first,total,0,total,0)) {
         for(unsigned i=0;i<total;i++) {
             uint32_t r[10]={0};
             if(!next_record(db,r,0,0))break;
+            consumed++;
             unsigned kind=r[2]&255u;
             if(kind!=15 && ((field && kind==field) || (second && kind==second))) {
                 uint16_t *text=format(r[0],r[1],kind,0xffffu);
+                if(!text)formatted=0;
                 if(kind==field)copy_text(out,text,127);
                 if(kind==second)copy_text(other,text,127);
                 if(text)free_text(text);
@@ -202,6 +226,224 @@ static void values_for(void *db,unsigned id,unsigned key,unsigned field,uint16_t
         unsigned n=0;while(n<127 && value[n])n++;
         if(n>=4 && value[n-4]==' ' && value[n-3]=='b' && value[n-2]=='p' && value[n-1]=='m')value[n-4]=0;
     }
+    return consumed==total && formatted;
+}
+/* Capture local USB metadata on the native database SERVER task while it is
+ * preparing visible records. Never issue EDB calls on the client or renderer.
+ * The client consumes bounded copies, so it adds no per-track mailbox trips.
+ * Each server page replaces this snapshot, including across USB remounts. */
+struct local_metadata {
+    unsigned id,drive,key,bpm,length,valid,generation,has_artist,has_key;
+    uint16_t artist[128];
+};
+static struct local_metadata local_page[32];
+static unsigned local_gate,local_next,local_generation;
+static unsigned metadata_clock(void);
+static struct installed_hook local_page_hook,local_record_hook;
+static int (*original_local_page)(void *,void *);
+static void *(*original_local_record)(void *,const uint32_t *,unsigned,unsigned,unsigned,unsigned);
+static void *(*edb_select)(int *,const char *,const char *,unsigned,unsigned,unsigned,
+                           const char *,unsigned,const unsigned **)=(void *)0x3dd464u;
+static void *(*edb_next)(void *,int *)=(void *)0x3ddd78u;
+static void *(*edb_column)(void *,unsigned)=(void *)0x3dde5cu;
+static int (*edb_close)(void *)=(void *)0x3ddb24u;
+static unsigned (*local_key)(unsigned,unsigned)=(void *)0x16095cu;
+static int (*table_string)(unsigned,unsigned,unsigned,uint16_t **,unsigned,unsigned)=(void *)0x19e360u;
+static void (*edb_free)(void *)=(void *)0x175038u;
+static int local_lock(void){return !__atomic_exchange_n(&local_gate,1u,__ATOMIC_ACQUIRE);}
+static void local_unlock(void){__atomic_store_n(&local_gate,0u,__ATOMIC_RELEASE);}
+static int local_page_rows(void *context,void *request)
+{
+    __atomic_add_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);
+    __atomic_add_fetch(&local_generation,1u,__ATOMIC_SEQ_CST);
+    if(local_lock()){memset(local_page,0,sizeof(local_page));local_next=0;local_unlock();}
+    int result=original_local_page(context,request);
+    __atomic_sub_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);return result;
+}
+static void *local_record(void *context,const uint32_t *record,unsigned drive,
+                          unsigned kind,unsigned mode,unsigned category)
+{
+    __atomic_add_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);
+    void *result=original_local_record(context,record,drive,kind,mode,category);
+    if(result && kind==1 && drive>1 && drive<4 && (mode==1 || mode==2) &&
+       (track(record[4]&255u)) && (column || marker)) {
+        unsigned started=metadata_clock();
+        /* Each lookup is a DeviceSQL read on the stick being browsed. Fetch only
+         * what a visible field or the key marker can ask for; the client falls
+         * back to its own path for anything this snapshot did not capture. */
+        unsigned wanted=column?column->field:0,kept=__atomic_load_n(&preserve_field,__ATOMIC_SEQ_CST);
+        int want_artist=wanted==7 || kept==7,want_key=marker || wanted==15 || kept==15;
+        struct local_metadata item;memset(&item,0,sizeof(item));
+        item.generation=__atomic_load_n(&local_generation,__ATOMIC_SEQ_CST);
+        item.id=record[0];item.drive=drive;
+        const unsigned *id=&item.id;int error=0;
+        void *set=edb_select(&error,"djdbContent","idxContent",0,0,0,"=",1,&id);
+        if(set && !error) {
+            void *row=edb_next(set,&error);
+            if(row && !error) {
+                const void *bpm=edb_column(row,8),*length=edb_column(row,9),*artist=edb_column(row,5);
+                if(bpm && length && artist) {
+                    item.bpm=word(bpm);item.length=half(length);item.valid=1;
+                    if(want_artist) {
+                        uint16_t *name=0;
+                        if(table_string(7,word(artist),item.id,&name,1,drive)>=0) {
+                            copy_text(item.artist,name,127);item.has_artist=1;
+                        } else item.valid=0;
+                        if(name)edb_free(name);
+                    }
+                }
+            }
+        }
+        if(set)edb_close(set);
+        METRIC_ADD(local_records,1);
+        if(item.valid) {
+            if(want_key){item.key=local_key(item.id,drive);item.has_key=1;}
+            if(local_lock()) {
+                local_page[local_next]=item;local_next=(local_next+1u)%32u;
+                local_unlock();
+            }
+        }
+        METRIC_ADD(local_ms,metadata_clock()-started);
+    }
+    __atomic_sub_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);return result;
+}
+static int local_field(unsigned field){return !field || field==7 || field==11 || field==13 || field==15;}
+static unsigned decimal_text(uint16_t *out,unsigned value)
+{
+    uint16_t reverse[10];unsigned n=0;
+    do{reverse[n++]=(uint16_t)('0'+value%10u);value/=10u;}while(value && n<10);
+    for(unsigned i=0;i<n;i++)out[i]=reverse[n-i-1];
+    return n;
+}
+static int local_value(const struct local_metadata *item,unsigned field,uint16_t out[128])
+{
+    out[0]=0;if(!field)return 1;
+    if(field==7){if(!item->has_artist)return 0;copy_text(out,item->artist,127);return 1;}
+    if(field==15){if(!item->has_key)return 0;key_text(item->key,out);return 1;}
+    /* ConvertRKey2RStr consumes a DBCCmd-owned input string, including for
+     * numbers. These snapshots own no such string: format the bounded number. */
+    unsigned n=0;
+    if(field==13 && item->bpm && item->bpm!=0x7fffffffu) {
+        unsigned tenths=(item->bpm+5u)/10u;
+        n=decimal_text(out,tenths/10u);out[n++]='.';out[n++]=(uint16_t)('0'+tenths%10u);
+    } else if(field==11 && item->length) {
+        n=decimal_text(out,item->length/60u);out[n++]=':';
+        out[n++]=(uint16_t)('0'+item->length%60u/10u);out[n++]=(uint16_t)('0'+item->length%10u);
+    }
+    out[n]=0;return 1;
+}
+static int local_cached_values(unsigned drive,unsigned id,unsigned field,uint16_t value[128],
+                                unsigned second,uint16_t other[128],unsigned *key)
+{
+    struct local_metadata item;int found=0;
+    if(!local_lock())return 0;
+    unsigned generation=__atomic_load_n(&local_generation,__ATOMIC_SEQ_CST);
+    for(unsigned i=0;i<32;i++)if(local_page[i].valid && local_page[i].generation==generation && local_page[i].id==id && local_page[i].drive==drive) {
+        item=local_page[i];found=1;break;
+    }
+    local_unlock();
+    if(!found)return 0;
+    /* A snapshot taken before the key marker registered carries no key. */
+    if(marker && !item.has_key)return 0;
+    *key=item.key;
+    return local_value(&item,field,value) && local_value(&item,second,other);
+}
+static int local_values(void *db,unsigned id,unsigned field,uint16_t value[128],
+                         unsigned second,uint16_t other[128],unsigned *key)
+{
+    if(!original_local_page || !original_local_record || !local_field(field) || !local_field(second))return 0;
+    const uint8_t *connection=(void *)(unsigned long)word(db);
+    /* SetHeader: db[1] is the drive byte, db[2] the database kind.
+     * Remote players have connection[1]!=0 and cannot use our local snapshot. */
+    if(!connection || word(connection+4) || word((uint8_t *)db+8)!=1)return 0;
+    return local_cached_values(word((uint8_t *)db+4),id,field,value,second,other,key);
+}
+/* Two viewports, bounded to ~34 KiB. Cache raw metadata, never classifications:
+ * MASTER, native green and selected rules are evaluated on every message.
+ * Native source, row and settings changes invalidate entries; time alone does not.
+ * A failed lookup is retried; an empty but complete field stream is cacheable. */
+enum { METADATA_SLOTS=32 };
+static struct {
+    const void *context,*db;
+    unsigned connection,index,depth,sort,field,second,epoch;
+} metadata_scope;
+static struct {
+    unsigned used,id,key,key_valid,values_valid,key_time,value_time;
+    uint8_t identity[532];
+    uint16_t value[128],other[128];
+} metadata_cache[METADATA_SLOTS];
+static unsigned metadata_next;
+static unsigned metadata_clock(void)
+{
+    struct {long seconds,micros;} now;
+    if(gettimeofday(&now,0))return 0;
+    return (unsigned)((uint64_t)now.seconds*1000u+(unsigned long)now.micros/1000u);
+}
+static unsigned (*metadata_now)(void)=metadata_clock;
+static void metadata_bind(const void *context,void *db,unsigned index,unsigned depth,
+                          unsigned sort,unsigned field,unsigned second)
+{
+    unsigned epoch=__atomic_load_n(&metadata_epoch,__ATOMIC_SEQ_CST),connection=word(db);
+    if(metadata_scope.context!=context || metadata_scope.db!=db ||
+       metadata_scope.connection!=connection || metadata_scope.index!=index ||
+       metadata_scope.depth!=depth || metadata_scope.sort!=sort ||
+       metadata_scope.field!=field || metadata_scope.second!=second || metadata_scope.epoch!=epoch) {
+        METRIC_ADD(scopes,1);
+        memset(metadata_cache,0,sizeof(metadata_cache));metadata_next=0;
+        metadata_scope.context=context;metadata_scope.db=db;metadata_scope.connection=connection;
+        metadata_scope.index=index;metadata_scope.depth=depth;metadata_scope.sort=sort;
+        metadata_scope.field=field;metadata_scope.second=second;metadata_scope.epoch=epoch;
+    }
+}
+static unsigned metadata_values(void *db,unsigned id,const uint8_t identity[532],int need_key,
+                                unsigned field,uint16_t value[128],unsigned second,uint16_t other[128])
+{
+    value[0]=other[0]=0;
+    if(!need_key && !field && !second)return 0;
+    unsigned slot=METADATA_SLOTS;
+    for(unsigned i=0;i<METADATA_SLOTS;i++)if(metadata_cache[i].used && metadata_cache[i].id==id &&
+        !memcmp(metadata_cache[i].identity,identity,532)) {slot=i;break;}
+    if(slot==METADATA_SLOTS) {
+        METRIC_ADD(misses,1);
+        slot=metadata_next;metadata_next=(metadata_next+1u)%METADATA_SLOTS;
+        memset(&metadata_cache[slot],0,sizeof(metadata_cache[slot]));
+        metadata_cache[slot].used=1;metadata_cache[slot].id=id;
+        memcpy(metadata_cache[slot].identity,identity,532);
+    } else METRIC_ADD(hits,1);
+    /* Exported USB metadata follows the native list/source lifetime. A wall
+     * clock timeout forced an entire visible page through synchronous I/O. */
+    {
+        unsigned key=0;
+        if(local_values(db,id,field,metadata_cache[slot].value,second,metadata_cache[slot].other,&key)) {
+            metadata_cache[slot].values_valid=1;metadata_cache[slot].key=key;
+            metadata_cache[slot].key_valid=key<=24;
+            METRIC_ADD(local_hits,1);
+        }
+    }
+    unsigned key=0;
+    if(need_key) {
+        if(!metadata_cache[slot].key_valid) {
+            METRIC_ADD(key_queries,1);
+            metadata_cache[slot].key=track_key(db,id);
+            metadata_cache[slot].key_valid=metadata_cache[slot].key>=1 && metadata_cache[slot].key<=24;
+            metadata_cache[slot].key_time=metadata_now();
+
+        }
+        key=metadata_cache[slot].key;
+    }
+    if(field || second) {
+        if(!metadata_cache[slot].values_valid) {
+            metadata_cache[slot].values_valid=values_for(db,id,key,field,metadata_cache[slot].value,
+                                                       second,metadata_cache[slot].other);
+            metadata_cache[slot].value_time=metadata_now();
+
+        }
+        memcpy(value,metadata_cache[slot].value,256);memcpy(other,metadata_cache[slot].other,256);
+        /* Key text follows the current key lookup, including failed lookups. */
+        if(field==15)key_text(key,value);
+        if(second==15)key_text(key,other);
+    }
+    return key;
 }
 /* Extension travels inside each native row, so queued updates, scrolling and
  * duplicate artist names cannot associate a value with the wrong track.
@@ -256,23 +498,23 @@ static void process(uint8_t *context,uint8_t *message,
     __atomic_store_n(&list_context,context,__ATOMIC_SEQ_CST);
     __atomic_store_n(&track_list,0u,__ATOMIC_SEQ_CST);
     unsigned index=word(context+4),bytes=word(message+0x1c),count=half(message+0x80);
-    if(index>4 || bytes<20 || bytes>MAX_MESSAGE-0x70 || count<2 || count>15)return;
+    if(index>4 || bytes<20 || bytes>MAX_MESSAGE-0x70 || count<2 || count>15){invalidate_metadata();return;}
     unsigned rows=0x17eacu+index*0x1d1cu,available=word(context+rows-4);
-    if(available>14 || count>available+1)return;
+    if(available>14 || count>available+1){invalidate_metadata();return;}
     void *db=(void *)(unsigned long)word(context+(index+0x1bceu)*4u+4u);
-    if(!db || !word(db))return;
+    if(!db || !word(db)){invalidate_metadata();return;}
     unsigned native_sort=word((uint8_t *)db+16);
     __atomic_store_n(&sort_observed,observed_sort(native_sort),__ATOMIC_SEQ_CST);
     if(preserve_field && (preserve_db!=(unsigned)(unsigned long)db || preserve_depth!=word((uint8_t *)db+4)))preserve_field=0;
     /* A folder/category list remains the native two-pane navigator. */
-    for(unsigned i=0;i<count-1;i++)if(!track(half(context+rows+i*532+4)))return;
+    for(unsigned i=0;i<count-1;i++)if(!track(half(context+rows+i*532+4))){invalidate_metadata();return;}
     __atomic_store_n(&track_list,1u,__ATOMIC_SEQ_CST);
     __atomic_store_n(&primary_field,half(context+rows+4),__ATOMIC_SEQ_CST);
     unsigned source=20;
     for(unsigned i=0;i<count;i++) {
-        if(source+22>bytes)return;
+        if(source+22>bytes){invalidate_metadata();return;}
         unsigned len=half(message+0x70+source+20);
-        if(len>255 || source+22+len*2>bytes)return;
+        if(len>255 || source+22+len*2>bytes){invalidate_metadata();return;}
         source+=22+len*2;
     }
     unsigned first_row=0x84u+22u+half(message+0x98u)*2u;
@@ -282,8 +524,9 @@ static void process(uint8_t *context,uint8_t *message,
     unsigned second=preserve_field?preserve_field:semantic_field(half(message+first_row),secondary_field);
     __atomic_store_n(&secondary_field,second,__ATOMIC_SEQ_CST);
     unsigned expected=0;
-    if(!__atomic_compare_exchange_n(&busy,&expected,1u,0,__ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST))return;
+    if(!__atomic_compare_exchange_n(&busy,&expected,1u,0,__ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)){invalidate_metadata();return;}
     memcpy(rebuilt,message,0x84);source=20;unsigned dest=20;
+    metadata_bind(context,db,index,depth,native_sort,column?column->field:0,preserve_field);
     struct rx3_harmonic_reference harmony=harmonic_reference();
     unsigned ref=word(context+0x10af8) && harmony.key>=0?(unsigned)harmony.key+1:0;
     for(unsigned i=0;i<count;i++) {
@@ -292,13 +535,14 @@ static void process(uint8_t *context,uint8_t *message,
         uint16_t value[128]={0},native_value[128]={0};unsigned badge=0;
         if(i) {
             unsigned id=word(context+rows+(i-1)*532);
-            if(ref || (column && (column->field==15 || preserve_field==15)))key=track_key(db,id);
+            int need_key=(marker && ref) || (column && (column->field==15 || preserve_field==15));
+            key=metadata_values(db,id,context+rows+(i-1)*532,need_key,
+                                column?column->field:0,value,preserve_field,native_value);
             if(marker && ref && key>=1 && key<=24) {
                 if(harmony.native_keys&(1u<<(key-1)))category=52;
             }
             if(marker)category=marker->category(ref,key,category);
             if(column) {
-                values_for(db,id,key,column->field,value,preserve_field,native_value);
                 if(!value[0]){value[0]=0x2014;value[1]=0;}
                 if(column->field==15 && marker)badge=marker->image(category);
             }
@@ -319,16 +563,30 @@ static void process(uint8_t *context,uint8_t *message,
 static int rows(void *context,void *message,void *request)
 {
     __atomic_add_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);
+    unsigned started=metadata_now();
     int result=original_rows(context,message,request);
+    unsigned native_done=metadata_now();
     const struct rx3_browse_column *c=__atomic_load_n(&column,__ATOMIC_SEQ_CST);
     const struct rx3_browse_marker *m=__atomic_load_n(&marker,__ATOMIC_SEQ_CST);
-    if(c || m)process(context,message,c,m);
+    if(c || m) {
+        process(context,message,c,m);
+        unsigned done=metadata_now();
+        METRIC_ADD(pages,1);
+        if(started && native_done)METRIC_ADD(native_ms,native_done-started);
+        if(native_done && done)METRIC_ADD(added_ms,done-native_done);
+    }
     __atomic_sub_fetch(&callbacks,1u,__ATOMIC_SEQ_CST);return result;
 }
 static int ensure(void)
 {
     if(original_rows)return 1;
     static const struct {unsigned address,a,b;} guards[]={
+        {0x3dd464,0xe92d4ff0,0xe24dd04c},
+        {0x3ddd78,0xe92d41f0,0xe24dd020},
+        {0x3dde5c,0xeaffe2fa,0xe92d4038},
+        {0x3ddb24,0xe92d40f0,0xe24dd01c},
+        {0x16095c,0xe92d41f0,0xe24dd028},
+        {0x19e360,0xe92d41f0,0xe24dd0c8},
         {0x265f48,0xe92d40f0,0xe2507000},{0x2637f4,0xe1a0c001,0xe1a03002},
         {0x262884,0xe92d4ff0,0xe24dd00c},{0x262a28,0xe92d4ff0,0xe24dd014},
         {0x262da0,0xe92d4ff0,0xe24dd00c},{0x26a480,0xe352000d,0x13520011},
@@ -338,7 +596,13 @@ static int ensure(void)
         if(memcmp((const void *)(unsigned long)guards[i].address,&guards[i].a,8))return 0;
     static const uint8_t guard[8]={0xf0,0x4f,0x2d,0xe9,0x2c,0xd0,0x4d,0xe2};
     original_rows=(void *)install_hook(&row_hook,ROW_HOOK,guard,(void *)rows);
-    return original_rows!=0;
+    if(!original_rows)return 0;
+    static const uint32_t page_guard[2]={0xe92d4ff0u,0xe24dd064u};
+    static const uint32_t record_guard[2]={0xe92d4ff0u,0xe24dd014u};
+    original_local_page=(void *)install_hook(&local_page_hook,0x20805cu,(const uint8_t *)page_guard,(void *)local_page_rows);
+    if(original_local_page)original_local_record=(void *)install_hook(&local_record_hook,0x207dd0u,(const uint8_t *)record_guard,(void *)local_record);
+    /* A failed optional optimization keeps the existing metadata path. */
+    return 1;
 }
 /* Only the on-screen list actions are intercepted; physical LOAD keys call
  * UiKey_Load1/2 directly. Never leave an invisible load action under metadata. */
@@ -696,12 +960,17 @@ static int register_marker(const void *owner,const struct rx3_browse_marker *m)
 }
 static void unregister_owner(const void *owner)
 {
+    invalidate_metadata();
     if(owner==column_owner){__atomic_store_n(&column,0,__ATOMIC_SEQ_CST);column_owner=0;remove_scroll_hooks();remove_load_hooks();remove_sort_hooks();}
     if(owner==marker_owner){__atomic_store_n(&marker,0,__ATOMIC_SEQ_CST);marker_owner=0;__atomic_store_n(&harmonic_snapshot,0u,__ATOMIC_SEQ_CST);}
     while(__atomic_load_n(&callbacks,__ATOMIC_SEQ_CST))usleep(1000);
     if(!column && !marker && original_rows) {
+        if(original_local_record && !detach_hook(&local_record_hook))return;
+        if(original_local_page && !detach_hook(&local_page_hook))return;
         if(!detach_hook(&row_hook))return;
         while(__atomic_load_n(&callbacks,__ATOMIC_SEQ_CST))usleep(1000);
+        if(original_local_record){release_hook(&local_record_hook);original_local_record=0;}
+        if(original_local_page){release_hook(&local_page_hook);original_local_page=0;}
         release_hook(&row_hook);original_rows=0;
     }
 }

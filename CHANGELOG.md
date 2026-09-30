@@ -3,11 +3,15 @@
 
 ## Unreleased
 
+- The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.
+
 - Stem preparation installs again on Intel Macs ([#21](https://github.com/Tratosca/rx3-toolkit/issues/21)). PyTorch no longer publishes Intel builds, so the app installs the last versions that have them, with Python 3.10 to 3.12; 3.11 and 3.12 need the Xcode Command Line Tools. Checked under Rosetta with vocals, 3-part and every preset; not yet run on a real Intel Mac.
 
 - Hold SHIFT on either deck while you plug in the USB drive to start without the mod for that session: the deck then works stock. Not yet run on hardware.
 
 - When the mod restarts the player, the USB drive is announced again, so it appears in SOURCE without unplugging it. Not yet run on hardware.
+
+- Reduce BROWSE pauses on local rekordbox USB libraries by reusing artist, duration, BPM and key metadata while the firmware prepares each page. Returning to an unchanged list after a pause no longer triggers a timed reload of every visible track. Sorting and harmonic markers remain active. Tested in the emulator; not yet run on hardware.
 
 - Fix pad-preview asset lookup after the core directory reorganization.
 
