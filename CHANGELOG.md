@@ -60,7 +60,7 @@
 - Extend the experimental OverCue exporter with manual provenance and measured full-mix loudness ceilings; vectorize the reader with NEON and add per-block CPU/cache diagnostics. Not yet run on hardware.
 
 
-- Add an opt-in OverCue stems prototype: read the original seven 96 kHz paged roles through a bounded 44.1 kHz cache, and export existing VOCAL/DRUMS packages to the shared USB format without rerunning separation. Emulator and synthetic format checks are documented in `docs/overcue-prototype.md`; physical RX3 and CDJ-3000 interoperability remains unverified.
+- Add an opt-in OverCue stems prototype: read the original seven 96 kHz paged roles through a bounded 44.1 kHz cache, and export existing VOCAL/DRUMS packages to the shared USB format without rerunning separation. Emulator and synthetic format checks are documented in [REFERENCES.md](REFERENCES.md#doc-overcue-prototype); physical RX3 and CDJ-3000 interoperability remains unverified.
 
 - Cancel separation, decoding, waveform filtering and runtime installation with their owned child processes. Closing the window waits for job cleanup; an interrupted installation remains unavailable until completed. Automatic PCM reuse now records inference package versions as well as model hashes. Managed installs fix audio-separator at 0.44.5, librosa at 0.11.0 and imageio-ffmpeg at 0.6.0.
 - macOS builds accept a Developer ID signing identity with hardened runtime and timestamps. A local notarization command verifies the signature, submits to Apple using a Keychain profile, staples the accepted ticket and checks Gatekeeper before creating the archive. No release is published by that command.

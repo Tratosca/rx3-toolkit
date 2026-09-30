@@ -7,6 +7,6 @@ After rbp starts, `apply.sh` waits up to 20 seconds for the internal UDP console
 
 This reduces the wait between decoder retries. It does not change Beat Jump distances or the delay between successive Beat Jump commands. More frequent retries can improve audio recovery after a jump or seek, at the cost of more CPU wakeups. The end-to-end improvement has not been measured here.
 
-The setting is volatile and resets at power-off. It does not modify flash or executable bytes. The script logs console responses but does not validate their content or read the configured value back; its success log is not confirmation that rbp accepted the value. If the console or Bash is unavailable, it logs a failure and leaves the runtime running.
+The setting is volatile and resets at power-off. It does not modify flash or executable bytes. The helper receives one datagram of up to 4096 bytes, waits at most five polling intervals of one second, and fails on an empty reply, timeout or transport error. Its receive child and temporary file are cleaned up on exit. The script logs responses but does not validate their content or read the configured value back: it reports responses received and explicitly leaves application unverified. If the console or Bash is unavailable, it logs a failure and leaves the runtime running.
 
-See [Faster decoder polling](../../../../REFERENCES.md#8-faster-decoder-polling).
+See [Faster decoder polling](../../../REFERENCES.md#8-faster-decoder-polling).

@@ -5,7 +5,7 @@ The STEMS tab offers INST and VOCAL for a track prepared with the vocal, and INS
 
 The Toolkit exports one self-describing `.rx3stem` package per track, with
 all prepared PCM roles, an internal manifest and optional embedded waveforms.
-See [the package format](../../../docs/stem-package.md).
+See [the package format](../../../REFERENCES.md#doc-stem-package).
 
 Preparation offers two modes: VOCAL + INST (one stored PCM role, three
 waveform combinations) and VOCAL + DRUMS + INST (two stored PCM roles,
@@ -37,7 +37,7 @@ The source port uses the time-stretch playback stream and fades between selectio
 
 Waveform adaptation is included with Stems. The Toolkit can skip waveform calculation, or calculate/recalculate it later per track without repeating separation. Audio-only packages use container version 3 and require the updated loader; they keep the original player display, including the overview. Available prepared waveforms follow the active stems. This still needs device validation.
 
-Enabled by default. Prepare tracks in the app's Stems preparation tab. See [Troubleshooting](../../../docs/troubleshooting.md#a-prepared-track-has-no-stem-controls) if a prepared track has no controls.
+Enabled by default. Prepare tracks in the app's Stems preparation tab. See [Troubleshooting](../../../REFERENCES.md#doc-troubleshooting--a-prepared-track-has-no-stem-controls) if a prepared track has no controls.
 
 The limits live in `rx3_stems_limits.h`; the computer reads the same values in `app/stems/limits.py`, and a test compiles the header to compare them. A track is loaded from 0.1 s to 31 min 42 s. The loader keeps a whole package resident (PCM, waveforms, index and manifest) and caps what both decks hold together at 512 MiB, so a package with drums is refused past about 24 min 54 s. It rechecks the available-memory estimate before each allocation, preserving 300 MiB for the player. The sum includes earlier roles in the pending set as well as the other deck. Mismatched optional lengths are rejected; only a contiguous valid prefix beginning with vocals is published for legacy files. Packages are all-or-nothing. Not yet run on hardware.
 

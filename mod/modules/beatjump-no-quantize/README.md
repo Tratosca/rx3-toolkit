@@ -20,4 +20,4 @@ So if you liked quantized cues, you keep them. This is not a "turn off quantize"
 
 ---
 
-What the change actually is, in one line of machine code: [Reference → A worked example](../../../../REFERENCES.md#a-worked-example-longer-beat-jumps).
+What the change actually is, in one line of machine code: [Reference → A worked example](../../../REFERENCES.md#a-worked-example-longer-beat-jumps).
