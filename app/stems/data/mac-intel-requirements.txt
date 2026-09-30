@@ -1,0 +1,80 @@
+# The separation runtime on Intel Macs, installed with `pip install --no-deps`.
+#
+# PyTorch published its last Intel macOS build with 2.2.2, and audio-separator
+# has declared torch>=2.3 and numpy>=2 since 0.24.3, so pip cannot resolve the
+# current separator there on its own. This set overrides only those two
+# requirements; every other package satisfies what it declares. The versions
+# are the last with Intel macOS wheels (numba 0.62, llvmlite 0.45, onnxruntime
+# 1.23, ml-dtypes 0.5, scipy 1.15). Python 3.10 installs from wheels alone;
+# 3.11 and 3.12 build diffq from source and need the Command Line Tools.
+#
+# Regenerate after changing SEPARATOR_VERSION or SUPPORT_PACKAGES:
+#
+#   printf 'audio-separator[cpu]==0.44.5\nlibrosa==0.11.0\nimageio-ffmpeg==0.6.0\n' |
+#     uv pip compile - --python-version 3.10 --python-platform x86_64-apple-darwin \
+#       --override <(printf 'torch==2.2.2\nnumpy<2\n') \
+#       -c <(printf 'numba<0.63\nllvmlite<0.46\nonnxruntime==1.23.2\nml-dtypes<0.6\nscipy<1.17\n') \
+#       --no-header --no-annotate
+#
+# then check that `uv pip check` in the installed environment reports only
+# audio-separator's torch and numpy requirements.
+absl-py==2.5.0
+audio-separator==0.44.5
+audioread==3.1.0
+beartype==0.18.5
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.2
+cloudpickle==3.1.2
+coloredlogs==15.0.1
+cython==3.3.0
+decorator==5.3.1
+diffq==0.2.4
+einops==0.8.2
+filelock==4.0.7
+flatbuffers==25.12.19
+fsspec==2026.9.0
+humanfriendly==10.0
+idna==3.20
+imageio-ffmpeg==0.6.0
+jinja2==3.1.6
+joblib==1.6.0
+julius==0.2.8
+lazy-loader==0.6
+librosa==0.11.0
+llvmlite==0.45.1
+markupsafe==3.0.3
+ml-collections==1.1.0
+ml-dtypes==0.5.4
+mpmath==1.3.0
+msgpack==1.2.3
+networkx==3.4.2
+numba==0.62.1
+numpy==1.26.4
+onnx-weekly==1.24.0.dev20260928
+onnx2torch-py313==1.6.0
+onnxruntime==1.23.2
+packaging==26.3
+pillow==12.3.0
+platformdirs==4.12.2
+pooch==1.9.0
+protobuf==7.36.2
+pycparser==3.0
+pydub==0.25.1
+pyyaml==6.0.3
+requests==2.34.2
+resampy==0.4.3
+rotary-embedding-torch==0.6.5
+samplerate==0.1.0
+scikit-learn==1.7.2
+scipy==1.15.3
+six==1.17.0
+soundfile==0.14.0
+soxr==1.1.0
+sympy==1.14.0
+threadpoolctl==3.7.0
+torch==2.2.2
+torchvision==0.17.2
+tqdm==4.70.1
+typing-extensions==4.16.0
+urllib3==2.8.0
