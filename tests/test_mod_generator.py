@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 import importlib.util
 import pathlib
+import re
 import shutil
 import tempfile
 import unittest
@@ -179,13 +180,13 @@ class ModGeneratorTests(unittest.TestCase):
             patch = discover_patches(root, "1.19")[0]
             artifact = patch.files[1]
             artifacts = root / "local-artifacts"
+            output = artifacts / "1.19/example/example.ko"
             with self.assertRaisesRegex(
                 ValueError,
-                "local-artifacts/1.19/example/example.ko",
+                re.escape(str(output)),
             ):
                 runtime_file_source(root, "1.19", patch, artifact, artifacts)
 
-            output = artifacts / "1.19/example/example.ko"
             output.parent.mkdir(parents=True)
             output.write_bytes(b"built outside source")
             self.assertEqual(
