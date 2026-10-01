@@ -121,7 +121,7 @@ The sections below are the stable overview. Exact procedures, binary layouts, me
 | Display and interaction | [Pad visual design](#doc-pad-visual-design), [Key Sync follow-up](#doc-key-sync-follow-up), [title visibility](#doc-title-visibility), [BROWSE scrolling](#doc-browse-scroll-performance). The [DJ UX audit](#doc-ux-audit-dj) is a dated audit with proposals; check current UI before treating a proposal as pending. |
 | Validation and incidents | [0.6.0 acceptance campaign](docs/acceptance/0.6.0/ACCEPTANCE.md#doc-acceptance-0-6-0-readme) and its cases, [hardware feedback](#doc-hardware-feedback-20260929), [emulator feedback](#doc-emulator-feedback-20260929), [startup incident](#doc-rx3-startup-incident) |
 
-The [changelog](CHANGELOG.md) is chronological history, not an authority for the current state. [AUDIT.md](AUDIT.md) and [CLEANUP.md](CLEANUP.md) record earlier repository decisions. Local evidence and vendor binaries live outside Git under `local/`; the private `local/INDEX.md` describes that workspace when present. Do not copy private keys, firmware or commercial audio into public documentation.
+The [changelog](CHANGELOG.md) is chronological history, not an authority for the current state. Local evidence and vendor binaries live outside Git under `local/`; the private `local/INDEX.md` describes that workspace when present. Do not copy private keys, firmware or commercial audio into public documentation.
 
 ## Cross-cutting contracts
 
