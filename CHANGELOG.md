@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- With logging on, the session log now says whether the deck's audio output is running after the mod restarts the player, and lists the audio state when it is not. This is the first step on decks that load tracks but stay silent on PLAY after the restart ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Not yet run on hardware.
+
 - Add optional **Heard key** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)): with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. KEY shifts add up, and Key Sync, the KEY tab and the KEY MATCH colours in BROWSE follow the heard key. Checked in the emulator (loads, screen unchanged at 0%); the tempo fader response is not yet run on hardware.
 
 - Removing the vocals no longer leaves a doubled voice on MP3 files whose encoder info the separator and the deck read differently ([#25](https://github.com/Tratosca/rx3-toolkit/issues/25)): the separator now hears the track exactly as the deck plays it. Stems already prepared for those files are made again on the next run; every other stem is kept. Checked on the reported file (25 ms early before, aligned after); not yet run on hardware.
