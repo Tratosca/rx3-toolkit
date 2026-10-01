@@ -3148,8 +3148,10 @@ startup setting or resource consumed only at startup requires a planned restart
 when the media guard permits one. Unknown firmware, patch words or process state
 must stop before writes.
 
-The first local branch merges PR #34 with the current core layout. It preserves
-the same-boot removal of the former `librx3_stems.so` preload. A second commit
+The first local branch merges PR #34 with the current core layout. It kept the
+same-boot removal of the former `librx3_stems.so` preload; PR #43 later dropped
+it, so a deck hot-swapped from a v0.4.0 drive keeps that preload until it is
+powered off. A second commit
 avoids replacing unchanged core/logo images and avoids recreating stems/sample
 links when they already point at the selected directory. Those changes do not
 establish the full contract below.
