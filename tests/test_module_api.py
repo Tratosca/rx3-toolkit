@@ -263,16 +263,16 @@ exit 0
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_core_preload_keeps_order_and_retires_legacy_library(self):
+    def test_core_preload_keeps_order_and_preserves_other_libraries(self):
         result = run_shell(
             r'''
 . "${1%/lib/module-api.sh}/modules/core/module.sh" || exit 9
 RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so"
 core_normalize_preload || exit 10
-[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 11
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so" ] || exit 11
 RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_stems.so"
 core_normalize_preload || exit 12
-[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 13
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so" ] || exit 13
 RBP_PRELOAD=""
 core_normalize_preload || exit 14
 [ "$RBP_PRELOAD" = "/root/pdj/librx3_core.so" ] || exit 15
