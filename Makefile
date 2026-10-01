@@ -8,11 +8,14 @@ endif
 
 PYTHON ?= python3
 CARGO ?= cargo
+DOCKER ?= docker
 BUILD_DIR ?= build
 # The version an operator reads in the deck's menu. Each module says which
 # versions it is built for; this picks which of them a drive carries.
 FIRMWARE ?= 1.19
 MODULES ?=
+PROFILES ?=
+PROFILE ?=
 # The key stays outside this repository. RX3_KEY saves retyping its path on
 # every build; KEY= on the command line still wins.
 KEY ?= $(RX3_KEY)
@@ -24,6 +27,7 @@ HOOK := $(BUILD_DIR)/librx3_core.so
 HOOK_UNITS := $(shell $(PYTHON) -c 'import json; print(" ".join("mod/modules/" + p for p in json.load(open("$(CORE_DIR)/manifest.json"))["arm_hook"].get("sources", [])))')
 AUTOEXEC := $(BUILD_DIR)/autoexec.bin
 PATCH_ARGS := $(foreach patch,$(MODULES),--patch $(patch))
+PROFILE_ARGS := $(foreach profile,$(PROFILES),--profile $(profile))
 
 # -fno-builtin-memcmp is load-bearing. At -O2 clang rewrites `memcmp(a,b,n) == 0`
 # into a call to bcmp, which rbp's libc does not export: the hook then fails to
@@ -45,16 +49,21 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help hook autoexec app new-module test preflight clean overcue-audio
+.PHONY: help hook autoexec app new-module kernel-builder kernel-source kernel-modules test preflight clean overcue-audio
 
 help:
 	@printf '%s\n' \
 	  'make hook                         compile the ARM EABI5 hook' \
 	  'make autoexec KEY=/path/key       build the runtime for firmware $(FIRMWARE)' \
 	  'make autoexec KEY=... MODULES="beatjump-32bars decoder-sleep"' \
+	  'make autoexec KEY=... MODULES="x" PROFILES="x=profile"' \
 	  'make app                          open the XDJ-RX3 Toolkit' \
 	  'make new-module ID=browse-lock CATEGORY=screen    write the files a new module is made of' \
 	  'make new-module ID=x CATEGORY=screen CORE=1       ... one that reacts while a track plays' \
+	  'make kernel-builder               build the pinned RX3 kernel toolchain' \
+	  'make kernel-source                fetch the published RX3 kernel source' \
+	  'make kernel-modules MODULE=x KERNEL_SOURCE=/path/to/kernel' \
+	  'make kernel-modules MODULE=x PROFILE=<profile> ...' \
 	  'make test                         run source tests' \
 	  'make preflight                    inspect publishable files' \
 	  'make clean                        remove build/ only'
@@ -75,7 +84,8 @@ autoexec:
 	@test -f "$(KEY)" || { echo 'key not found: $(KEY)' >&2; exit 2; }
 	@mkdir -p "$(BUILD_DIR)"
 	$(PYTHON) -m app.runtime.cli build \
-	  --firmware "$(FIRMWARE)" $(PATCH_ARGS) --key "$(KEY)" --output "$(BUILD_DIR)"
+	  --firmware "$(FIRMWARE)" $(PATCH_ARGS) $(PROFILE_ARGS) \
+	  --key "$(KEY)" --output "$(BUILD_DIR)"
 
 app:
 	$(PYTHON) app/ui/shell.py
@@ -87,6 +97,29 @@ new-module:
 	@test -n "$(ID)" || { echo 'ID=<module-id> is required, e.g. make new-module ID=browse-lock CATEGORY=screen' >&2; exit 2; }
 	$(PYTHON) -m app.runtime.scaffold --id "$(ID)" --name "$(NAME)" --category "$(CATEGORY)" \
 	  $(if $(CORE),--core,)
+
+kernel-builder:
+	$(DOCKER) build --file tools/rx3_kernel/Containerfile \
+	  --tag rx3-kernel-builder:bookworm tools/rx3_kernel
+
+kernel-source:
+	tools/rx3_kernel/fetch-source.sh "$(FIRMWARE)" \
+	  "$(BUILD_DIR)/kernel-source/$(FIRMWARE)"
+
+kernel-modules:
+	@test -n "$(MODULE)" || { echo 'MODULE=<module-id> is required' >&2; exit 2; }
+	@test -n "$(KERNEL_SOURCE)" || { echo 'KERNEL_SOURCE=/path/to/prepared/kernel is required' >&2; exit 2; }
+	@recipe="tools/rx3_$(subst -,_,$(MODULE))_kernel"; \
+	  sources="$(BUILD_DIR)/sources/$(MODULE)"; \
+	  output="$(BUILD_DIR)/artifacts/$(FIRMWARE)/$(MODULE)"; \
+	  if [ -n "$(PROFILE)" ]; then \
+	    recipe="$$recipe/profiles/$(PROFILE)"; \
+	    sources="$$sources/$(PROFILE)"; \
+	    output="$$output/$(PROFILE)"; \
+	  fi; \
+	  test -d "$$recipe" || { echo "unknown kernel recipe: $$recipe" >&2; exit 2; }; \
+	  DOCKER="$(DOCKER)" tools/rx3_kernel/build-recipe.sh \
+	    "$(FIRMWARE)" "$(KERNEL_SOURCE)" "$$recipe" "$$sources" "$$output"
 
 test:
 	$(PYTHON) -m unittest discover -s tests -p 'test_*.py'

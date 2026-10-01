@@ -16,6 +16,7 @@ var state = {
   firmware: null,
   modules: [],
   selected: [],
+  profiles: {},
   key: "",
   output: "",
   logo: null,
@@ -396,6 +397,22 @@ function moduleTile(item) {
   if (explanation) {
     var wrapper = el("div", "module-config"); wrapper.append(tile, explanation); tile = wrapper;
   }
+  if (item.profiles && item.profiles.length) {
+    var group=el("div","module-config"), settings=el("div","module-settings");
+    var label=el("label","field-label",t("modules.profile"));
+    var select=document.createElement("select");
+    select.id="module-profile-"+item.id;label.htmlFor=select.id;select.disabled=!on;
+    var prompt=el("option",null,t("modules.chooseProfile"));prompt.value="";select.append(prompt);
+    item.profiles.forEach(function(profile) {
+      var option=el("option",null,profile);option.value=profile;select.append(option);
+    });
+    select.value=state.profiles[item.id] || "";
+    select.addEventListener("change",function() {
+      if(select.value)state.profiles[item.id]=select.value;else delete state.profiles[item.id];
+      renderSummary();
+    });
+    settings.hidden=!on;settings.append(label,select);group.append(tile,settings);return group;
+  }
   if (item.id === "browse-columns") {
     var group=el("div","module-config"), settings=el("div","module-settings");
     var label=el("label","field-label",t("browseColumn.field"));
@@ -687,10 +704,14 @@ function renderSummary() {
   for (var i = 0; i < names.length; i++) chips.append(el("li", null, names[i]));
 
   var note = document.getElementById("build-note");
+  var missingProfile=selected.some(function(item) {
+    return item.profiles && item.profiles.length && !state.profiles[item.id];
+  });
   note.textContent = !selected.length ? t("modules.nothing")
     : !state.output ? t("modules.needOutput")
+    : missingProfile ? t("modules.chooseProfile")
     : state.logo && state.selected.indexOf("logo") >= 0 ? t("modules.withLogo") : "";
-  document.getElementById("installation-confirm").disabled = !selected.length || !state.output;
+  document.getElementById("installation-confirm").disabled = !selected.length || !state.output || missingProfile;
   document.getElementById("installation-confirm").textContent = t(state.key ? "modules.build" : "install.continue");
   document.getElementById("installation-step").textContent = state.key ? t("install.ready") : t("install.first");
   renderPreparationSummary();
@@ -711,6 +732,10 @@ async function loadModules() {
   var modules = await ask("mod_modules", state.firmware);
   if (!modules) return;
   state.modules = modules;
+  Object.keys(state.profiles).forEach(function(id) {
+    var item=modules.find(function(module){return module.id===id;});
+    if(!item || item.profiles.indexOf(state.profiles[id])<0)delete state.profiles[id];
+  });
   var wanted = [];
   for (var i = 0; i < modules.length; i++) {
     if (modules[i].selectable && modules[i].default) wanted.push(modules[i].id);
@@ -831,8 +856,10 @@ async function startBuild() {
   if (!state.key) return openTerms();
   var button = document.getElementById("installation-confirm");
   button.disabled = true;
+  var profiles={};
+  state.selected.forEach(function(id) {if(state.profiles[id])profiles[id]=state.profiles[id];});
   var started = await ask(
-    "mod_build", state.firmware, state.selected.filter(selectable), state.key, state.output, state.logo, state.keySyncRange, state.keySyncMode, state.keyMatchRules, state.browseColumn);
+    "mod_build", state.firmware, state.selected.filter(selectable), state.key, state.output, state.logo, state.keySyncRange, state.keySyncMode, state.keyMatchRules, state.browseColumn, profiles);
   renderSummary();
   if (started) watchJob();
 }

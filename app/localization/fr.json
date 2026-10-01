@@ -46,6 +46,8 @@
   "modules.performanceTradeoff": "Sur la platine, Key Shift et Stems remplacent les commandes tactiles ZOOM et GRID. Si vous activez l’un de ces modules, ces deux commandes natives ne sont plus accessibles.",
   "modules.advanced": "Composants et réglages techniques",
   "modules.firmware": "Versions compatibles du XDJ-RX3",
+  "modules.profile": "Profil matériel",
+  "modules.chooseProfile": "Choisissez un profil matériel.",
   "modules.needs": "Nécessite le module {names}",
   "modules.clashes": "Incompatible avec {names}",
   "modules.key": "Clé de chiffrement",

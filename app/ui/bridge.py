@@ -390,6 +390,7 @@ class Bridge:
                 "advanced": patch.advanced,
                 "requires": list(patch.requires),
                 "conflicts": list(patch.conflicts),
+                "profiles": list(patch.profiles),
             }
             for patch in build_module.discover_patches(None, firmware)
         ]
@@ -507,7 +508,10 @@ class Bridge:
 
     @answered
     def mod_build(
-        self, firmware: str, selected: list, key: str, output: str, logo=None, key_sync_range=1, key_sync_mode="harmonic", key_match_rules=key_match_service.DEFAULT_RULES, browse_column=13
+        self, firmware: str, selected: list, key: str, output: str, logo=None,
+        key_sync_range=1, key_sync_mode="harmonic",
+        key_match_rules=key_match_service.DEFAULT_RULES, browse_column=13,
+        profiles=None,
     ) -> dict:
         """Start writing an autoexec.bin, and answer once it has started.
 
@@ -516,6 +520,10 @@ class Bridge:
         pressed rather than as a job that fails a second later.
         """
         chosen = [str(item) for item in selected]
+        selected_profiles = {
+            str(module): str(profile)
+            for module, profile in dict(profiles or {}).items()
+        }
         if not chosen:
             raise LocalizedError("error.selection")
         key_path = pathlib.Path(key)
@@ -539,12 +547,17 @@ class Bridge:
         self._watch(stop.stop)
         threading.Thread(
             target=self._build,
-            args=(firmware, chosen, key_path, destination, frame, stop, key_sync_range, key_sync_mode, key_match_rules, browse_column),
+            args=(firmware, chosen, key_path, destination, frame, stop,
+                  key_sync_range, key_sync_mode, key_match_rules,
+                  browse_column, selected_profiles),
             daemon=True,
         ).start()
         return {"started": True}
 
-    def _build(self, firmware, chosen, key_path, destination, frame, stop, key_sync_range=1, key_sync_mode="harmonic", key_match_rules=key_match_service.DEFAULT_RULES, browse_column=13) -> None:
+    def _build(self, firmware, chosen, key_path, destination, frame, stop,
+               key_sync_range=1, key_sync_mode="harmonic",
+               key_match_rules=key_match_service.DEFAULT_RULES,
+               browse_column=13, profiles=None) -> None:
         """The build, off the calling thread. Every exit settles the slot."""
         try:
             resolved = {module.patch_id for module in build_module.resolve_patches(
@@ -566,6 +579,7 @@ class Bridge:
                 chosen,
                 key_path,
                 destination,
+                profiles=profiles,
                 supplied_files=supplied,
                 cancellation=stop,
                 progress=lambda message: self._step(message),

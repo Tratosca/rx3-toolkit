@@ -19,6 +19,8 @@ PATCH_TABLE=""
 PATCH_OFFSETS=""
 SUPPORTED_SHA1=""
 PREPARE_HOOKS=""
+STOPPED_HOOKS=""
+ROLLBACK_HOOKS=""
 AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
@@ -211,6 +213,45 @@ run_hooks "$PREPARE_HOOKS" || exit 12
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "prepared")
+
+    def test_stopped_and_rollback_hooks_are_separate_phases(self):
+        result = run_shell(
+            r'''
+module_begin network network || exit 10
+network_stopped() { printf 'stopped '; }
+network_rollback() { printf 'rolled-back'; }
+register_stopped_hook network_stopped || exit 11
+register_rollback_hook network_rollback || exit 12
+run_hooks "$STOPPED_HOOKS" || exit 13
+run_hooks "$ROLLBACK_HOOKS" || exit 14
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "stopped rolled-back")
+
+    def test_module_cannot_register_a_sibling_namespace(self):
+        result = run_shell(
+            r'''
+module_begin feature-a feature_a || exit 10
+feature_b_prepare() { :; }
+register_prepare_hook feature_b_prepare && exit 11
+[ "$MODULE_LOAD_FAILED" = 1 ] || exit 12
+'''
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_every_post_stop_failure_runs_rollback_hooks(self):
+        autoexec = (ROOT / "mod/autoexec.sh").read_text(encoding="utf-8")
+
+        self.assertEqual(autoexec.count('run_hooks "$ROLLBACK_HOOKS"'), 5)
+        for failure in (
+            "a stopped hook failed",
+            "patch write(s)",
+            "replacement rbp exited",
+            "replacement rbp missed readiness",
+        ):
+            with self.subTest(failure=failure):
+                self.assertIn(failure, autoexec)
 
     def test_two_modules_cannot_own_the_same_patch_address(self):
         result = run_shell(

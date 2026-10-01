@@ -231,9 +231,14 @@ Each feature is one directory under `mod/modules/`, described by a `manifest.jso
 | `selectable` | `false` for internal services, which cannot be picked directly |
 | `order` | load order; dependencies must sort earlier |
 | `requires` / `conflicts` | module relationships |
-| `files` | what to copy into the image, and what must be executable |
+| `files` | source-controlled or generated files to copy into the image, and what must be executable |
 | `build_files` | headers this module owns at compile time |
 | `arm_hook` | the ARM source and target this module compiles, if any |
+
+A file with `"artifact": true` is read from
+`build/artifacts/<firmware>/<module>/` instead of the module source directory.
+Generated artifacts stay out of Git; their feature-specific recipes use the
+shared builder under `tools/rx3_kernel`.
 
 The build resolves dependencies, rejects cycles and conflicts, and writes the resolved load order into the image. Asking for one feature therefore pulls in the internal core it depends on, without the caller having to know. `make new-module ID=<id>` writes a directory that already satisfies the whole of the above, described in [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-module).
 
@@ -3816,7 +3821,7 @@ Delete `autoexec.bin` from the drive before using the RX3 again.
 
 `STOP:` means a precondition failed and nothing was modified. The most common one is `STOP: unsupported rbp SHA-1`, which means the player binary is not one the runtime recognises. That is a firmware other than `1.19` or `1.20`, or a build of one of them this project has not seen.
 
-A drive that was removed and pushed back in without a power cycle used to report that same `STOP`, because the player binary carried the writes of the first run and no longer matched the state it started from. It no longer does: the guarded words are put back to their stock values before the comparison, so an already-patched session is recognised and the log says `accepted rbp SHA-1: … (already patched; normalises to …)`.
+A drive that was removed and pushed back in without a power cycle used to report that same `STOP`, because the player binary carried the writes of the first run and no longer matched the state it started from. It no longer does: guarded patches are put back to their stock values before the comparison, so an already-patched session is recognised and the log says `accepted rbp SHA-1: … (already patched; normalises to …)`.
 
 `FAILED:` means something went wrong during modification and the previous state was restored automatically. The exception is a player that exits straight after being relaunched: there the previous state is what just died, so the stock binary is put back instead and this runtime's shared objects are taken out of the preload. The log then says `stock rbp restarted`.
 

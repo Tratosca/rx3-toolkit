@@ -62,6 +62,8 @@ class RuntimeFile:
     source: str
     target: str
     executable: bool = False
+    artifact: bool = False
+    directory: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,6 +91,7 @@ class PatchDefinition:
     namespace: str
     requires: tuple[str, ...]
     conflicts: tuple[str, ...]
+    profiles: tuple[str, ...]
     files: tuple[RuntimeFile, ...]
     build_files: tuple[str, ...]
     arm_hook: ArmHook | None
@@ -249,7 +252,13 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
         if not re.fullmatch(r"[a-z][a-z0-9_]*", data["namespace"]):
             raise ValueError(f"{manifest_path}: unsafe shell namespace")
         files = tuple(
-            RuntimeFile(item["source"], item["target"], bool(item.get("executable", False)))
+            RuntimeFile(
+                item["source"],
+                item["target"],
+                bool(item.get("executable", False)),
+                bool(item.get("artifact", False)),
+                bool(item.get("directory", False)),
+            )
             for item in data["files"]
         )
         build_files = tuple(data.get("build_files", []))
@@ -267,6 +276,12 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
             raise ValueError(f"{manifest_path}: advanced must be a boolean")
         hook_data = data.get("arm_hook")
         hook = ArmHook(hook_data["source"], hook_data["target"], tuple(hook_data.get("sources", ()))) if hook_data else None
+        profiles_directory = manifest_path.parent / "profiles"
+        profiles = _discover_profiles(profiles_directory)
+        if bool(data.get("profile_required", False)) != bool(profiles):
+            raise ValueError(
+                f"{manifest_path}: profile_required must match the profiles directory"
+            )
         patch = PatchDefinition(
             patch_id=data["id"],
             name=localized(data["name"], "name")["en"] if isinstance(data["name"], dict) else data["name"],
@@ -279,6 +294,7 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
             namespace=data["namespace"],
             requires=_module_ids(manifest_path, data.get("requires", []), "requires"),
             conflicts=_module_ids(manifest_path, data.get("conflicts", []), "conflicts"),
+            profiles=profiles,
             files=files,
             build_files=build_files,
             arm_hook=hook,
@@ -294,6 +310,34 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
     patches = sorted(patches, key=lambda patch: (patch.order, patch.name.lower()))
     _validate_module_graph(patches)
     return patches
+
+
+def _discover_profiles(directory: pathlib.Path) -> tuple[str, ...]:
+    if not directory.is_dir():
+        return ()
+
+    profiles = []
+    for path in sorted(item for item in directory.iterdir() if item.is_dir()):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", path.name):
+            raise ValueError(f"{path}: unsafe profile id")
+        profile_path = path / "profile.json"
+        if not profile_path.is_file():
+            raise ValueError(f"{path}: missing profile.json")
+        data = json.loads(profile_path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError(f"{profile_path}: profile must be an object")
+        required = {"id", "name"}
+        missing = required.difference(data)
+        if missing:
+            raise ValueError(
+                f"{profile_path}: missing {', '.join(sorted(missing))}"
+            )
+        if data["id"] != path.name:
+            raise ValueError(f"{profile_path}: id does not match its directory")
+        if not isinstance(data["name"], str) or not data["name"].strip():
+            raise ValueError(f"{profile_path}: name must be a non-empty string")
+        profiles.append(path.name)
+    return tuple(profiles)
 
 
 def _module_ids(manifest_path: pathlib.Path, value: object, field: str) -> tuple[str, ...]:
@@ -320,7 +364,12 @@ def _validate_patch_files(patch: PatchDefinition) -> None:
         target_path = pathlib.PurePosixPath(runtime_file.target)
         if source_path.is_absolute() or ".." in source_path.parts:
             raise ValueError(f"{patch.patch_id}: unsafe source {runtime_file.source!r}")
-        if not (patch.directory / runtime_file.source).is_file():
+        if runtime_file.directory and not runtime_file.artifact:
+            raise ValueError(f"{patch.patch_id}: directory inputs must be artifacts")
+        if (
+            not runtime_file.artifact
+            and not (patch.directory / runtime_file.source).is_file()
+        ):
             raise ValueError(f"{patch.patch_id}: missing {runtime_file.source}")
         if target_path.is_absolute() or ".." in target_path.parts:
             raise ValueError(f"{patch.patch_id}: unsafe target {runtime_file.target!r}")
@@ -524,7 +573,8 @@ def available_versions(root: pathlib.Path | None = None) -> list[str]:
 
 def validate_arm_hook(path: pathlib.Path) -> None:
     """Validate the architecture and EABI marker without a host `file` tool."""
-    header = path.read_bytes()[:52]
+    data = path.read_bytes()
+    header = data[:52]
     if len(header) < 52 or header[:4] != b"\x7fELF":
         raise ValueError(f"{path}: compiled hook is not an ELF file")
     if header[4:6] != b"\x01\x01":
@@ -533,6 +583,44 @@ def validate_arm_hook(path: pathlib.Path) -> None:
     flags = struct.unpack_from("<I", header, 36)[0]
     if machine != 40 or (flags & 0xFF000000) != 0x05000000:
         raise ValueError(f"{path}: hook must target ARM EABI5")
+
+    forbidden = {"bcmp", "__memcmp_chk"}
+    imported = _undefined_elf32_symbols(data)
+    rejected = sorted(imported & forbidden)
+    if rejected:
+        names = ", ".join(rejected)
+        raise ValueError(f"{path}: hook imports unavailable symbol(s): {names}")
+
+
+def _undefined_elf32_symbols(data: bytes) -> set[str]:
+    """Return undefined dynamic symbols from a little-endian ELF32 image."""
+    section_offset, = struct.unpack_from("<I", data, 0x20)
+    section_size, section_count = struct.unpack_from("<HH", data, 0x2E)
+
+    def section(index: int) -> tuple[int, int, int, int, int]:
+        base = section_offset + index * section_size
+        section_type, = struct.unpack_from("<I", data, base + 4)
+        offset, size, link = struct.unpack_from("<III", data, base + 0x10)
+        entry_size, = struct.unpack_from("<I", data, base + 0x24)
+        return section_type, offset, size, link, entry_size
+
+    names: set[str] = set()
+    for index in range(section_count):
+        section_type, offset, size, link, entry_size = section(index)
+        if section_type != 11 or not entry_size:  # SHT_DYNSYM
+            continue
+        _, strings_offset, _, _, _ = section(link)
+        for entry in range(size // entry_size):
+            base = offset + entry * entry_size
+            name_offset, _, _, _, _, defined = struct.unpack_from(
+                "<IIIBBH", data, base
+            )
+            if defined != 0 or not name_offset:  # SHN_UNDEF only
+                continue
+            start = strings_offset + name_offset
+            end = data.index(b"\0", start)
+            names.add(data[start:end].decode("ascii"))
+    return names
 
 
 def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str | None = None,
@@ -646,6 +734,36 @@ def _validate_supplied_files(
     return supplied
 
 
+def runtime_file_source(
+    root: pathlib.Path,
+    firmware: str,
+    patch: PatchDefinition,
+    runtime_file: RuntimeFile,
+    artifact_directory: pathlib.Path | None = None,
+    profile: str | None = None,
+) -> pathlib.Path:
+    if not runtime_file.artifact:
+        return patch.directory / runtime_file.source
+
+    base = pathlib.Path(artifact_directory or root / "build/artifacts")
+    base = base / firmware / patch.patch_id
+    if patch.profiles:
+        if profile not in patch.profiles:
+            choices = ", ".join(patch.profiles)
+            raise ValueError(
+                f"{patch.patch_id}: select a hardware profile ({choices})"
+            )
+        base = base / profile
+    source = base / runtime_file.source
+    expected = source.is_dir() if runtime_file.directory else source.is_file()
+    if not expected:
+        raise ValueError(
+            f"{patch.patch_id}: missing generated artifact {runtime_file.source}. "
+            f"Build it into {source} before packaging"
+        )
+    return source
+
+
 def build_runtime(
     firmware: str,
     patch_ids: Iterable[str],
@@ -656,6 +774,8 @@ def build_runtime(
     prebuilt_hook: pathlib.Path | None = None,
     supplied_files: Mapping[str, Mapping[str, bytes]] | None = None,
     cancellation: Cancellation | None = None,
+    artifact_directory: pathlib.Path | None = None,
+    profiles: Mapping[str, str] | None = None,
     progress: ProgressCallback | None = None,
 ) -> BuildResult:
     """Build an atomic `autoexec.bin` from selected versioned modules.
@@ -686,6 +806,25 @@ def build_runtime(
         )
     selected = resolve_patches(definitions, patch_ids)
     by_module = _validate_supplied_files(supplied_files, selected)
+    profiles = dict(profiles or {})
+    selected_ids = {patch.patch_id for patch in selected}
+    unknown_profiles = sorted(set(profiles).difference(selected_ids))
+    if unknown_profiles:
+        raise ValueError(
+            "profile supplied for an unselected module: " + ", ".join(unknown_profiles)
+        )
+    for patch in selected:
+        if patch.profiles and patch.patch_id not in profiles:
+            choices = ", ".join(patch.profiles)
+            raise ValueError(
+                f"{patch.patch_id}: select a hardware profile ({choices})"
+            )
+        if patch.patch_id in profiles and profiles[patch.patch_id] not in patch.profiles:
+            choices = ", ".join(patch.profiles)
+            raise ValueError(
+                f"{patch.patch_id}: unknown profile {profiles[patch.patch_id]!r}; "
+                f"choose one of: {choices}"
+            )
 
     compatibility = root / "mod/compatibility.sh"
     if not compatibility.is_file():
@@ -712,8 +851,19 @@ def build_runtime(
             for runtime_file in patch.files:
                 written = destination / runtime_file.target
                 written.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(patch.directory / runtime_file.source, written)
-                written.chmod(0o755 if runtime_file.executable else 0o644)
+                source = runtime_file_source(
+                    root,
+                    firmware,
+                    patch,
+                    runtime_file,
+                    artifact_directory,
+                    profiles.get(patch.patch_id),
+                )
+                if runtime_file.directory:
+                    shutil.copytree(source, written, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source, written)
+                    written.chmod(0o755 if runtime_file.executable else 0o644)
             for name, content in by_module.get(patch.patch_id, {}).items():
                 (destination / name).write_bytes(content)
                 (destination / name).chmod(0o644)

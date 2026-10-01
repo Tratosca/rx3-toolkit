@@ -1,13 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 # SPDX-License-Identifier: MPL-2.0
 
-import json
 import os
 import pathlib
 import sys
 
 
 repository = pathlib.Path(SPECPATH).parent
+sys.path.insert(0, str(repository))
+
+from app.runtime.bundle_resources import collect_bundle_resources
+
+
 # The USB runtime half carries its module manifests and the ARM hook. The stems
 # half provisions audio-separator, PyTorch, and FFmpeg into a per-user
 # environment on first launch, so it contributes only its notices.
@@ -18,33 +22,8 @@ resources = [
     (str(repository / "app/stems/wave_worker.py"), "."),
     (str(repository / "app/stems/wave_memory.py"), "."),
     (str(repository / "app/stems/wave_encoding.py"), "."),
-    (str(repository / "LICENSE"), "."),
-    (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
-    (str(repository / "mod/autoexec.sh"), "resources/mod"),
-    (str(repository / "mod/categories.json"), "resources/mod"),
-    (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
-    (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
-for compatibility in (repository / "mod").glob("*/compatibility.sh"):
-    destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
-    resources.append((str(compatibility), destination))
-for manifest in (repository / "mod/modules").glob("**/manifest.json"):
-    destination = f"resources/{manifest.parent.relative_to(repository).as_posix()}"
-    resources.append((str(manifest), destination))
-    data = json.loads(manifest.read_text(encoding="utf-8"))
-    for item in data["files"]:
-        source = manifest.parent / item["source"]
-        source_destination = f"resources/{source.parent.relative_to(repository).as_posix()}"
-        resources.append((str(source), source_destination))
-    for source in data.get("build_files", []):
-        source = manifest.parent / source
-        source_destination = f"resources/{source.parent.relative_to(repository).as_posix()}"
-        resources.append((str(source), source_destination))
-    hook = data.get("arm_hook")
-    if hook:
-        source = manifest.parent / hook["source"]
-        source_destination = f"resources/{source.parent.relative_to(repository).as_posix()}"
-        resources.append((str(source), source_destination))
+resources.extend(collect_bundle_resources(repository))
 
 # The interface itself. shell.resources() looks for it under _MEIPASS, which
 # inside a .app is Contents/Frameworks, and nothing put it there before, so the

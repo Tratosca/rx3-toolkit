@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 import importlib.util
 import pathlib
+import re
+import shutil
 import tempfile
 import unittest
 import unittest.mock
@@ -8,7 +10,13 @@ from dataclasses import replace
 from pathlib import Path
 
 from app.runtime import build as build_module
-from app.runtime.build import build_runtime, discover_patches, resolve_patches
+from app.runtime.build import (
+    build_runtime,
+    discover_patches,
+    resolve_patches,
+    runtime_file_source,
+)
+from app.runtime.bundle_resources import collect_bundle_resources
 
 
 REPOSITORY = Path(__file__).parents[1]
@@ -85,6 +93,42 @@ class DurableInstallTests(unittest.TestCase):
             self.assertIn("does not read back", str(raised.exception))
 
 
+def profiled_fixture(root):
+    firmware = root / "app/firmware"
+    firmware.mkdir(parents=True)
+    shutil.copy2(
+        REPOSITORY / "app/firmware/firmware_image.py",
+        firmware / "firmware_image.py",
+    )
+    module = root / "mod/modules/example"
+    module.mkdir(parents=True)
+    (module / "module.sh").write_text("module_begin example example\n")
+    (module / "manifest.json").write_text(
+        """{
+  "id": "example",
+  "name": "Example",
+  "description": "Profiled artifact fixture.",
+  "firmwares": ["1.19"],
+  "category": "hardware",
+  "runtime_directory": "example",
+  "namespace": "example",
+  "profile_required": true,
+  "files": [
+    {"source": "module.sh", "target": "module.sh"},
+    {"source": ".", "target": "hardware", "artifact": true, "directory": true}
+  ]
+}
+"""
+    )
+    for profile in ("first-device", "second-device"):
+        directory = module / "profiles" / profile
+        directory.mkdir(parents=True)
+        (directory / "profile.json").write_text(
+            f'{{"id": "{profile}", "name": "{profile.title()}"}}\n'
+        )
+    return discover_patches(root, "1.19")[0]
+
+
 class ModGeneratorTests(unittest.TestCase):
     def test_the_discovered_order_is_dependency_first(self):
         """`resolve_patches` filters this order rather than sorting again, so a
@@ -109,6 +153,142 @@ class ModGeneratorTests(unittest.TestCase):
         right = replace(core, patch_id="right", selectable=True)
         with self.assertRaisesRegex(ValueError, "incompatible modules"):
             resolve_patches([left, right], ["left", "right"])
+
+    def test_generated_module_artifacts_stay_outside_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "mod/modules/example"
+            module.mkdir(parents=True)
+            (module / "module.sh").write_text("module_begin example example\n")
+            (module / "manifest.json").write_text(
+                """{
+  "id": "example",
+  "name": "Example",
+  "description": "Generated artifact fixture.",
+  "firmwares": ["1.19"],
+  "selectable": false,
+  "runtime_directory": "example",
+  "namespace": "example",
+  "files": [
+    {"source": "module.sh", "target": "module.sh"},
+    {"source": "example.ko", "target": "example.ko", "artifact": true}
+  ]
+}
+"""
+            )
+
+            patch = discover_patches(root, "1.19")[0]
+            artifact = patch.files[1]
+            artifacts = root / "local-artifacts"
+            output = artifacts / "1.19/example/example.ko"
+            with self.assertRaisesRegex(
+                ValueError,
+                re.escape(str(output)),
+            ):
+                runtime_file_source(root, "1.19", patch, artifact, artifacts)
+
+            output.parent.mkdir(parents=True)
+            output.write_bytes(b"built outside source")
+            self.assertEqual(
+                runtime_file_source(root, "1.19", patch, artifact, artifacts), output
+            )
+
+    def test_profiled_module_requires_an_explicit_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            patch = profiled_fixture(root)
+            self.assertEqual(patch.profiles, ("first-device", "second-device"))
+            key = root / "aes256.key"
+            key.write_bytes(b"0123456789012345678901234567890\n")
+            with self.assertRaisesRegex(ValueError, "select a hardware profile"):
+                build_runtime(
+                    "1.19", ["example"], key, root, root=root
+                )
+            with self.assertRaisesRegex(ValueError, "unknown profile"):
+                build_runtime(
+                    "1.19", ["example"], key, root, root=root,
+                    profiles={"example": "some-random-device"},
+                )
+
+    def test_profiled_directory_artifact_uses_the_selected_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            patch = profiled_fixture(root)
+            hardware = next(item for item in patch.files if item.directory)
+            expected = root / "build/artifacts/1.19/example/first-device"
+            expected.mkdir(parents=True)
+
+            self.assertEqual(
+                runtime_file_source(
+                    root, "1.19", patch, hardware, profile="first-device"
+                ),
+                expected,
+            )
+
+    def test_bundle_keeps_each_profiled_directory_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profiled_fixture(root)
+            for profile in ("first-device", "second-device"):
+                artifact = root / "build/artifacts/1.19/example" / profile
+                artifact.mkdir(parents=True)
+                (artifact / "module.ko").write_bytes(profile.encode())
+
+            resources = collect_bundle_resources(root)
+
+            for profile in ("first-device", "second-device"):
+                artifact = root / "build/artifacts/1.19/example" / profile
+                self.assertIn(
+                    (
+                        str(artifact),
+                        f"resources/build/artifacts/1.19/example/{profile}",
+                    ),
+                    resources,
+                )
+
+    def test_desktop_bundle_reads_generated_artifacts_from_build_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "mod/modules/example"
+            module.mkdir(parents=True)
+            (module / "module.sh").write_text("module_begin example example\n")
+            (module / "manifest.json").write_text(
+                """{
+  "id": "example",
+  "name": "Example",
+  "description": "Generated artifact fixture.",
+  "firmwares": ["1.19"],
+  "selectable": false,
+  "runtime_directory": "example",
+  "namespace": "example",
+  "files": [
+    {"source": "module.sh", "target": "module.sh"},
+    {"source": "helper", "target": "helper", "artifact": true}
+  ]
+}
+"""
+            )
+            artifacts = root / "release-inputs"
+            artifact = artifacts / "1.19/example/helper"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_bytes(b"generated outside source")
+
+            resources = collect_bundle_resources(root, artifacts)
+
+            self.assertIn(
+                (
+                    str(module / "module.sh"),
+                    "resources/mod/modules/example",
+                ),
+                resources,
+            )
+            self.assertIn(
+                (
+                    str(artifact),
+                    "resources/build/artifacts/1.19/example",
+                ),
+                resources,
+            )
 
     def test_builds_selected_modules_without_external_iso_tool(self):
         codec = load_firmware_codec()

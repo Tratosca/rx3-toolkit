@@ -141,6 +141,37 @@ The generated files already follow the rules below. They are written down for wh
 - The performance core owns executable hook installation. Optional features own their state and hook group, depend only on core services, and must remove only their own hooks on failure. See [the orchestrator](REFERENCES.md#the-orchestrator).
 - A core feature reaches libc through the names declared at the top of `rx3_core_hook.c`. Calling a new one means adding it to `ALLOWED` in `tests/test_hook_symbols.py`, and confirming `rbp` exports it. The hook is `-nostdlib`: a name `rbp` does not export is neither a link error nor a warning, the shared object simply fails to load, and every module goes silent, not just yours.
 
+### Building generated artifacts
+
+Compiled runtime files are generated outside the module source directory. Mark
+each generated manifest file with `"artifact": true` and have its build recipe
+write to `build/artifacts/<firmware>/<module>/`. Runtime packaging reads the
+file from that ignored directory. The build recipe and its original inputs
+remain in the feature's `tools/` directory.
+
+### Building additional kernel modules
+
+Kernel modules are generated artifacts and never belong in Git. Shared RX3
+toolchain, production-ABI, container, and validation behavior lives in
+`tools/rx3_kernel`. A feature owns only its Kconfig and Kbuild recipe in
+`tools/rx3_<module>_kernel`.
+
+Build kernel artifacts with the common runner:
+
+```sh
+make kernel-builder
+make kernel-source FIRMWARE=1.19
+make kernel-modules \
+  MODULE=<module-id> \
+  FIRMWARE=1.19 \
+  KERNEL_SOURCE=build/kernel-source/1.19
+```
+
+The feature recipe includes a checksum-pinned, minimal production symbol
+profile containing exactly the kernel symbols its outputs import. The common
+builder prepares the published source without network access and validates
+the profile, architecture, vermagic, modversion table, and relocation model.
+
 ## Supporting another firmware build
 
 A firmware version is not a set of addresses. Several versions can carry the same one, and when they do, supporting the new version is one checksum in `mod/compatibility.sh` and one entry in each module's `firmwares` list -- no new directory, no new hook. `scripts/check_addresses.py` answers which case you are in: point it at that version's own player binary and it checks every hooked address and every registered patch word against the sources. All of them holding means the existing target covers it.

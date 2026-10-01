@@ -28,9 +28,13 @@ LOCK=/tmp/rx3-runtime.lock
 # Named so the guards below can be run against a directory that is not /proc.
 PROC_ROOT=/proc
 PATCH_TABLE=""
+PATCH_FILE_TABLE=""
 PATCH_OFFSETS=""
+PATCH_SPANS=""
 SUPPORTED_SHA1=""
 PREPARE_HOOKS=""
+STOPPED_HOOKS=""
+ROLLBACK_HOOKS=""
 AFTER_LAUNCH_HOOKS=""
 POST_LAUNCH_HOOKS=""
 REPORT_HOOKS=""
@@ -263,9 +267,15 @@ trap 'exit 1' 1 2 15
 rm -rf "$TMP"
 mkdir -p "$TMP" || { say "FAILED: /tmp is unavailable"; sync; exit 1; }
 
-extract_guarded_words "$TMP"
+extract_guarded_words "$TMP" || {
+    say "STOP: guarded patches could not be staged."
+    rm -rf "$TMP"; sync; exit 1
+}
 PATCH_COUNT=$(printf '%s\n' "$PATCH_TABLE" | awk '/^[0-9]/ {count++} END {print count+0}')
+PATCH_FILE_COUNT=$(printf '%s\n' "$PATCH_FILE_TABLE" | awk '/^[0-9]/ {count++} END {print count+0}')
+PATCH_TOTAL=$((PATCH_COUNT + PATCH_FILE_COUNT))
 say "$PATCH_COUNT guarded words registered"
+[ "$PATCH_FILE_COUNT" = "0" ] || say "$PATCH_FILE_COUNT guarded ranges registered"
 
 RBP_SHA1=$(sha1sum "$RBP" 2>/dev/null | awk '{print $1}')
 ACCEPTED=""
@@ -275,10 +285,10 @@ esac
 # A drive pulled out and pushed back in meets an rbp this runtime has already
 # patched, which is no longer any of the registered states. Putting the guarded
 # words back to stock and hashing that tells the two cases apart.
-if [ -z "$ACCEPTED" ] && [ "$PATCH_COUNT" != "0" ]; then
+if [ -z "$ACCEPTED" ] && [ "$PATCH_TOTAL" != "0" ]; then
     NORMALIZED=$(normalized_rbp_sha1 "$RBP" "$TMP")
     if [ -z "$NORMALIZED" ]; then
-        say "guarded words are not aligned; identity cannot be normalised"
+        say "guarded patches are not aligned; identity cannot be normalised"
     else
         case " $SUPPORTED_SHA1 " in
             *" $NORMALIZED "*) ACCEPTED=$NORMALIZED ;;
@@ -316,9 +326,24 @@ printf '%s\n' "$PATCH_TABLE" | while read -r OFF STOCK PATCHED LABEL; do
         echo "unknown $OFF $LABEL" >> "$TMP/state"
     fi
 done
+i=0
+printf '%s\n' "$PATCH_FILE_TABLE" | while read -r OFF LENGTH STOCK PATCHED LABEL; do
+    [ -n "$OFF" ] || continue
+    i=$((i+1))
+    range_state=$(guarded_patch_file_state "$RBP" "$OFF" "$LENGTH" \
+        "$TMP/stock-file$i" "$TMP/patched-file$i")
+    case "$range_state" in
+        stock|patched)
+            echo "$range_state" >> "$TMP/state"
+            dd if="$RBP" of="$TMP/previous-file$i" bs=1 skip="$OFF" \
+                count="$LENGTH" 2>/dev/null
+            ;;
+        *) echo "unknown $OFF $LABEL" >> "$TMP/state" ;;
+    esac
+done
 UNKNOWN=$(grep -c '^unknown ' "$TMP/state" 2>/dev/null); [ -n "$UNKNOWN" ] || UNKNOWN=0
 if [ "$UNKNOWN" != "0" ]; then
-    say "STOP: $UNKNOWN unexpected patch word(s); nothing was changed."
+    say "STOP: $UNKNOWN unexpected patch(es); nothing was changed."
     [ "$LOGGING" = "1" ] && grep '^unknown ' "$TMP/state" >> "$LOG" 2>&1
     rm -rf "$TMP"; sync; exit 1
 fi
@@ -327,10 +352,10 @@ fi
 # a word that still holds its stock value makes an rbp restart necessary.
 STOCK_WORDS=$(grep -c '^stock$' "$TMP/state" 2>/dev/null); [ -n "$STOCK_WORDS" ] || STOCK_WORDS=0
 if [ "$STOCK_WORDS" != "0" ]; then
-    say "$STOCK_WORDS of $PATCH_COUNT word(s) still hold the stock value"
+    say "$STOCK_WORDS of $PATCH_TOTAL patch(es) still hold the stock value"
     request_rbp_restart
-elif [ "$PATCH_COUNT" != "0" ]; then
-    say "all $PATCH_COUNT word(s) already carry the patched value"
+elif [ "$PATCH_TOTAL" != "0" ]; then
+    say "all $PATCH_TOTAL patch(es) already carry the patched value"
 fi
 
 PID=""
@@ -373,7 +398,7 @@ if defer_for_unsafe_media "$USB"; then
 fi
 
 run_hooks "$PREPARE_HOOKS" || {
-    say "STOP: a prepare hook failed; no guarded word was written."
+    say "STOP: a prepare hook failed; no guarded patch was written."
     discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 }
@@ -408,7 +433,7 @@ fi
 say "restart requested by:${RESTART_REQUESTED_BY:- unknown}"
 say "stopping rbp"
 if ! stop_rbp "$PID"; then
-    say "STOP: the running rbp did not stop; no guarded word was written."
+    say "STOP: the running rbp did not stop; no guarded patch was written."
     discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
@@ -424,6 +449,23 @@ write_words()
     done
 }
 
+write_files()
+{
+    source_prefix=$1
+    i=0
+    printf '%s\n' "$PATCH_FILE_TABLE" | while read -r OFF LENGTH STOCK PATCHED LABEL; do
+        [ -n "$OFF" ] || continue
+        i=$((i+1))
+        write_guarded_patch_file "$RBP" "$OFF" "$LENGTH" \
+            "$TMP/$source_prefix-file$i"
+    done
+}
+
+write_patches()
+{
+    write_words "$1" && write_files "$1"
+}
+
 verify_words()
 {
     source_prefix=$1
@@ -436,6 +478,29 @@ verify_words()
     done
     failures=$(grep -c . "$TMP/failed" 2>/dev/null); [ -n "$failures" ] || failures=0
     echo "$failures"
+}
+
+verify_files()
+{
+    source_prefix=$1
+    rm -f "$TMP/failed-files"
+    i=0
+    printf '%s\n' "$PATCH_FILE_TABLE" | while read -r OFF LENGTH STOCK PATCHED LABEL; do
+        [ -n "$OFF" ] || continue
+        i=$((i+1))
+        guarded_patch_file_matches "$RBP" "$OFF" "$LENGTH" \
+            "$TMP/$source_prefix-file$i" || \
+            echo "$OFF $LABEL" >> "$TMP/failed-files"
+    done
+    failures=$(grep -c . "$TMP/failed-files" 2>/dev/null); [ -n "$failures" ] || failures=0
+    echo "$failures"
+}
+
+verify_patches()
+{
+    word_failures=$(verify_words "$1")
+    file_failures=$(verify_files "$1")
+    echo $((word_failures + file_failures))
 }
 
 # One generation of the player's own output, kept the way the session log is.
@@ -557,17 +622,32 @@ restore_resources_or_halt()
     sync; exit 1
 }
 
-verify_recovery_words_or_halt()
+verify_recovery_patches_or_halt()
 {
-    recovery_failed=$(verify_words "$1")
+    recovery_failed=$(verify_patches "$1")
     [ "$recovery_failed" = 0 ] && return 0
-    say "STOP: $recovery_failed recovery word(s) differ; player not relaunched"
+    say "STOP: $recovery_failed recovery patch(es) differ; player not relaunched"
     : > "$LOCK/recovery-needed"
     sync; exit 1
 }
 
+# Stopped hooks replace resources after the old player releases them.
+run_hooks "$STOPPED_HOOKS" || {
+    say "STOP: a stopped hook failed; restoring the previous runtime."
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
+    RBP_PRELOAD=$PREVIOUS_PRELOAD
+    echo patched > /tmp/rx3-patch.state
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    wait_for_rbp "$NEW"
+    announce_media
+    say "previous rbp restarted, pid=$NEW"
+    discard_runtime_stage
+    rm -rf "$TMP"; sync; exit 1
+}
+
 if ! commit_runtime_stage; then
     say "FAILED: staged resource commit; restoring the previous generation"
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     restore_resources_or_halt
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     launch_rbp "$RBP_RESTORE_OUTPUT"
@@ -580,14 +660,17 @@ fi
 for ready_file in $RBP_READY_FILES; do rm -f "$ready_file"; done
 for diagnostic_file in $RBP_DIAGNOSTIC_FILES; do rm -f "$diagnostic_file"; done
 
-write_words patched
-FAILED=$(verify_words patched)
+write_patches patched
+FAILED=$(verify_patches patched)
 if [ "$FAILED" != "0" ]; then
-    say "FAILED: $FAILED patch word write(s); restoring previous bytes"
-    [ "$LOGGING" = "1" ] && cat "$TMP/failed" >> "$LOG" 2>&1
-    write_words previous
+    say "FAILED: $FAILED patch write(s); restoring previous bytes"
+    if [ "$LOGGING" = "1" ]; then
+        cat "$TMP/failed" "$TMP/failed-files" >> "$LOG" 2>/dev/null
+    fi
+    write_patches previous
     restore_resources_or_halt
-    verify_recovery_words_or_halt previous
+    verify_recovery_patches_or_halt previous
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
@@ -597,7 +680,7 @@ if [ "$FAILED" != "0" ]; then
     discard_runtime_stage
     rm -rf "$TMP"; sync; exit 1
 fi
-say "write verified: $PATCH_COUNT/$PATCH_COUNT words"
+say "write verified: $PATCH_TOTAL/$PATCH_TOTAL patches"
 
 launch_rbp "$RBP_OUTPUT"
 wait_for_rbp "$NEW"
@@ -608,10 +691,11 @@ if [ ! -d "/proc/$NEW" ]; then
     # back to stock, and our hook comes out of the preload with it.
     say "FAILED: replacement rbp exited; restoring the stock binary"
     append_diagnostics
-    write_words stock
+    write_patches stock
     restore_resources_or_halt
-    verify_recovery_words_or_halt stock
+    verify_recovery_patches_or_halt stock
     RBP_PRELOAD=$(preload_without_runtime "$PREVIOUS_PRELOAD")
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     echo stock > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"
     say "stock rbp restarted, pid=$NEW, preload=${RBP_PRELOAD:-none}"
@@ -637,9 +721,10 @@ if [ -n "$MISSING_READY" ]; then
         : > "$LOCK/recovery-needed"
         sync; exit 1
     fi
-    write_words previous
+    write_patches previous
     restore_resources_or_halt
-    verify_recovery_words_or_halt previous
+    verify_recovery_patches_or_halt previous
+    run_hooks "$ROLLBACK_HOOKS" || say "WARNING: a rollback hook failed"
     RBP_PRELOAD=$PREVIOUS_PRELOAD
     echo patched > /tmp/rx3-patch.state
     launch_rbp "$RBP_RESTORE_OUTPUT"

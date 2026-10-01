@@ -8,6 +8,7 @@
 *.so
 *.o
 *.a
+*.ko
 *.rx3stem
 
 # Private laboratory material
