@@ -2828,7 +2828,7 @@ their hooks and drain admitted native callbacks before releasing trampolines.
 | Search Latin | Transliteration | Hooks, logging |
 | Stems | Files and formats, payloads, per-deck mix, pad and light policy, panel | Input (pads, SLIP LOOP lights, blink clock), deck stream stage, providers, panels, memory, loader, track notifications |
 | Stemwave | Waveform rendering | Hooks, mix observations, waveform copies, track notifications |
-| Theme | Chrome and conversion policy, SHIFT + SHORTCUT, Utility row, waveform palette, pixel arena, watcher | Image variants and fill adapter, key handler, guarded writes, memory |
+| Theme | Chrome, text and conversion policy, SHIFT + SHORTCUT, Utility row, waveform palette, pixel arena, watcher | Image variants and fill adapter, text rendering, key handler, guarded writes, memory |
 | Beat Jump variants, Decoder Sleep, Telnet, Logging variants | Shell lifecycle and guarded patches | None in process |
 
 <a id="doc-runtime-framework--alternatives"></a>
@@ -3102,6 +3102,35 @@ stay for the life of the process. Theme claims the variants with a policy: a
 adapter consults while the light table is shown, never while the core paints
 its own panels. Theme reads records through `native_image` and publishes
 converted pixels with `publish_variant`; it never writes a table.
+
+**Text (API version 20).** `services->text` accepts one process-lifetime
+`rx3_text_policy`. Its `colour(const rx3_text_draw *)` callback receives the
+native glyph colour, its resolved window colour, window format, borrowed
+palette, layer and rectangle, and the native visible-list selection index and
+focus flags.
+It returns the native colour for this draw only. The core copies a changed
+glyph before calling rbp, so the player's model and other modules' text stay
+intact. Observation and pending UI work precede the policy; BROWSE's split
+glyphs and generated captions pass through it as well. `invalidate()` queues
+the active native glyph tree for redraw at a render-pass boundary. Claim and
+release run during serial module lifecycle; the colour callback and
+invalidation run on the render thread and must not allocate, perform I/O or
+wait. They never run on the audio callback.
+
+On 1.19 (`cf309238491e73cdbdc1f08a09f7a3177e079068`),
+`ui_ListBrowse_SetText` at `0x00299b9c` and `ui_Utility_SetText` at
+`0x002952e8` call `ui_com_SetListDispText` at `0x001940fc`. That routine
+assigns glyph colour at offset `0x28` from `ALL_COLOR_LIST_TEXT` at
+`0x00514be8`. `NS_PALRender_DrawText` at `0x001d23e4` resolves the window
+format and passes that colour to `DS_GR_SetWindowColor` at `0x001a0680`
+before `DS_GR_DrawWString`. For paletted windows the setter resolves the low
+byte through the window palette. The theme policy remaps only neutral list
+style zero, outside the native selected visible row. It leaves semantic
+colours and other screens untouched. This service and the theme's text policy
+have emulator and host-test evidence; they have not yet run on hardware. The
+native selection index remains zero while focus is on the BROWSE sidebar.
+The list's `0x10` focus flag controls whether that row keeps its white ink;
+without focus, it takes the same dark ink as the other light rows.
 
 **Memory.** `services->memory` is one ledger for stems, sample banks and the
 theme arena. A module reserves before it allocates, settles once the pages are

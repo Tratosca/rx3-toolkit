@@ -1161,6 +1161,7 @@ static void theme_run_pending_toggle(void) {
     assert(!drawing);
     if(pending) { light_state=!light_state; pending=0; switches++; }
 }
+static void theme_refresh_text_for_view(void) {}
 ''' + function(core, "run_pending_ui") + r'''
 static void native_render(void *manager) {
     assert(manager==(void *)123);

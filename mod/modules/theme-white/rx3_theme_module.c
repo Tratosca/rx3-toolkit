@@ -58,7 +58,7 @@ static int theme_start(const struct rx3_services *services)
 {
     framework = services;
     if (!services->images || !services->images->claim_variants || !services->input ||
-        !services->panels || !services->memory)
+        !services->panels || !services->memory || !services->text)
         return 0;
     const char *theme = getenv("RX3_THEME");
     theme_enabled = theme && theme[0] != '\0';

@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- Light theme: BROWSE lists and both UTILITY pages now show dark text on the light background, and the selected blue row keeps its white text ([#44](https://github.com/Tratosca/rx3-toolkit/issues/44)). One case remains: while TRACK is still selected in the left column, the first track of the list stays white. Checked in the emulator; not yet run on hardware.
+
 - With logging on, the session log now says whether the deck's audio output is running after the mod restarts the player, and lists the audio state when it is not. This is the first step on decks that load tracks but stay silent on PLAY after the restart ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Not yet run on hardware.
 
 - Add optional **Heard key** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)): with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. KEY shifts add up, and Key Sync, the KEY tab and the KEY MATCH colours in BROWSE follow the heard key. Checked in the emulator (loads, screen unchanged at 0%); the tempo fader response is not yet run on hardware.

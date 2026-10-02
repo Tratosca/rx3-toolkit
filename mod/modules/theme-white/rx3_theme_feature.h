@@ -42,6 +42,16 @@ static unsigned int theme_fill_channel(unsigned int fill, unsigned int shift)
 }
 
 #include "rx3_theme_pixels.h"
+#include "rx3_theme_text.h"
+
+static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
+{
+    unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
+    return theme_text_colour(theme_light_active(), view,
+                             draw->native_colour, draw->box[0], draw->box[1],
+                             draw->selection_index, draw->list_flags);
+}
+static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
 
 /* Whether this fill colour is chrome rather than a decision.
  *
@@ -103,6 +113,7 @@ static uint8_t theme_shortcut_swallowed;
  */
 static volatile int theme_toggle_pending;
 static unsigned int theme_refresh_pending;
+static int theme_last_text_view = -1;
 /* The light theme can start armed rather than active. The player paints its
    own first frame stock, and the display is taken over only once it has:
    switching during that first paint is what leaves half the chrome in one
@@ -159,6 +170,7 @@ static void theme_run_pending_toggle(void)
         __sync_bool_compare_and_swap(&theme_toggle_pending, request, 3)) {
         int light = !theme_light_active();
         framework->images->select_variant(light);
+        framework->text->invalidate();
         theme_waveform_apply(light);
         if (request == 2) {
             theme_refresh_pending = 0;
@@ -211,12 +223,22 @@ static unsigned int theme_refresh_header(void)
         ((void *(*)(void *))vtable[THEME_CONTROL_CHILDREN_SLOT])(header));
 }
 
+static void theme_refresh_text_for_view(void)
+{
+    int view = ((int (*)(void))0x001126d0u)();
+    if (theme_light_active() && view != theme_last_text_view &&
+        (view == 3 || view == 7))
+        framework->text->invalidate();
+    theme_last_text_view = view;
+}
+
 static void hooked_theme_render_pass(void *manager)
 {
     if (theme_render_active) { original_theme_render_pass(manager); return; }
     theme_render_active = 1;
     int previous_theme = theme_light_active();
     theme_run_pending_toggle();
+    theme_refresh_text_for_view();
     int repaint = theme_run_conversions() || previous_theme != theme_light_active();
     if (repaint) ((int (*)(void))THEME_DIRTY_WINDOWS)();
     original_theme_render_pass(manager);
@@ -341,6 +363,8 @@ static int theme_feature_install(void)
     theme_render_pass_installed = 1;
     if (!framework->images->claim_variants(&theme_enabled, &theme_policy))
         return 0;
+    if (!framework->text || !framework->text->claim(&theme_enabled, &theme_text_policy))
+        return 0;
     /* The fill substitution is the theme; the key only turns it on. So a key
        that cannot be watched leaves a working feature with no switch, which is
        worth saying and is not worth refusing the feature over. */
@@ -363,6 +387,7 @@ static void theme_feature_remove(void)
     theme_refresh_pending = 0;
     int was_light = theme_light_active();
     framework->images->release_variants(&theme_enabled);
+    if (framework->text) framework->text->release(&theme_enabled);
     if (was_light)
         theme_waveform_apply(0);
     framework->input->unregister_owner(&theme_enabled);

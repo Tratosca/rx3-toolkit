@@ -77,6 +77,7 @@
 #include "services/rx3_panels.h"
 #include "services/rx3_images.h"
 #include "services/rx3_browse.h"
+#include "services/rx3_text.h"
 #include "services/rx3_input.h"
 #include "services/rx3_audio.h"
 
@@ -216,6 +217,10 @@ static struct installed_hook beatfx_xpad_ctor_hook;
 static struct installed_hook audio_start_hook;
 static struct installed_hook set_beatfx_hook;
 static draw_text_fn original_draw_text;
+static void draw_text_with_policy(void *render, void *glyph)
+{
+    rx3_text_draw_native(render, glyph, original_draw_text);
+}
 static draw_image_fn original_draw_image;
 static image_info_fn original_image_info;
 static solve_touch_fn original_solve_touch;
@@ -799,7 +804,7 @@ static void draw_message_header(void *render,const void *model)
         memcpy(text+0x34,&pointer,4);
         unsigned n=0;while(n<95 && message_display_text[n])n++;
         text[0x38]=(uint8_t)n;
-        original_draw_text(render,text);
+        draw_text_with_policy(render,text);
     }
     message_display_dirty=0;
 }
@@ -1116,7 +1121,7 @@ static void hooked_draw_image(void *render, void *image)
     if (image_id != 0x15c9u && image_id != 0x15cau) {
         if (rx3_browse_hide_image(image)) return;
         original_draw_image(render, image);
-        rx3_browse_caption(render,image,original_draw_text);
+        rx3_browse_caption(render,image,draw_text_with_policy);
         return;
     }
     draw_custom_tabs(render, image);
@@ -1149,9 +1154,9 @@ static void hooked_draw_text(void *render, void *text)
     if (!RX3_DIAGNOSTIC_ONLY && overlay_panel &&
         is_performance_pad_subtree(window_layer))
         return;
-    if (!RX3_DIAGNOSTIC_ONLY && rx3_browse_draw(render,text,original_draw_text,original_draw_image))return;
+    if (!RX3_DIAGNOSTIC_ONLY && rx3_browse_draw(render,text,draw_text_with_policy,original_draw_image))return;
     if (!RX3_DIAGNOSTIC_ONLY && title_text_hidden(text)) return;
-    original_draw_text(render, text);
+    draw_text_with_policy(render, text);
     if (RX3_DIAGNOSTIC_ONLY)
         return;
     if (window_layer != HEADER_LAYER)

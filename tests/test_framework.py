@@ -22,7 +22,8 @@ class FrameworkTests(unittest.TestCase):
         if 'core/runtime/rx3_modules.c' in units:
             # The service table names every shared service.
             for unit in ('core/services/rx3_input.c', 'core/services/rx3_audio.c',
-                         'core/services/rx3_memory.c', 'core/services/rx3_loader.c'):
+                         'core/services/rx3_memory.c', 'core/services/rx3_loader.c',
+                         'core/services/rx3_text.c'):
                 if unit not in units:
                     units = [*units, unit]
         compiler = shutil.which('clang') or shutil.which('cc')
