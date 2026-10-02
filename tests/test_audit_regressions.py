@@ -119,6 +119,7 @@ static int *failed;
 static int uninstall_hook(int *hook){return hook!=failed;}
 static void park_native_performance_touches(int x){(void)x;}
 static void rx3_modules_stop(void){}
+static void rx3_utility_remove(void){}
 static void log_line(const char *text){(void)text;}
 ''' + function(core, 'uninstall_performance_hooks') + '\nstatic void reject(void){\n' + rejection + '\n}\n' +
         'int main(void){\n' + setup + '\nfailed=&load_hook;reject();\n' + verify + '\n' + setup +

@@ -405,15 +405,17 @@ Lettering is artwork. `build_labels.py` renders one image per character on each 
 
 `EMERGENCY LOOP` is not special. It is one entry in a table of on-screen notices the player raises for itself, alongside `PC FULL`, `OVERCURRENT`, `DATABASE UNFOUND`, `QUANTIZE LIMITED` and dozens more. The mechanism is `ui::CautionManager`, and the binary is not stripped, so all of it is readable.
 
-The entry point takes the text, which is what makes it usable from here:
+The entry point has a text parameter:
 
     ui::Caution::set(bool show, uif::UiObject::Channel deck, unsigned short const *text) const
 
-The player builds 72 `ui::Caution` objects in one static initialiser, each 32 bytes, and keeps a pointer to each in a table. A caution carries a service code as its first field, encoded as the code reads: `A008` is `0xa008`, `B051` is `0xb051`. Its placement is fixed at construction, in four shapes -- `CautionOnTop`, `CautionOnInfo`, `CautionOnBrowse`, and the plain base -- and the info-bar ones carry a life in milliseconds, 500 to 3000.
+That signature is misleading on firmware 1.19. Decompiled `ui::Caution::set` at `0x0032b374` forwards the text only to `BrowseUiIf::SetCautionID_StatusforBrowseMode` for its special status caution. The native status and Browse painters (`0x00195084`, `0x00194640`) select text by ID through `NS_GetString`, not from that argument. On this renderer, the initial `uif::MsgManager::refMainMsgManager` route reaches a `__cxa_throw` in `0x0000fba8`. Calling `set` is unsafe here. `ui::Caution::getText` at `0x002bb794` can read the object's stored pointer at `+0x1c`, but changing that pointer would not make the ID-based painter use it.
 
-**Twenty of the seventy-two are constructed and then never referenced anywhere else in the binary**, so the player never raises them. Counting the literal pools alone is not enough to establish that: four more are reached through `movw`/`movt` pairs, and `B046` and `B059` look unused until those are counted too. The mod borrows `B051`, an info-bar notice with a three second life and no other reader.
+The player builds 72 `ui::Caution` objects in one static initialiser, each 32 bytes, and keeps a pointer to each in a table. A caution carries a service code as its first field, encoded as the code reads: `A008` is `0xa008`, `B051` is `0xb051`. Its placement is fixed at construction, in four shapes -- `CautionOnTop`, `CautionOnInfo`, `CautionOnBrowse`, and the plain base -- and the info-bar ones carry a life in milliseconds, 500 to 3000. The `B003` object associated with `EMERGENCY LOOP` is constructed as a base caution with info placement in `ui::CautionObj::_GLOBAL__sub_I_unsetCautions` at `0x00018e6c`.
 
-Borrowing rather than building is deliberate. Constructing a caution means modelling a C++ object with bitfields and multiple inheritance, and a wrong field is a frozen player. That is not hypothetical here: a build predating this repository had caution workers of its own, and the only record of them is the line that disabled them, in `tools/rx3_runtime/patch_r38_ui.py`, kept in the tag `snapshot/before-cleanup` -- "invoking that path froze rbp". The cause was never written down.
+**Twenty of the seventy-two are constructed and then never referenced anywhere else in the binary**, so the player never raises them. Counting the literal pools alone is not enough to establish that: four more are reached through `movw`/`movt` pairs, and `B046` and `B059` look unused until those are counted too. An earlier implementation borrowed `B051`, an info-bar notice with a three second life and no other reader.
+
+The earlier B051 borrowing was deliberate. Constructing a caution means modelling a C++ object with bitfields and multiple inheritance, and a wrong field is a frozen player. That is not hypothetical here: a build predating this repository had caution workers of its own, and the only record of them is the line that disabled them, in `tools/rx3_runtime/patch_r38_ui.py`, kept in the tag `snapshot/before-cleanup` -- "invoking that path froze rbp". The cause was never written down. The current boot notice uses the renderer-owned native top strip instead of this caution path.
 
 ### The player's language
 

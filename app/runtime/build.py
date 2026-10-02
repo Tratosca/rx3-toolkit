@@ -736,6 +736,22 @@ def build_runtime(
         modules = staging / "modules"
         modules.mkdir(parents=True)
         shutil.copy2(root / "mod/autoexec.sh", staging / "autoexec.sh")
+        # A checkout has an exact tag or a reproducible tag-distance identity.
+        # Release bundles without .git carry the version stamped by CI.
+        version_file = root / "mod/toolkit-version"
+        if (root / ".git").exists():
+            described = subprocess.run(
+                ["git", "-C", str(root), "describe", "--tags", "--always", "--dirty"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            toolkit_version = described.removeprefix("v")
+        else:
+            if not version_file.is_file():
+                raise ValueError("this Toolkit bundle has no stamped version")
+            toolkit_version = version_file.read_text(encoding="ascii").strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]{0,47}", toolkit_version):
+            raise ValueError("invalid toolkit version for the RX3 display")
+        (staging / "toolkit-version").write_text(toolkit_version + "\n", encoding="ascii")
         library = staging / "lib"
         library.mkdir()
         shutil.copy2(root / "mod/lib/module-api.sh", library / "module-api.sh")

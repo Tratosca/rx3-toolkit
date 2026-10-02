@@ -16,9 +16,8 @@
  * The u"" literals compile to exactly that, so the text stays readable here
  * rather than becoming a wall of code points.
  *
- * On length: the player's own notices in this position run to about twenty-two
- * characters -- "HOT CUE - NOW LOADING..." is one of them -- so these are
- * written to that. What the player does with a longer one has not been tried.
+ * The active flag and module noun stay short; the supplied version and count
+ * are bounded by the notice queue before they reach the native text renderer.
  *
  * On the translations: English and French are the author's. The rest are
  * written with care and none has been read by a native speaker of that
@@ -31,32 +30,29 @@
 
 #define RX3_TEXT(s) ((const uint16_t *)u##s)
 
-/* Shown only after the native core starts drawing on the normal load path.
-   The notice identifies the mod while keeping the USB warning. Its absence
-   alone cannot prove safe mode: rendering or notice delivery may fail. */
-static const uint16_t *const message_loading_table[RX3_LANGUAGE_COUNT] = {
-    /*  1 ENGLISH             */ RX3_TEXT("MODS LOADING - KEEP USB"),
-    /*  2 FRANCAIS            */ RX3_TEXT("MODS EN COURS - USB EN PLACE"),
-    /*  3 DEUTSCH             */ RX3_TEXT("MODS LADEN - USB BELASSEN"),
-    /*  4 ITALIANO            */ RX3_TEXT("CARICO MOD - TENERE USB"),
-    /*  5 NEDERLANDS          */ RX3_TEXT("MODS LADEN - USB LATEN"),
-    /*  6 ESPANOL             */ RX3_TEXT("CARGANDO MODS - DEJAR USB"),
-    /*  7 Russian             */ RX3_TEXT("ЗАГРУЗКА МОДОВ - НЕ ТРОГАТЬ USB"),
-    /*  8 Korean              */ RX3_TEXT("모드 로딩 중 - USB 유지"),
-    /*  9 Chinese simplified  */ RX3_TEXT("正在加载模组 - 请勿拔出USB"),
-    /* 10 Chinese traditional */ RX3_TEXT("正在載入模組 - 請勿拔出USB"),
-    /* 11 Japanese            */ RX3_TEXT("MOD読込中 - USBを抜かない"),
-    /* 12 PORTUGUES           */ RX3_TEXT("A CARREGAR MODS - MANTER USB"),
-    /* 13 SVENSKA             */ RX3_TEXT("MODDAR LADDAS - BEHÅLL USB"),
-    /* 14 CESTINA             */ RX3_TEXT("NAČÍTÁNÍ MODŮ - NECHAT USB"),
-    /* 15 MAGYAR              */ RX3_TEXT("MODOK TÖLTÉSE - USB MARAD"),
-    /* 16 DANSK               */ RX3_TEXT("MODS INDLÆSES - BEHOLD USB"),
-    /* 17 Greek               */ RX3_TEXT("ΦΟΡΤΩΣΗ MOD - ΚΡΑΤΗΣΤΕ USB"),
-    /* 18 TURKCE              */ RX3_TEXT("MODLAR YÜKLENİYOR - USB KALSIN")
+/* The version and count are supplied by the image. The core only formats this
+   generic summary; the labels follow the player's language order above. */
+static const uint16_t *const message_mod_count_table[RX3_LANGUAGE_COUNT] = {
+    RX3_TEXT("MODS"), RX3_TEXT("MODS"), RX3_TEXT("MODS"),
+    RX3_TEXT("MOD"), RX3_TEXT("MODS"), RX3_TEXT("MODS"),
+    RX3_TEXT("МОДОВ"), RX3_TEXT("모드"), RX3_TEXT("模组"),
+    RX3_TEXT("模組"), RX3_TEXT("MOD"), RX3_TEXT("MODS"),
+    RX3_TEXT("MODDAR"), RX3_TEXT("MODŮ"), RX3_TEXT("MOD"),
+    RX3_TEXT("MODS"), RX3_TEXT("MOD"), RX3_TEXT("MOD")
 };
-
-static const struct rx3_message message_drive_loading = {
-    message_loading_table, RX3_LANGUAGE_COUNT
+static const struct rx3_message message_mod_count = {
+    message_mod_count_table, RX3_LANGUAGE_COUNT
+};
+static const uint16_t *const message_active_table[RX3_LANGUAGE_COUNT] = {
+    RX3_TEXT("ON"), RX3_TEXT("ACTIF"), RX3_TEXT("AKTIV"),
+    RX3_TEXT("ATTIVO"), RX3_TEXT("ACTIEF"), RX3_TEXT("ACTIVO"),
+    RX3_TEXT("АКТИВЕН"), RX3_TEXT("활성"), RX3_TEXT("已启用"),
+    RX3_TEXT("已啟用"), RX3_TEXT("有効"), RX3_TEXT("ATIVO"),
+    RX3_TEXT("AKTIV"), RX3_TEXT("AKTIVNÍ"), RX3_TEXT("AKTÍV"),
+    RX3_TEXT("AKTIV"), RX3_TEXT("ΕΝΕΡΓΟ"), RX3_TEXT("AKTİF")
+};
+static const struct rx3_message message_active = {
+    message_active_table, RX3_LANGUAGE_COUNT
 };
 
 #endif /* RX3_MESSAGES_H */

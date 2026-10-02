@@ -1284,6 +1284,7 @@ static void *watcher(void *unused) {
     stopped=1; return 0;
 }
 static void rx3_modules_stop(void) {}
+static void rx3_utility_remove(void) {}
 static void uninstall_performance_hooks(void) { assert(stopped && !state_thread_started); removed=1; }
 ''' + finalizer + r'''
 int main(void) {

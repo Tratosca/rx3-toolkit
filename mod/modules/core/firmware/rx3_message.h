@@ -10,7 +10,8 @@
  * named ui::Caution::set throws if it is called there and ignores custom text.
  * Notices are bounded renderer-owned text, painted in the native header. */
 static uint16_t message_display_text[96];
-static unsigned message_display_active,message_display_dirty;
+static unsigned message_display_active,message_refresh_pending;
+static void (*rx3_message_refresh)(void);
 
 /* gUtilityLanguageNo: one byte, and it counts from one. The Utility row reads
    it and subtracts one before indexing, which is the off-by-one that would
@@ -119,27 +120,70 @@ static void rx3_message_render(unsigned int deck, const uint16_t *text, int show
     if(n && message_display_text[n-1]>=0xd800 && message_display_text[n-1]<=0xdbff)n--;
     message_display_text[n]=0;
     message_display_active=show && n;
-    message_display_dirty=1;
+    message_refresh_pending=1;
     if(show)log_line("messages: native header notice ready");
-}
-static enum rx3_notice_result rx3_message_show(
-    unsigned int deck, const struct rx3_message *message)
-{
-    struct rx3_notice request = {
-        message, 0u, deck, RX3_NOTICE_WARNING, RX3_MESSAGE_HOLD_US / 1000u,
-        rx3_message_text(message)
-    };
-    return rx3_notices.post(&request);
+    else log_line("messages: native header notice expired");
 }
 static void rx3_message_run_pending(void)
 {
     int enabled = __atomic_load_n(&messages_enabled, __ATOMIC_SEQ_CST) &&
         rx3_message_call_site_ready();
     rx3_notice_pump(monotonic_enough_us() / 1000u, enabled, rx3_message_render);
+    if (message_refresh_pending && rx3_message_refresh)
+        rx3_message_refresh();
 }
 
 /* The prose lives next door, so a translation can be corrected without reading
    a byte guard or a thread rule. */
 #include "../ui/rx3_messages.h"
+
+static uint16_t startup_summary[RX3_NOTICE_TEXT_UNITS];
+static int summary_append_utf16(unsigned int *used, const uint16_t *source)
+{
+    if (!source) return 0;
+    while (*source) {
+        if (*used + 1u >= RX3_NOTICE_TEXT_UNITS) return 0;
+        startup_summary[(*used)++] = *source++;
+    }
+    startup_summary[*used] = 0;
+    return 1;
+}
+static int summary_append_ascii(unsigned int *used, const char *source)
+{
+    if (!source) return 0;
+    while (*source) {
+        unsigned char character = (unsigned char)*source++;
+        if (character < 0x20u || character > 0x7eu ||
+            *used + 1u >= RX3_NOTICE_TEXT_UNITS) return 0;
+        startup_summary[(*used)++] = character;
+    }
+    startup_summary[*used] = 0;
+    return 1;
+}
+static enum rx3_notice_result rx3_message_show_startup(void)
+{
+    const char *version = getenv("RX3_TOOLKIT_VERSION");
+    const char *count = getenv("RX3_ACTIVE_MODULES");
+    if (!count || !*count) return RX3_NOTICE_INVALID;
+    for (const char *p = count; *p; p++)
+        if (*p < '0' || *p > '9') return RX3_NOTICE_INVALID;
+    unsigned int used = 0;
+    /* An image without a version still says it is running. */
+    if (!summary_append_ascii(&used, "RX3 TOOLKIT ") ||
+        !summary_append_utf16(&used, rx3_message_text(&message_active)) ||
+        !summary_append_ascii(&used, " ") ||
+        (version && *version && (!summary_append_ascii(&used, version) ||
+                                 !summary_append_ascii(&used, " "))) ||
+        !summary_append_ascii(&used, "- ") ||
+        !summary_append_utf16(&used, rx3_message_text(&message_mod_count)) ||
+        !summary_append_ascii(&used, ": ") ||
+        !summary_append_ascii(&used, count))
+        return RX3_NOTICE_INVALID;
+    struct rx3_notice request = {
+        &message_active, 0u, 0u, RX3_NOTICE_INFO,
+        RX3_MESSAGE_HOLD_US / 1000u, startup_summary
+    };
+    return rx3_notices.post(&request);
+}
 
 #endif /* RX3_MESSAGE_H */

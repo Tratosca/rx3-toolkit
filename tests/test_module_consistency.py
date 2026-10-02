@@ -776,43 +776,37 @@ class MessageTranslationTests(unittest.TestCase):
         source = (
             modules_by_id()["core"].directory / "ui/rx3_messages.h"
         ).read_text(encoding="utf-8")
-        return source, re.findall(r'RX3_TEXT\("((?:[^"\\]|\\.)*)"\)', source)
+        tables = {}
+        for name in ("message_active_table", "message_mod_count_table"):
+            match = re.search(rf"{name}\[RX3_LANGUAGE_COUNT\] = \{{(.*?)\}};", source, re.S)
+            self.assertIsNotNone(match, f"{name} is missing")
+            tables[name] = re.findall(r'RX3_TEXT\("((?:[^"\\]|\\.)*)"\)', match.group(1))
+        return source, tables
 
     def test_every_language_has_its_own_line(self):
-        source, entries = self.table()
+        source, tables = self.table()
         found = re.search(r"#define RX3_LANGUAGE_COUNT (\d+)u", (
             modules_by_id()["core"].directory / "firmware/rx3_message.h"
         ).read_text(encoding="utf-8"))
         self.assertIsNotNone(found, "the language count is gone")
         languages = int(found.group(1))
-        self.assertEqual(
-            len(entries), languages,
-            f"{languages} languages are offered and {len(entries)} are written",
-        )
-        for index, text in enumerate(entries, start=1):
-            with self.subTest(language=index):
-                self.assertTrue(text.strip(), "an empty line shows nothing at all")
+        for name, entries in tables.items():
+            self.assertEqual(len(entries), languages, f"{name} needs {languages} languages")
+            for index, text in enumerate(entries, start=1):
+                with self.subTest(table=name, language=index):
+                    self.assertTrue(text.strip(), "an empty line shows nothing")
 
     def test_no_language_quietly_repeats_another(self):
-        """Two identical lines means one of them was never translated."""
-        _, entries = self.table()
-        seen = {}
-        for index, text in enumerate(entries, start=1):
-            if text in seen:
-                self.fail(
-                    f"language {index} repeats language {seen[text]} word for "
-                    f"word: {text!r}. Leave it out to fall back to English "
-                    f"rather than copying a language nobody set."
-                )
-            seen[text] = index
+        """Shared short terms are valid, but EN and FR must be explicit."""
+        _, tables = self.table()
+        self.assertEqual(tables["message_active_table"][:2], ["ON", "ACTIF"])
+        self.assertEqual(tables["message_mod_count_table"][:2], ["MODS", "MODS"])
 
     def test_the_notice_stays_about_as_short_as_the_player_s_own(self):
         """The player's own notices in this position run to about twenty-two
         characters. What it does with a longer one has not been tried."""
-        _, entries = self.table()
-        for index, text in enumerate(entries, start=1):
-            with self.subTest(language=index):
-                self.assertLessEqual(
-                    len(text), 34,
-                    f"{text!r} is longer than anything the player shows there",
-                )
+        _, tables = self.table()
+        for name, entries in tables.items():
+            for index, text in enumerate(entries, start=1):
+                with self.subTest(table=name, language=index):
+                    self.assertLessEqual(len(text), 16)

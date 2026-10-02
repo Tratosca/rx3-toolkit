@@ -49,6 +49,37 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_summary_exports_selected_module_count_and_image_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            version = Path(directory) / "toolkit-version"
+            version.write_text("0.5.2-90-gb730f95\n", encoding="ascii")
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin compatibility compatibility || exit 10\n'
+                'module_begin core core || exit 11\n'
+                'module_begin stems stems || exit 12\n'
+                'module_begin logging logging || exit 13\n'
+                'DISABLED_MODULES=" stems"\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                '[ "$RX3_ACTIVE_MODULES" = 1 ] || exit 15\n'
+                '[ "$RX3_TOOLKIT_VERSION" = 0.5.2-90-gb730f95 ] || exit 16\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_image_without_a_version_still_loads_and_exports_the_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin core core || exit 10\n'
+                'module_begin logging logging || exit 11\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 12\n'
+                '[ "$RX3_ACTIVE_MODULES" = 1 ] || exit 13\n'
+                '[ -z "$RX3_TOOLKIT_VERSION" ] || exit 14\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_removed_or_switched_off_module_requests_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             switch = Path(directory) / "stems.off"
@@ -57,7 +88,10 @@ class ModuleApiTests(unittest.TestCase):
                 'module_begin core core || exit 10\n'
                 'module_begin stems stems || exit 11\n'
                 'running="core stems|"\n'
-                'rbp_environment_value() { printf %s "$running"; }\n'
+                # The running player already carries this summary.
+                'rbp_environment_value() { case $1 in\n'
+                '  RX3_RUNTIME_MODULE_SET) printf %s "$running" ;;\n'
+                '  RX3_ACTIVE_MODULES) printf 1 ;; esac; }\n'
                 'reconcile_module_set\n'
                 '[ "$NEED_RBP_RESTART" = 0 ] || exit 12\n'
                 f'module_switch_path() {{ printf %s {shlex.quote(str(switch))}; }}\n'

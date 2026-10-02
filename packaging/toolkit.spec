@@ -4,6 +4,7 @@
 import json
 import os
 import pathlib
+import subprocess
 import sys
 
 
@@ -25,6 +26,17 @@ resources = [
     (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
     (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
+# The frozen application has no Git directory. Stamp the checkout identity into
+# its runtime resources at packaging time, including the tag distance on a
+# development build. A release tag produces the release number itself.
+version = subprocess.run(
+    ["git", "-C", str(repository), "describe", "--tags", "--always", "--dirty"],
+    capture_output=True, text=True, check=True,
+).stdout.strip().removeprefix("v")
+version_file = repository / "build/toolkit-version"
+version_file.parent.mkdir(parents=True, exist_ok=True)
+version_file.write_text(version + "\n", encoding="ascii")
+resources.append((str(version_file), "resources/mod"))
 for compatibility in (repository / "mod").glob("*/compatibility.sh"):
     destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
     resources.append((str(compatibility), destination))

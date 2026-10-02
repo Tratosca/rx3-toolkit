@@ -116,6 +116,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # The packaged app stamps `git describe`; a shallow clone has no tags.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5

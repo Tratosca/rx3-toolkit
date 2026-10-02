@@ -148,6 +148,9 @@ static volatile unsigned int overlay_panel;
 static volatile unsigned int native_beatfx_selected;
 static volatile unsigned long draw_calls;
 static volatile unsigned long main_window_draws;
+static volatile unsigned long message_header_paints;
+static uint16_t message_small_font_id;
+static unsigned message_small_font_ready;
 static volatile unsigned long image_draw_calls;
 static volatile unsigned long custom_tab_draws;
 static volatile unsigned long custom_pad_draws;
@@ -178,6 +181,7 @@ static volatile uint8_t performance_window;
 static volatile unsigned int performance_window_ready;
 static volatile unsigned int text_template_ready;
 static uint8_t text_template[0x54];
+static unsigned int message_header_refreshing;
 /* 0 none, 1 a plausible label, 2 a label that also carries a fill. */
 static volatile unsigned int pad_text_template_ready;
 static uint8_t pad_text_template[0x54];
@@ -369,6 +373,8 @@ static unsigned int now_ms(void)
 }
 
 static void refresh_performance_ui(void);
+static void *performance_native_layer(void *glyph);
+static void refresh_message_header(void);
 static int read_exactly(int fd, void *destination, size_t length);
 
 static uint8_t tab_image_pixels[TAB_IMAGE_COUNT][TAB_IMAGE_BYTES];
@@ -393,6 +399,7 @@ static unsigned int performance_refresh_reported;
 
 #include "ui/rx3_pad_atlas.h"
 #include "firmware/rx3_message.h"
+#include "firmware/rx3_utility.h"
 
 static int load_tab_pixels(void)
 {
@@ -606,6 +613,7 @@ static void *watch_patch_state(void *unused)
         if (ticks == 100u) {
             log_number("probe text draw calls = ", draw_calls);
             log_number("probe main-window draws = ", main_window_draws);
+            log_number("probe header notice paints = ", message_header_paints);
             log_number("probe image draw calls = ", image_draw_calls);
             log_number("probe custom tab draws = ", custom_tab_draws);
             log_number("probe custom PAD draws = ", custom_pad_draws);
@@ -790,23 +798,99 @@ static void refresh_initial_performance_tabs_if_ready(void)
     }
 }
 
-/* Temporarily use the overview strip inside the native header window.
- * Use its own glyph model so UTF-16, font, clipping and theme remain native. */
+/* The top notice window is an offscreen child. Its own flip is inert:
+   only the root graphics window is composited. All calls stay in a draw hook. */
+#define NOTICE_X1 645
+#define NOTICE_X2 1074
+#define NOTICE_Y1 3
+#define NOTICE_Y2 49
+#define TOP_NOTICE_LAYER 0x1501u
+
+static int message_top_surface_ready(void)
+{
+    static const uint32_t flip_guard[2]={0xe24dd010u,0xe92d4070u};
+    const uint8_t *top=((void **)0x05a15f68u)[0x115u];
+    const uint8_t *root=((void **)0x05a15f68u)[0x100u];
+    uint16_t width=0,height=0;
+    if (memcmp((const void *)0x001a0948u,flip_guard,8) || !top || !root)
+        return 0;
+    memcpy(&width,top,2);memcpy(&height,top+2,2);
+    return width>=1075u && height>=50u;
+}
+
+static void flip_message_header(void)
+{
+    void *root=((void **)0x05a15f68u)[0x100u];
+    if (root)
+        ((int (*)(void *,int,int,int,int,unsigned))0x001a0948u)(
+            root,NOTICE_X1,NOTICE_Y1,NOTICE_X2+1,NOTICE_Y2+1,0x4000u);
+}
+
+static void paint_message_background(void *render,const void *model)
+{
+    uint8_t top_model[0x54];
+    memcpy(top_model,model,sizeof(top_model));
+    set_u16(top_model,0x10,TOP_NOTICE_LAYER);
+    int origin_x=0,origin_y=0;
+    ((void (*)(int *,int *))0x001d46f0u)(&origin_x,&origin_y);
+    uint32_t ground=rx3_image_is_light()?0x00ffffffu:0u;
+    draw_native_box_local(render,model,top_model,1,
+                          NOTICE_X1-origin_x,NOTICE_Y1-origin_y,
+                          NOTICE_X2-origin_x,NOTICE_Y2-origin_y,
+                          0,0,ground);
+}
+
 static void draw_message_header(void *render,const void *model)
 {
-    if(!message_display_active && !message_display_dirty)return;
-    uint32_t clone[21];memcpy(clone,model,sizeof(clone));
-    uint8_t *text=(void *)clone;uint16_t box[4]={194,8,630,41};
-    memcpy(text+0x18,box,sizeof(box));
-    draw_native_box_local(render,model,model,1,194,8,630,41,0,0,0);
-    if(message_display_active) {
-        uint32_t pointer=(uint32_t)(unsigned long)message_display_text;
-        memcpy(text+0x34,&pointer,4);
-        unsigned n=0;while(n<95 && message_display_text[n])n++;
-        text[0x38]=(uint8_t)n;
-        draw_text_with_policy(render,text);
+    if (!message_display_active || !message_top_surface_ready())
+        return;
+    paint_message_background(render,model);
+
+    unsigned length=0,split=0;
+    while(length<95u && message_display_text[length]) length++;
+    for(unsigned i=12u;i<length;i++) {
+        if(message_display_text[i]>='0' && message_display_text[i]<='9') {
+            split=i;
+            break;
+        }
     }
-    message_display_dirty=0;
+    if (!split) split=length;
+    while(split>0u && message_display_text[split-1u]==' ') split--;
+
+    uint16_t title[96];
+    for(unsigned i=0;i<split;i++) title[i]=message_display_text[i];
+    title[split]=0;
+
+    uint8_t top_text[0x54];
+    memcpy(top_text,model,sizeof(top_text));
+    set_u16(top_text,0x10,TOP_NOTICE_LAYER);
+    set_u16(top_text,0x48,message_small_font_ready?
+            message_small_font_id:*(const uint16_t *)((const uint8_t *)model+0x48u));
+    set_u32(top_text,0x28,pad_native_fill_colour(
+            rx3_image_is_light()?0x00000000u:0x00ffffffu));
+    set_u32(top_text,0x40,0u);
+    top_text[0x3c]=0u;
+    int origin_x=0,origin_y=0;
+    ((void (*)(int *,int *))0x001d46f0u)(&origin_x,&origin_y);
+    set_u16(top_text,0x18,NOTICE_X1+4-origin_x);
+    set_u16(top_text,0x1a,NOTICE_Y1-origin_y);
+    set_u16(top_text,0x1c,NOTICE_X2-origin_x);
+    set_u16(top_text,0x1e,NOTICE_Y1+22-origin_y);
+    set_u32(top_text,0x34,(uint32_t)(unsigned long)title);
+    top_text[0x38]=(uint8_t)split;
+    original_draw_text(render,top_text);
+
+    unsigned second=split;
+    while(second<length && message_display_text[second]==' ') second++;
+    if(second<length) {
+        set_u16(top_text,0x1a,NOTICE_Y1+22-origin_y);
+        set_u16(top_text,0x1e,NOTICE_Y2-origin_y);
+        set_u32(top_text,0x34,(uint32_t)(unsigned long)(message_display_text+second));
+        top_text[0x38]=(uint8_t)(length-second);
+        original_draw_text(render,top_text);
+    }
+    flip_message_header();
+    message_header_paints++;
 }
 
 static void show_startup_message_when_ready(void)
@@ -814,7 +898,7 @@ static void show_startup_message_when_ready(void)
     if (startup_message_queued || !rx3_message_allowed() ||
         !rx3_message_call_site_ready())
         return;
-    if (rx3_message_show(0u, &message_drive_loading) == RX3_NOTICE_OK) {
+    if (rx3_message_show_startup() == RX3_NOTICE_OK) {
         startup_message_queued = 1u;
         log_line("messages: startup notice queued");
         rx3_message_run_pending();
@@ -1122,6 +1206,14 @@ static void hooked_draw_image(void *render, void *image)
         if (rx3_browse_hide_image(image)) return;
         original_draw_image(render, image);
         rx3_browse_caption(render,image,draw_text_with_policy);
+        if (message_display_active && text_template_ready) {
+            static uint64_t next_message_draw_us;
+            uint64_t now=monotonic_enough_us();
+            if (now>=next_message_draw_us) {
+                next_message_draw_us=now+50000u;
+                draw_message_header(render,text_template);
+            }
+        }
         return;
     }
     draw_custom_tabs(render, image);
@@ -1156,6 +1248,17 @@ static void hooked_draw_text(void *render, void *text)
         return;
     if (!RX3_DIAGNOSTIC_ONLY && rx3_browse_draw(render,text,draw_text_with_policy,original_draw_image))return;
     if (!RX3_DIAGNOSTIC_ONLY && title_text_hidden(text)) return;
+    if (!message_small_font_ready) {
+        uint16_t top=0,bottom=0,font=0;
+        memcpy(&top,(const uint8_t *)text+0x1au,2);
+        memcpy(&bottom,(const uint8_t *)text+0x1eu,2);
+        memcpy(&font,(const uint8_t *)text+0x48u,2);
+        if (bottom>top && bottom-top>=12u && bottom-top<=20u) {
+            message_small_font_id=font;
+            message_small_font_ready=1u;
+            log_number("messages: compact font id = ",font);
+        }
+    }
     draw_text_with_policy(render, text);
     if (RX3_DIAGNOSTIC_ONLY)
         return;
@@ -1239,6 +1342,24 @@ static void *performance_native_layer(void *glyph)
         cursor=parent;
     }
     return glyph;
+}
+
+/* The notice pump only asks the renderer to clear its temporary strip. */
+static void refresh_message_header(void)
+{
+    if (message_header_refreshing || !message_refresh_pending) return;
+    message_header_refreshing=1u;
+    if (!message_display_active && text_template_ready) {
+        if (!message_top_surface_ready()) {
+            message_header_refreshing=0u;
+            return;
+        }
+        paint_message_background(0,text_template);
+        flip_message_header();
+        log_line("messages: top strip cleared");
+    }
+    message_refresh_pending=0u;
+    message_header_refreshing=0u;
 }
 
 static void refresh_performance_ui(void)
@@ -1657,20 +1778,22 @@ __attribute__((constructor)) static void initialize(void)
     }
     rx3_input_bind_mode_keys(leave_performance_panel);
     rx3_panels_bind_refresh(refresh_performance_ui);
+    rx3_message_refresh=refresh_message_header;
     rx3_modules_bind_writer(rx3_write_guarded);
+    rx3_utility_install();
 
     /* Each feature is a module of its own and announces itself through the
        environment its module.sh exports. Modules start first: they register
        rows, images and handlers, and the shared services install their own
        native hooks as clients arrive. */
     unsigned int started = rx3_modules_start();
-    if (rx3_modules_failures()) { rx3_modules_stop(); return; }
+    if (rx3_modules_failures()) { rx3_modules_stop(); rx3_utility_remove(); return; }
     if (!rx3_panel_count() && !rx3_image_contributions() && !rx3_browse_count() &&
         !rx3_titles_enabled()) {
         if (started) {
             publish_ready();
             log_line("RX3 performance hook active");
-        }
+        } else rx3_utility_remove();
         return;
     }
 
@@ -1778,6 +1901,7 @@ __attribute__((constructor)) static void initialize(void)
 reject_performance_hooks:
     log_line("runtime failed: selected modules not ready");
     rx3_modules_stop();
+    rx3_utility_remove();
     uninstall_performance_hooks();
 }
 
@@ -1790,5 +1914,6 @@ __attribute__((destructor)) static void finalize(void)
         state_thread_started = 0;
     }
     rx3_modules_stop();
+    rx3_utility_remove();
     uninstall_performance_hooks();
 }

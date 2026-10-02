@@ -116,10 +116,14 @@ static void rx3_log_configure(void){}
 static void log_line(const char *s){(void)s;}
 static void log_number(const char *s,unsigned long n){(void)s;(void)n;}
 static int rx3_message_allowed(void){return 1;}
+static void rx3_utility_install(void){}
+static void rx3_utility_remove(void){}
 static uint64_t monotonic_enough_us(void){return 1;}
 static void rx3_input_trace_keys(unsigned n){(void)n;}
 static void leave_performance_panel(void){}
 static void refresh_performance_ui(void){}
+static void refresh_message_header(void){}
+static void (*rx3_message_refresh)(void);
 static int rx3_write_guarded(unsigned long a,const void *e,const void *r,unsigned n){(void)a;(void)e;(void)r;(void)n;return 1;}
 static void rx3_input_bind_mode_keys(void (*f)(void)){bound+=f==leave_performance_panel;}
 static void rx3_panels_bind_refresh(void (*f)(void)){bound+=f==refresh_performance_ui;}
@@ -201,6 +205,7 @@ static void join_thread(int t,void *p){(void)t;(void)p;assert(0);}
 #define pthread_join join_thread
 /* Modules release their own resident state from stop(). */
 static void rx3_modules_stop(void){stops++;}
+static void rx3_utility_remove(void){}
 static void uninstall_performance_hooks(void){cleanup++;}
 ''' + code + '''
 int main(void) {

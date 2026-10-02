@@ -437,6 +437,30 @@ reconcile_module_set()
     _rx3_selection="${LOADED_MODULES# }|${DISABLED_MODULES# }"
     RUNNING_HOOK=module-set
     module_export RX3_RUNTIME_MODULE_SET "$_rx3_selection" "Module set" || :
+    _rx3_count=0
+    for _rx3_loaded in $LOADED_MODULES; do
+        case "$_rx3_loaded" in
+            compatibility|core) ;;
+            *)
+                case " $DISABLED_MODULES " in
+                    *" $_rx3_loaded "*) ;;
+                    *) _rx3_count=$((_rx3_count + 1)) ;;
+                esac
+                ;;
+        esac
+    done
+    module_export RX3_ACTIVE_MODULES "$_rx3_count" "Module summary" || :
+    # The version is only shown to the operator: an image without a valid one
+    # still loads, and the boot message leaves the number out.
+    _rx3_version=$(cat "${RX3_ISO_ROOT:-/mnt/iso}/toolkit-version" 2>/dev/null) ||
+        _rx3_version=
+    case "$_rx3_version" in
+        ""|*[!A-Za-z0-9.+-]*)
+            say "toolkit version missing or invalid in this image; boot message without it"
+            return 0
+            ;;
+    esac
+    module_export RX3_TOOLKIT_VERSION "$_rx3_version" "Toolkit version" || :
 }
 
 # Where a module's kill switch lives. One shape for every module, so an operator

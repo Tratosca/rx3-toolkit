@@ -53,6 +53,7 @@
     "ui/rx3_pad_widgets.h",
     "ui/rx3_messages.h",
     "firmware/rx3_message.h",
+    "firmware/rx3_utility.h",
     "services/rx3_hooks.c",
     "services/rx3_hooks.h",
     "services/rx3_log.c",
