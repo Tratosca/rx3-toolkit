@@ -63,6 +63,26 @@ class RestartAudioCheckTests(unittest.TestCase):
     def test_running_state_with_a_frozen_pointer_is_a_failure(self):
         self.assertIn("FAILED:", self.run_check(moving=False))
 
+    def test_only_the_master_counts_when_the_players_card_is_present(self):
+        with tempfile.TemporaryDirectory() as directory:
+            proc = Path(directory) / "proc"
+            (proc / "4242/fd").mkdir(parents=True)
+            (proc / "4242/exe").touch()
+            (proc / "4242/stat").write_text("4242 (rbp) S 1 1 0\n")
+            card = proc / "asound/card1"
+            for pcm, state in (("pcm0p", "PREPARED"), ("pcm1p", "RUNNING")):
+                (card / pcm / "sub0").mkdir(parents=True)
+                (card / pcm / "sub0/status").write_text(
+                    STATUS.format(state=state, pointer=100))
+            (card / "id").write_text("cs4344audiorev8\n")
+            headphones = card / "pcm1p/sub0/status"
+            log = Path(directory) / "log.txt"
+            advance = f'printf "{STATUS}" > "{headphones}"'.format(state="RUNNING", pointer=200)
+            body = (f'PROC_ROOT="{proc}"\nNEW=4242\nLOGGING=1\nLOG="{log}"\n'
+                    f"usleep() {{ {advance}; }}\n" + SCRIPT + "\ncheck_audio_device\n")
+            subprocess.run(["sh", "-s"], input=body, text=True, check=False)
+            self.assertIn("FAILED:", log.read_text())
+
     def test_kernel_without_pcm_status_is_not_reported_as_a_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "log.txt"

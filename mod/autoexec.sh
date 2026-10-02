@@ -546,7 +546,16 @@ announce_media()
 # running only when its hardware pointer moves between two reads.
 running_playback_pcm()
 {
-    for _rx3_status in "$PROC_ROOT"/asound/card*/pcm*p/sub*/status; do
+    # The master is device 0 of the card rbp opens by name. Any other playback
+    # stream running (headphones, booth) says nothing about what the room hears.
+    _rx3_streams=""
+    for _rx3_card in "$PROC_ROOT"/asound/card*; do
+        [ "$(cat "$_rx3_card/id" 2>/dev/null)" = "cs4344audiorev8" ] &&
+            _rx3_streams="$_rx3_streams $_rx3_card/pcm0p/sub*/status"
+    done
+    [ -n "$_rx3_streams" ] ||
+        _rx3_streams="$PROC_ROOT/asound/card*/pcm*p/sub*/status"
+    for _rx3_status in $_rx3_streams; do
         [ -r "$_rx3_status" ] || continue
         grep -q '^state: RUNNING' "$_rx3_status" 2>/dev/null || continue
         _rx3_before=$(sed -n 's/^hw_ptr *: *//p' "$_rx3_status")
