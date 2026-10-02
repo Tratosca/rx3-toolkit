@@ -103,12 +103,15 @@ static int shown;
 static int native_icon(unsigned c,int selected,int side){(void)selected;return side?228:(c==52?227:225);}
 static int native_show(void *w,int object,int im){(void)w;(void)object;shown=im;return 1;}
 static void native_set(unsigned side,unsigned row){(void)row;assert(icon(draw_category,0,side)==227);show_icon(0,0,draw_image);}
-static void *install(struct installed_hook *h,unsigned long addr,const uint8_t g[8],void *r){
+static int install(struct installed_hook *h,unsigned long addr,const uint8_t g[8],void *r,void *o){
     (void)h;(void)g;assert(r);installs++;
-    if(installs==fail_install)return 0;
-    if(addr==SET_ICON)return (void *)native_set;
-    if(addr==SHOW_ICON)return (void *)native_show;
-    assert(addr==ICON_ID);return (void *)native_icon;
+    void *original=0;
+    if(installs!=fail_install) {
+        if(addr==SET_ICON)original=(void *)native_set;
+        else if(addr==SHOW_ICON)original=(void *)native_show;
+        else {assert(addr==ICON_ID);original=(void *)native_icon;}
+    }
+    memcpy(o,&original,sizeof(original));return original!=0;
 }
 static int detach(struct installed_hook *h){(void)h;return 1;}
 static unsigned reg(const void *o,unsigned source,uint16_t from,uint16_t to){

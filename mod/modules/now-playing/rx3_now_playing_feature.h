@@ -394,20 +394,23 @@ static int now_playing_feature_install(void)
         return 0;
     }
 
-    original_now_playing_status = (now_playing_status_fn)framework->install_hook(
+    int hooks_installed = RX3_INSTALL_HOOK(
+        framework->install_hook, original_now_playing_status,
         &now_playing_status_hook, NOW_PLAYING_STATUS_UPDATED,
-        now_playing_status_guard, (void *)hooked_now_playing_status);
-    original_now_playing_load = (now_playing_load_fn)framework->install_hook(
+        now_playing_status_guard, hooked_now_playing_status);
+    hooks_installed &= RX3_INSTALL_HOOK(
+        framework->install_hook, original_now_playing_load,
         &now_playing_load_hook, NOW_PLAYING_LOAD_TRACK,
-        now_playing_load_guard, (void *)hooked_now_playing_load);
-    original_now_playing_unload = (now_playing_unload_fn)framework->install_hook(
+        now_playing_load_guard, hooked_now_playing_load);
+    hooks_installed &= RX3_INSTALL_HOOK(
+        framework->install_hook, original_now_playing_unload,
         &now_playing_unload_hook, NOW_PLAYING_UNLOAD_RESULT,
-        now_playing_unload_guard, (void *)hooked_now_playing_unload);
-    original_now_playing_mixer = (now_playing_mixer_fn)framework->install_hook(
+        now_playing_unload_guard, hooked_now_playing_unload);
+    hooks_installed &= RX3_INSTALL_HOOK(
+        framework->install_hook, original_now_playing_mixer,
         &now_playing_mixer_hook, NOW_PLAYING_MIXER_ON_AIR_UPDATE,
-        now_playing_mixer_guard, (void *)hooked_now_playing_mixer);
-    if (!original_now_playing_status || !original_now_playing_load ||
-        !original_now_playing_unload || !original_now_playing_mixer) {
+        now_playing_mixer_guard, hooked_now_playing_mixer);
+    if (!hooks_installed) {
         framework->log_line("now playing refused: a player event prologue differs");
         return 0;
     }

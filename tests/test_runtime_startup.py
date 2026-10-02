@@ -93,6 +93,7 @@ int main(void) {
         decl += [f'#define {name} {i+1}' for i,name in enumerate(constants)]
         self.run_c('''
 #include <stdlib.h>
+#include "core/api/rx3_hook_types.h"
 #define READY_FILE "ready"
 #define RENDER_PROBE_FILE "probe"
 #define O_WRONLY 1
@@ -134,8 +135,10 @@ static unsigned rx3_panel_count(void){return !!(selection&(2|4|16|64));}
 static void rx3_modules_stop(void){stops++;}
 static void uninstall_performance_hooks(void){cleanup++;}
 static void publish_ready(void){ready=1;}
-static void *install_hook(void *h,unsigned long a,const void *g,void *r){
-    (void)h;(void)a;(void)g;(void)r;hook_calls++;return hook_calls==reject_hook?0:(void *)1;
+static int install_hook(void *h,unsigned long a,const void *g,void *r,void *o){
+    (void)h;(void)a;(void)g;(void)r;hook_calls++;
+    void *original=hook_calls==reject_hook?0:(void *)1;
+    memcpy(o,&original,sizeof(original));return original!=0;
 }
 #define pthread_create(a,b,c,d) (0)
 ''' + '\n'.join(decl) + '\n' + code + '''
@@ -170,26 +173,23 @@ int main(void) {
     def test_player_identity_rejects_inherited_preload_and_read_failures(self):
         code = function(MODULES/'core/rx3_core_hook.c', 'is_player_process')
         self.run_c('''
-#define O_RDONLY 0
-static const char *comm;
-static int closes;
-static int open(const char *path,int mode) {
-    assert(!strcmp(path,"/proc/self/comm"));assert(mode==O_RDONLY);
-    return comm?3:-1;
+#include <sys/types.h>
+static const char *executable;
+static ssize_t readlink(const char *path,char *out,size_t size) {
+    assert(!strcmp(path,"/proc/self/exe"));
+    if(!executable)return -1;
+    size_t length=strlen(executable);if(length>size)length=size;
+    memcpy(out,executable,length);return (ssize_t)length;
 }
-static int read(int fd,void *out,unsigned size) {
-    assert(fd==3);unsigned n=strlen(comm);if(n>size)n=size;
-    memcpy(out,comm,n);return n;
-}
-static void close(int fd){assert(fd==3);closes++;}
 ''' + code + '''
 int main(void) {
-    comm="rbp\\n";assert(is_player_process());
-    comm="sh\\n";assert(!is_player_process());
-    comm="udhcpc\\n";assert(!is_player_process());
-    comm="rbp-helper\\n";assert(!is_player_process());
-    comm="";assert(!is_player_process());
-    comm=0;assert(!is_player_process());assert(closes==5);
+    executable="/root/pdj/rbp";assert(is_player_process());
+    executable="rbp";assert(!is_player_process());
+    executable="/tmp/rbp";assert(!is_player_process());
+    executable="/root/pdj/rbp-helper";assert(!is_player_process());
+    executable="/root/pdj/rbp (deleted)";assert(!is_player_process());
+    executable="";assert(!is_player_process());
+    executable=0;assert(!is_player_process());
     return 0;
 }
 ''')

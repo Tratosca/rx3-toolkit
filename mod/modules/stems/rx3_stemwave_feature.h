@@ -106,10 +106,10 @@ static int stemwave_feature_install(void)
     static const uint8_t renew_guard[8] = {0x56, 0x0e, 0x80, 0xe2, 0x01, 0x20, 0x41, 0xe2};
     if (!stemwave_enabled || memcmp((const void *)WAVEFORM_REQUEST_RENEW, renew_guard, 8u))
         return 0;
-    original_ex_wave_renew_check = (ex_wave_renew_check_fn)framework->install_hook(
-        &ex_wave_renew_hook, EX_WAVE_RENEW_CHECK, ex_wave_renew_guard,
-        hooked_ex_wave_renew_check);
-    if (!original_ex_wave_renew_check)
+    if (!RX3_INSTALL_HOOK(framework->install_hook,
+                          original_ex_wave_renew_check, &ex_wave_renew_hook,
+                          EX_WAVE_RENEW_CHECK, ex_wave_renew_guard,
+                          hooked_ex_wave_renew_check))
         return 0;
     framework->log_line("stem waveform: refresh hook installed");
     return 1;

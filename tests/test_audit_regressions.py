@@ -41,14 +41,21 @@ int main(void){
   uint32_t code[4]={0xe59f3000,0xe92d4010,0x12345678,0};
   uint8_t guard[8];memcpy(guard,code,8);struct installed_hook hook={0};
   protects=freed=0;fail_at=failure;fail_twice=failure==3;
-  void *original=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234):
-                    install_hook(&hook,(unsigned long)code,guard,(void *)1234);
-  assert(!original && !hook_is_installed(&hook));
-  assert(!memcmp(code,guard,8) && freed==1);
+  void *original=0;
+  int installed=RX3_INSTALL_HOOK(pc?install_pc_ldr_hook:install_hook,
+                                 original,&hook,(unsigned long)code,guard,(void *)1234);
+  assert(!installed && !memcmp(code,guard,8));
+  if(failure==3) {
+   assert(original && hook_is_installed(&hook) && !freed);
+   fail_at=fail_twice=0;
+   assert(uninstall_hook(&hook));
+  }
+  assert(!original && !hook_is_installed(&hook) && freed==1);
  }
  uint32_t code[4]={1,2,3,4};uint8_t guard[8];memcpy(guard,code,8);
  struct installed_hook hook={0};protects=freed=fail_at=fail_twice=0;
- assert(install_hook(&hook,(unsigned long)code,guard,(void *)1234));
+ void *original=0;
+ assert(RX3_INSTALL_HOOK(install_hook,original,&hook,(unsigned long)code,guard,(void *)1234));
  fail_at=protects+2; /* RX restoration on detach */
  assert(!detach_hook(&hook) && hook_is_installed(&hook) && !freed);
  assert(code[0]==0xe51ff004 && code[1]==1234);

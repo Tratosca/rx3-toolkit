@@ -342,16 +342,17 @@ static void rx3_keyshift_start_audio(unsigned int sample_rate)
 
 static void rx3_keyshift_install(void)
 {
-    original_timestretch_manager = (timestretch_manager_fn)install_hook(
-        &timestretch_manager_hook, TIMESTRETCH_MANAGER,
-        timestretch_manager_guard, (void *)hooked_timestretch_manager);
-    if (original_timestretch_manager)
+    int installed=RX3_INSTALL_HOOK(
+        install_hook, original_timestretch_manager, &timestretch_manager_hook,
+        TIMESTRETCH_MANAGER, timestretch_manager_guard,
+        hooked_timestretch_manager);
+    if (installed)
         __atomic_store_n(&keyshift_callbacks_enabled, 1u, __ATOMIC_SEQ_CST);
 }
 
 static int rx3_keyshift_ready(void)
 {
-    return original_timestretch_manager != 0;
+    return __atomic_load_n(&keyshift_callbacks_enabled, __ATOMIC_SEQ_CST) != 0;
 }
 
 static void rx3_keyshift_remove(void)

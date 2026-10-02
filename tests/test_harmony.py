@@ -16,7 +16,7 @@ class HarmonyTests(unittest.TestCase):
     def test_native_reference_tracks_master_and_preserves_native_key_set(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+int install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void *o){(void)h;(void)a;(void)g;(void)r;(void)o;return 0;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}

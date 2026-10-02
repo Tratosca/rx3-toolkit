@@ -103,7 +103,7 @@ static const float rx3_semitone_ratio[25] = {
 
 /* Hann, which sums to one in amplitude across a half-grain overlap.
  *
- * A raised sine would sum to one in power instead, and on sustained noise -- 
+ * A raised sine would sum to one in power instead, and on sustained noise --
  * where the correlation alignment cannot make the two heads coherent -- that
  * removes about a decibel of the level ripple. It was measured and rejected:
  * its broader top makes repeated material louder at the splice, and an impulse
