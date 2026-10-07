@@ -97,3 +97,8 @@ guarantee of performance at 50 Mb/s or with different USB media, songs, or
 firmware. The export changed in content while the relevant file identities
 remained stable; future sampling should verify track-specific identity rather
 than blindly accepting or permanently blocking all PDB changes.
+
+After testing, SOUND_PRO was restored from the installer backup to its prior
+8 MiB image. The read-back SHA-256 matched the previously verified
+`1723f3b140c925fe37a50360f03f701583343cb8aaf8faef931c205d42af0c26`.
+The stick was safely ejected from the computer.
