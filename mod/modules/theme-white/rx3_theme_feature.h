@@ -235,6 +235,11 @@ static void theme_run_pending_toggle(void)
     int request = __atomic_load_n(&theme_toggle_pending, __ATOMIC_SEQ_CST);
     if ((request == 1 || request == 2) &&
         __sync_bool_compare_and_swap(&theme_toggle_pending, request, 3)) {
+        /* A request taken while the start is still armed came from the DJ
+           (SHIFT + SHORTCUT or Utility): the armed start clears itself before
+           it publishes. Their choice wins, or the next switch to dark would
+           find the start still armed and go light again on its own. */
+        theme_light_armed = 0;
         int light = !theme_light_active();
         framework->images->select_variant(light);
         framework->text->invalidate();
@@ -399,13 +404,16 @@ static void theme_waveform_apply(int light)
 static void theme_read_mode(const char *theme)
 {
     theme_global_dark = theme[0] == 'd';
-    theme_light_armed = theme[0] == 'w';
+    /* l and w take the same armed toggle at a render boundary; only w waits
+       for the player's first paint. l used to log and never switch. */
+    theme_light_armed = theme[0] == 'w' || theme[0] == 'l';
     if (theme_global_dark) {
         log_line("global dark theme active (sentinel: " THEME_DARK_SENTINEL ")");
-    } else if (theme_light_armed) {
+    } else if (theme[0] == 'w') {
         theme_start_light_not_before_us = monotonic_enough_us() + 1000000u;
         log_line("display mode: light, held back until the player has painted once");
     } else if (theme[0] == 'l') {
+        theme_start_light_not_before_us = 0u;
         log_line("display mode: light from the first frame");
     } else {
         log_line("display mode: dark to begin with, switch it in Utility");

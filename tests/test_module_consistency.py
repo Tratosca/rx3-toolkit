@@ -9,8 +9,11 @@ Modules are located through their manifest rather than by path, so moving a
 module directory does not silently disable a test.
 """
 
+import os
 import re
 import struct
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -200,6 +203,37 @@ class DisplayModeTests(unittest.TestCase):
         # nothing, so it is exported without ever being compared.
         unread = exported - understood - {"s"}
         self.assertEqual(unread, set(), f"the module exports {unread}, which the core ignores")
+
+    def prepared_letter(self, display=None):
+        """The letter the module exports for a drive holding `display`."""
+        with tempfile.TemporaryDirectory() as usb:
+            runtime = Path(usb) / "RX3_RUNTIME"
+            runtime.mkdir()
+            if display is not None:
+                (runtime / "display").write_text(display + "\n", encoding="utf-8")
+            core = Path(usb) / "librx3_core.so"
+            core.write_bytes(b"")
+            script = (
+                "module_begin() { :; }\n"
+                "say() { :; }\n"
+                "module_disabled_by_switch() { return 1; }\n"
+                "module_export() { [ \"$1\" = RX3_THEME ] && printf '%s\\n' \"$2\"; }\n"
+                "register_prepare_hook() { :; }\n"
+                "register_after_launch_hook() { :; }\n"
+                f". '{self.MODULE}'\n"
+                "theme_white_prepare\n"
+            )
+            result = subprocess.run(
+                ["sh", "-c", script], capture_output=True, text=True, check=True,
+                env={**os.environ, "USB": usb, "CORE_OBJECT": str(core)},
+            )
+            return result.stdout.strip()
+
+    def test_a_drive_without_a_display_word_starts_light(self):
+        # Choosing the module is asking for light: a deck that boots dark
+        # with it selected looks like the module did not load.
+        self.assertEqual(self.prepared_letter(), "l")
+        self.assertEqual(self.prepared_letter("switch"), "s")
 
     def test_every_mode_the_core_reads_can_be_asked_for(self):
         unreachable = self.understood() - self.exported()

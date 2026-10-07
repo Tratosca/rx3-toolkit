@@ -23,15 +23,18 @@ theme_white_prepare()
     if [ -r "$USB/RX3_RUNTIME/display" ]; then
         IFS= read -r mode < "$USB/RX3_RUNTIME/display" || :
     fi
+    # Choosing the module is asking for the light display, so a drive that
+    # names no mode starts light. SHIFT + SHORTCUT and Utility switch it either
+    # way afterwards; switch is the word for starting dark.
     case "$mode" in
         dark)   letter=d; described="dark, and it stays dark" ;;
-        light)  letter=l; described="light from the first frame" ;;
+        ''|light) letter=l; described="light from the first frame, switchable" ;;
         wait)   letter=w; described="light, once the player has painted once" ;;
-        ''|switch) letter=s; described="dark, switchable from Utility" ;;
+        switch) letter=s; described="dark, switchable from Utility" ;;
         *)
-            letter=s
-            described="dark, switchable from Utility"
-            say "Display mode: '$mode' is not a mode; starting dark and switchable"
+            letter=l
+            described="light from the first frame, switchable"
+            say "Display mode: '$mode' is not a mode; starting light and switchable"
             ;;
     esac
 
@@ -43,7 +46,7 @@ theme_white_prepare()
 theme_white_after_launch()
 {
     [ "$THEME_WHITE_READY" = "1" ] || return 0
-    say "DISPLAY MODE: Utility or SHIFT + SHORTCUT; the deck boots dark"
+    say "DISPLAY MODE: Utility or SHIFT + SHORTCUT switches between DARK and LIGHT"
     say "Light images, waveform palette and Utility port: hardware validation pending"
 }
 

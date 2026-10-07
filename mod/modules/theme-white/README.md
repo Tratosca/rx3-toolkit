@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Light display mode
 
-The deck starts dark. Use SHIFT + SHORTCUT or DISPLAY MODE in Utility to switch between DARK and LIGHT.
+The deck starts in LIGHT. Use SHIFT + SHORTCUT or DISPLAY MODE in Utility to switch between DARK and LIGHT at any time.
 
 The source port includes solid fills, image conversion, the waveform palette, the Utility row and the optional light logo. Images are converted as they are drawn. Shared bitmaps reuse the same converted pixels. A bounded memory arena leaves further images stock when it fills.
 
