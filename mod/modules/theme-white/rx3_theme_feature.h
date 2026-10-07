@@ -17,6 +17,8 @@ static int theme_browse_rect_installed;
 static unsigned char theme_browse_row_blue[12];
 static unsigned char theme_browse_right_row_blue[12];
 static unsigned int theme_browse_track_active;
+static unsigned int theme_browse_list_start = 379u;
+static unsigned int theme_browse_list_split = 857u;
 static unsigned char theme_source_row_blue[2];
 static const uint8_t theme_browse_rect_guard[8] = {
     0xb0, 0x31, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
@@ -62,9 +64,10 @@ static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
         draw->box[1] >= 60u &&
         draw->box[1] < 60u + 12u * 50u) {
         unsigned int row = (draw->box[1] - 60u) / 50u;
-        selected_background = draw->box[0] < 379u ?
+        selected_background = draw->box[0] < 108u ?
             ((draw->list_flags & 0x10u) && draw->selection_index == row) :
-            draw->box[0] < 857u ?
+            draw->box[0] < theme_browse_list_start ? 0u :
+            draw->box[0] < theme_browse_list_split ?
             (theme_browse_track_active && theme_browse_row_blue[row]) :
             (theme_browse_track_active && theme_browse_right_row_blue[row]);
     }
@@ -94,6 +97,8 @@ static void theme_browse_rect(void *render, void *rect)
         if (view == 3u && layer == 0x0801u && box[0] == 0u &&
             box[1] == 50u && box[2] == 1280u && box[3] == 659u) {
             theme_browse_track_active = 0u;
+            theme_browse_list_start = 379u;
+            theme_browse_list_split = 857u;
             memset(theme_browse_row_blue, 0, sizeof(theme_browse_row_blue));
             memset(theme_browse_right_row_blue, 0,
                    sizeof(theme_browse_right_row_blue));
@@ -102,8 +107,11 @@ static void theme_browse_rect(void *render, void *rect)
             box[1] >= 50u && box[1] < 50u + 12u * 50u &&
             box[3] == box[1] + 53u && (box[1] - 50u) % 50u == 0u) {
             unsigned int row = (box[1] - 50u) / 50u;
-            if (box[0] == 379u && box[2] == 857u) {
+            if ((box[0] == 379u || box[0] == 108u) &&
+                box[2] == 857u) {
                 theme_browse_track_active = 1u;
+                theme_browse_list_start = box[0];
+                theme_browse_list_split = box[0] == 108u ? 735u : 857u;
                 theme_browse_row_blue[row] = colour == 0xff1c1f00u;
             } else if (box[0] == 857u && box[2] == 1280u) {
                 theme_browse_track_active = 1u;

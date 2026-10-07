@@ -45,8 +45,11 @@ static void theme_prepare_conversion(void)
    core has replaced never reach the conversion: native_image() refuses them. */
 static void theme_remap_image(unsigned int image)
 {
-    /* Native BROWSE selection artwork carries white ink over blue. */
-    if (image == 0x859u || image == 0x7eeu || image == 0x7fbu ||
+    /* Native BROWSE category-on artwork carries white ink over blue. */
+    if (image == 0x83cu || image == 0x859u || image == 0x806u ||
+        image == 0x80cu || image == 0x823u || image == 0x84au ||
+        image == 0x829u || image == 0x820u || image == 0x81au ||
+        image == 0x7eeu || image == 0x7fbu ||
         image == 0x96du) return;
     if ((!theme_light_active() && !theme_global_dark) ||
         !framework->images->variants_ready() || image >= STOCK_IMAGE_COUNT) return;
