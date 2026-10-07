@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0
  * RX3 read-only metadata transport. Separate process; never preloaded into rbp.
- * One request per TCP connection: PDB\n or ANLZ /PIONEER/USBANLZ/.../ANLZ0000.EXT\n.
- * Replies OK\n<file bytes> or ERR\n. The connection closes after each reply.
+ * One request per TCP connection. PDB and ANLZ serve metadata; STAT and RANGE
+ * serve bounded, read-only music-file bytes for host-side excerpt decoding.
+ * The connection closes after each reply. No player audio buffer is touched.
  */
 #ifdef __arm__
 typedef unsigned int size_t;
@@ -59,13 +60,19 @@ static long call6(long n,long a,long b,long c,long d,long e,long f) {
 #define O_DIRECTORY_ O_DIRECTORY
 #define O_NOFOLLOW_ O_NOFOLLOW
 #endif
-#define MAX_REQUEST 240u
+#define MAX_REQUEST 1024u
 #define MAX_PDB (16u*1024u*1024u)
 #define MAX_ANALYSIS (4u*1024u*1024u)
+#define MAX_AUDIO_FILE (512u*1024u*1024u)
+#define MAX_AUDIO_RANGE (256u*1024u)
+#ifndef AUDIO_SESSION_BUDGET
+#define AUDIO_SESSION_BUDGET (8u*1024u*1024u)
+#endif
 #ifndef METADATA_PORT
 #define METADATA_PORT 50131u
 #endif
 static unsigned char buffer[4096];
+static unsigned int audio_bytes_sent;
 
 static size_t length(const char *s) { size_t n=0; while(s[n]) n++; return n; }
 static int equal(const char *a,const char *b) {
@@ -84,8 +91,8 @@ static int send_all(int fd,const unsigned char *data,size_t count) {
 
 /* Walk each path component with O_NOFOLLOW: no symlink can escape the USB.
  * Analysis paths may come from a PDB row, so never trust them as filesystem paths. */
-static int open_relative(int root,const char *path) {
-    char component[64];
+static int open_relative(int root,const char *path,int audio) {
+    char component[256];
     int parent=root,owned=0;
     const char *cursor=path;
     for (;;) {
@@ -93,8 +100,9 @@ static int open_relative(int root,const char *path) {
         while(cursor[n] && cursor[n]!='/') {
             char c=cursor[n];
             if(n+1>=sizeof(component) ||
-               !((c>='A'&&c<='Z')||(c>='a'&&c<='z')||
-                 (c>='0'&&c<='9')||c=='.')) goto bad;
+               (audio ? ((unsigned char)c<32 || c=='\\') :
+                !((c>='A'&&c<='Z')||(c>='a'&&c<='z')||
+                  (c>='0'&&c<='9')||c=='.'))) goto bad;
             component[n]=c;n++;
         }
         if(!n || (n==1 && component[0]=='.') ||
@@ -122,9 +130,97 @@ static int allowed(const char *request,const char **relative,unsigned int *limit
     if(!prefix(request,"ANLZ /PIONEER/USBANLZ/")) return 0;
     const char *path=request+5;
     size_t n=length(path);
-    if(n<35 || n>MAX_REQUEST-5 ||
+    if(n<35 || n>240-5 ||
        !(suffix(path,"/ANLZ0000.DAT") || suffix(path,"/ANLZ0000.EXT"))) return 0;
     *relative=path+1;*limit=MAX_ANALYSIS;return 1;
+}
+
+static int hex_digit(char c) {
+    if(c>='0'&&c<='9') return c-'0';
+    if(c>='a'&&c<='f') return c-'a'+10;
+    if(c>='A'&&c<='F') return c-'A'+10;
+    return -1;
+}
+static int decode_audio_path(const char *hex,char *out,size_t capacity) {
+    size_t n=length(hex);
+    if(!n || (n&1) || n/2>=capacity) return 0;
+    for(size_t i=0;i<n/2;i++) {
+        int a=hex_digit(hex[2*i]),b=hex_digit(hex[2*i+1]);
+        if(a<0||b<0) return 0;
+        unsigned char c=(unsigned char)((a<<4)|b);
+        if(c<32 || c==127 || c=='\\') return 0;
+        out[i]=(char)c;
+    }
+    out[n/2]=0;
+    if(!prefix(out,"Contents/")) return 0;
+    return suffix(out,".wav") || suffix(out,".aif") || suffix(out,".aiff") ||
+           suffix(out,".flac") || suffix(out,".mp3") || suffix(out,".m4a") ||
+           suffix(out,".aac") || suffix(out,".WAV") || suffix(out,".AIFF") ||
+           suffix(out,".FLAC") || suffix(out,".MP3");
+}
+static int parse_uint(const char *s,unsigned int *value) {
+    unsigned int n=0;if(!*s) return 0;
+    for(;*s;s++) {
+        if(*s<'0'||*s>'9' || n>429496729u) return 0;
+        unsigned int next=n*10u+(unsigned int)(*s-'0');
+        if(next<n) return 0;
+        n=next;
+    }
+    *value=n;return 1;
+}
+static size_t decimal(char *out,unsigned int n) {
+    char reversed[10];size_t k=0;
+    do { reversed[k++]=(char)('0'+n%10);n/=10; } while(n);
+    for(size_t i=0;i<k;i++) out[i]=reversed[k-i-1];
+    return k;
+}
+static void serve_audio(int client,int root,char *request) {
+    int stat=prefix(request,"STAT "),range=prefix(request,"RANGE ");
+    if(!stat && !range) { send_all(client,(const unsigned char *)"ERR\n",4);return; }
+    char *hex=request+(stat?5:6),*offset_text=0,*count_text=0;
+    if(range) {
+        for(char *p=hex;*p;p++) if(*p==' ') { *p=0;offset_text=p+1;break; }
+        if(!offset_text) goto error;
+        for(char *p=offset_text;*p;p++) if(*p==' ') { *p=0;count_text=p+1;break; }
+        if(!count_text) goto error;
+    }
+    char path[512];
+    if(!decode_audio_path(hex,path,sizeof(path))) goto error;
+    unsigned int offset=0,count=0;
+    if(range && (!parse_uint(offset_text,&offset) || !parse_uint(count_text,&count) ||
+                 count==0 || count>MAX_AUDIO_RANGE ||
+                 count>AUDIO_SESSION_BUDGET-audio_bytes_sent)) goto error;
+    int file=open_relative(root,path,1);
+    if(file<0) goto error;
+    long size=SEEK(file,0,2);
+    if(size<0 || (unsigned long)size>MAX_AUDIO_FILE ||
+       (range && ((unsigned long)offset>(unsigned long)size ||
+                  count>(unsigned long)size-offset))) { CLOSE(file);goto error; }
+    char header[48];size_t n=0;
+    if(stat) {
+        header[n++]='S';header[n++]='I';header[n++]='Z';header[n++]='E';header[n++]=' ';
+        n+=decimal(header+n,(unsigned int)size);header[n++]='\n';
+        send_all(client,(const unsigned char *)header,n);CLOSE(file);return;
+    }
+    if(SEEK(file,(long)offset,0)<0) { CLOSE(file);goto error; }
+    header[n++]='D';header[n++]='A';header[n++]='T';header[n++]='A';header[n++]=' ';
+    n+=decimal(header+n,count);header[n++]=' ';
+    n+=decimal(header+n,(unsigned int)size);header[n++]='\n';
+    if(send_all(client,(const unsigned char *)header,n)) {
+        unsigned int remaining=count;
+        while(remaining) {
+            unsigned int want=remaining<sizeof(buffer)?remaining:sizeof(buffer);
+            long read_count=READ(file,buffer,want);
+            if(read_count<=0) break;
+            if(!send_all(client,buffer,(size_t)read_count)) break;
+            remaining-=(unsigned int)read_count;
+            audio_bytes_sent+=(unsigned int)read_count;
+            PACE();
+        }
+    }
+    CLOSE(file);return;
+error:
+    send_all(client,(const unsigned char *)"ERR\n",4);
 }
 
 static void serve_client(int client,int root) {
@@ -136,9 +232,12 @@ static void serve_client(int client,int root) {
     }
     if(!count || request[count-1]!='\n') return;
     request[count-1]=0;
+    if(prefix(request,"STAT ") || prefix(request,"RANGE ")) {
+        serve_audio(client,root,request);return;
+    }
     const char *relative=0;unsigned int limit=0;
     if(!allowed(request,&relative,&limit)) { send_all(client,(const unsigned char *)"ERR\n",4);return; }
-    int file=open_relative(root,relative);
+    int file=open_relative(root,relative,0);
     if(file<0) { send_all(client,(const unsigned char *)"ERR\n",4);return; }
     long size=SEEK(file,0,2);
     if(size<0 || (unsigned long)size>limit || SEEK(file,0,0)<0) {

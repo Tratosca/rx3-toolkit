@@ -16,6 +16,7 @@ from pre_gig import decode_analysis, load_tracks
 
 MAX_PDB = 16 * 1024 * 1024
 MAX_ANALYSIS = 4 * 1024 * 1024
+MAX_AUDIO_RANGE = 256 * 1024
 
 
 def validate_analysis_path(path: str) -> str:
@@ -42,6 +43,56 @@ def fetch(host: str, request: str, limit: int, port: int = 50131) -> bytes:
     return data
 
 
+def validate_audio_path(path: str) -> str:
+    if (not isinstance(path, str) or not path.startswith("/Contents/") or
+            len(path.encode("utf-8")) > 480 or
+            any(part in ("", ".", "..") for part in path.split("/")[1:]) or
+            not path.lower().endswith((".wav", ".aif", ".aiff", ".flac", ".mp3",
+                                       ".m4a", ".aac")) or
+            any(ord(character) < 32 or character == "\\" for character in path)):
+        raise ValueError("unsafe or unsupported audio path")
+    return path
+
+
+def audio_stat(host: str, path: str, port: int = 50131) -> int:
+    encoded = validate_audio_path(path).lstrip("/").encode("utf-8").hex()
+    with socket.create_connection((host, port), timeout=3) as sock:
+        sock.settimeout(5)
+        sock.sendall(f"STAT {encoded}\n".encode("ascii"))
+        with sock.makefile("rb") as stream:
+            header = stream.readline(40)
+    if not header.startswith(b"SIZE ") or not header.endswith(b"\n"):
+        raise OSError("RX3 refused audio size request")
+    size = int(header[5:-1])
+    if not 0 <= size <= 512 * 1024 * 1024:
+        raise ValueError("RX3 returned invalid audio size")
+    return size
+
+
+def audio_range(host: str, path: str, offset: int, count: int,
+                port: int = 50131) -> tuple[bytes, int]:
+    if not isinstance(offset, int) or offset < 0 or not 1 <= count <= MAX_AUDIO_RANGE:
+        raise ValueError("audio range must be nonnegative and at most 256 KiB")
+    encoded = validate_audio_path(path).lstrip("/").encode("utf-8").hex()
+    with socket.create_connection((host, port), timeout=3) as sock:
+        sock.settimeout(5)
+        sock.sendall(f"RANGE {encoded} {offset} {count}\n".encode("ascii"))
+        with sock.makefile("rb") as stream:
+            header = stream.readline(48)
+            if not header.startswith(b"DATA ") or not header.endswith(b"\n"):
+                raise OSError("RX3 refused audio range request")
+            fields = header[5:-1].split(b" ")
+            if len(fields) != 2 or int(fields[0]) != count:
+                raise ValueError("RX3 returned unexpected audio range header")
+            size = int(fields[1])
+            if not 0 <= size <= 512 * 1024 * 1024 or offset + count > size:
+                raise ValueError("RX3 returned invalid audio size")
+            data = stream.read(count + 1)
+    if len(data) != count:
+        raise OSError("RX3 returned truncated or oversized audio range")
+    return data, size
+
+
 class RemoteCatalog:
     def __init__(self, host: str, port: int = 50131):
         self.host, self.port = host, port
@@ -64,6 +115,8 @@ class RemoteCatalog:
         self._pending: set[str] = set()
         self._last_attempt: dict[str, float] = {}
         self._lock = threading.Lock()
+        self._identity_lock = threading.Lock()
+        self._verified_at = 0.0
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rx3-analysis")
 
     def request(self, track_id: int | None) -> None:
@@ -107,3 +160,28 @@ class RemoteCatalog:
 
     def close(self) -> None:
         self._pool.shutdown(wait=False, cancel_futures=True)
+
+    def verify_export(self, max_age_s: float = 2.0) -> None:
+        with self._identity_lock:
+            if time.monotonic() - self._verified_at < max_age_s:
+                return
+            actual = hashlib.sha256(fetch(self.host, "PDB", MAX_PDB,
+                                          self.port)).hexdigest()
+            if actual != self.manifest["export_pdb_sha256"]:
+                raise ValueError("RX3 USB export changed; restart the gateway")
+            self._verified_at = time.monotonic()
+
+    def audio_stat(self, track_id: int) -> int:
+        self.verify_export()
+        item = self.tracks.get(str(track_id))
+        if item is None:
+            raise KeyError(track_id)
+        return audio_stat(self.host, item["metadata"]["file_path"], self.port)
+
+    def audio_range(self, track_id: int, offset: int, count: int) -> tuple[bytes, int]:
+        self.verify_export()
+        item = self.tracks.get(str(track_id))
+        if item is None:
+            raise KeyError(track_id)
+        return audio_range(self.host, item["metadata"]["file_path"], offset, count,
+                           self.port)

@@ -38,6 +38,13 @@ def load_tracks(source: Path) -> dict[int, dict]:
             artists[artist_id] = name
         except ValueError:
             continue
+    keys = {}
+    for row in pdb.iter_rows(tables, pdb.TABLE_KEYS):
+        try:
+            key_id, name = pdb.parse_key(row)
+            keys[key_id] = name
+        except ValueError:
+            continue
     tracks = {}
     for row in pdb.iter_rows(tables, pdb.TABLE_TRACKS):
         try:
@@ -52,6 +59,9 @@ def load_tracks(source: Path) -> dict[int, dict]:
             "duration_s": track.duration,
             "file_path": track.file_path,
             "anlz_path": track.analysis_path,
+            "key": keys.get(track.key_id),
+            "sample_rate_hz": track.sample_rate_hz or None,
+            "file_size_bytes": track.file_size_bytes or None,
         }
     return tracks
 

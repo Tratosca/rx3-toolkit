@@ -29,6 +29,7 @@ class PdbError(ValueError):
 
 TABLE_TRACKS = 0
 TABLE_ARTISTS = 2
+TABLE_KEYS = 5
 TABLE_PLAYLIST_TREE = 7
 TABLE_PLAYLIST_ENTRIES = 8
 
@@ -42,6 +43,9 @@ TRACK_FIXED_SIZE = 94
 TRACK_ARTIST_ID = 68
 TRACK_ID = 72
 TRACK_DURATION = 84
+TRACK_KEY_ID = 32
+TRACK_SAMPLE_RATE = 8
+TRACK_FILE_SIZE = 16
 # The fixed part is followed by this many offsets, one per string the row can
 # carry. The audio and analysis paths refer to the same exported track.
 TRACK_STRING_COUNT = 21
@@ -192,6 +196,14 @@ class TrackRow:
     title: str
     file_path: str
     analysis_path: str = ""
+    key_id: int = 0
+    sample_rate_hz: int = 0
+    file_size_bytes: int = 0
+
+
+def parse_key(row: Row) -> tuple[int, str]:
+    """Rekordbox musical-key table row (DeviceSQL page type 5)."""
+    return _u32(row.page, row.position), read_string(row.page, row.position + 8).strip()
 
 
 def parse_artist(row: Row) -> tuple[int, str]:
@@ -229,6 +241,9 @@ def parse_track(row: Row) -> TrackRow:
         title=string_at(STRING_TITLE),
         file_path=string_at(STRING_FILE_PATH),
         analysis_path=analysis_path,
+        key_id=_u32(row.page, row.position + TRACK_KEY_ID),
+        sample_rate_hz=_u32(row.page, row.position + TRACK_SAMPLE_RATE),
+        file_size_bytes=_u32(row.page, row.position + TRACK_FILE_SIZE),
     )
 
 

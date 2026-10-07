@@ -248,7 +248,7 @@ class BridgeState:
                       "track_key": f"{source}:{track_id}" if catalog and now_fresh else None,
                       "analysis_key": asset_key(asset) if asset else None,
                       "title": metadata.get("title"), "artist": metadata.get("artist"),
-                      "key": None, "duration_ms": metadata.get("duration_s", 0)*1000 or None,
+                      "key": metadata.get("key"), "duration_ms": metadata.get("duration_s", 0)*1000 or None,
                       "original_bpm": original_bpm},
             "transport": {"valid": bool(now_fresh), "source": "rx3_now_playing",
                           "observed_at_ms": int(observed * 1000) if observed else None,
