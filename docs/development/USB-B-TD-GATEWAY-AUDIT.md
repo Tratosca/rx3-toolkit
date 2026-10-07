@@ -36,8 +36,15 @@ audio correctly remained invalid. This validates the packet schema and
 single-track data path, **not** an actual running TouchDesigner network or a
 full DJ set. The rolling recorder did not capture a separate startup status
 packet in this insertion, although it did capture the preflight report and
-the helper/telemetry functioned. A subjective dropout/freeze observation from
-the operator is still pending.
+the helper/telemetry functioned. A second one-second excerpt request, made
+while the operator listened, returned HTTP 503 from the host decoder. Direct
+`STAT` and 4 KiB `RANGE` still worked afterward, and the rolling telemetry
+continued. The likely cause is the helper's remaining 8 MiB audio allowance
+being too small for another FFmpeg seek, but this has not been measured or
+confirmed. The operator reported **no audible dropout and no screen freeze**
+during that request. Treat repeated excerpt sampling as unverified until a
+subsequent bench run measures requested range bytes and distinguishes budget
+exhaustion from other decode errors.
 
 ## TouchDesigner data
 
