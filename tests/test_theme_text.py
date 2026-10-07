@@ -20,39 +20,19 @@ class ThemeTextTests(unittest.TestCase):
 int main(void) {
     const unsigned semantic[] = {0x100u, 0x200u, 0x1c00u,
                                   0xffe02020u, 0xff00aa00u};
+    const unsigned neutral[] = {0u, 0xffe0e0e0u, 0xffffffffu};
     for (unsigned view = 0; view <= 12; ++view) {
         for (unsigned light = 0; light < 2; ++light) {
-            unsigned expected = light && (view == 3 || view == 7 || view == 12)
-                ? THEME_TEXT_DARK : 0u;
-            assert(theme_text_colour(light, view, 0u, 15u, 700u, 0u, 0u) == expected);
-            if (view == 3 || view == 7) {
-                unsigned first = view == 3 ? 60u : 11u;
-                unsigned step = view == 3 ? 50u : 52u;
-                for (unsigned row = 0; row < 12; ++row) {
-                    unsigned y = first + row * step;
-                    unsigned fill = view == 3 ? 1u : 0u;
-                    assert(theme_text_colour(light, view, 0u, 15u, y, row,
-                        fill) == 0u);
-                    assert(theme_text_colour(light, view, 0u, 15u, y,
-                        (row + 1u) % 12u, 0u) == expected);
-                    if (view == 3)
-                        assert(theme_text_colour(light, view, 0u, 15u, y,
-                            row, 0u) == expected);
-                    if (view == 7)
-                        assert(theme_text_colour(light, view, 0u, 750u, y,
-                            row, 0u) == expected);
-                }
+            int themed = light && (view == 3 || view == 7 || view == 12);
+            for (unsigned i = 0; i < sizeof(neutral)/sizeof(neutral[0]); ++i) {
+                /* Light surface: dark ink. Selection fill: native ink. */
+                assert(theme_text_colour(light, view, neutral[i], 0u) ==
+                       (themed ? THEME_TEXT_DARK : neutral[i]));
+                assert(theme_text_colour(light, view, neutral[i], 1u) == neutral[i]);
             }
             for (unsigned i = 0; i < sizeof(semantic)/sizeof(semantic[0]); ++i)
-                assert(theme_text_colour(light, view, semantic[i], 15u, 700u,
-                    0u, 0u)
-                       == semantic[i]);
-            unsigned source_ink = 0xffe0e0e0u;
-            assert(theme_text_colour(light, view, source_ink, 780u, 110u,
-                0u, 0u) == (light && (view == 3u || view == 7u || view == 12u)
-                    ? THEME_TEXT_DARK : source_ink));
-            assert(theme_text_colour(light, view, source_ink, 780u, 110u,
-                0u, 1u) == source_ink);
+                for (unsigned fill = 0; fill < 2; ++fill)
+                    assert(theme_text_colour(light, view, semantic[i], fill) == semantic[i]);
         }
     }
     return 0;

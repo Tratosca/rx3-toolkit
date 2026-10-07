@@ -20,6 +20,9 @@ static unsigned int theme_browse_track_active;
 static unsigned int theme_browse_list_start = 379u;
 static unsigned int theme_browse_list_split = 857u;
 static unsigned char theme_source_row_blue[2];
+/* Utility paints exactly one blue cell: the chosen row's name, or its value
+   while the value is being changed. 0 until a cell has been seen. */
+static unsigned int theme_utility_blue_cell;
 static const uint8_t theme_browse_rect_guard[8] = {
     0xb0, 0x31, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
 };
@@ -76,9 +79,15 @@ static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
         unsigned int row = draw->box[1] < 190u ? 0u : 1u;
         selected_background = theme_source_row_blue[row];
     }
-    return theme_text_colour(theme_light_active(), view,
-                             draw->native_colour, draw->box[0], draw->box[1],
-                             draw->selection_index, selected_background);
+    if (view == 7u && draw->box[1] >= 11u && draw->box[1] < 11u + 12u * 52u) {
+        unsigned int row = (draw->box[1] - 11u) / 52u;
+        unsigned int side = draw->box[0] < 734u ? 1u : 2u;
+        selected_background = theme_utility_blue_cell ?
+            theme_utility_blue_cell == ((row << 2) | side) :
+            side == 1u && draw->selection_index == row;
+    }
+    return theme_text_colour(theme_light_active(), view, draw->native_colour,
+                             selected_background);
 }
 static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
 
@@ -87,13 +96,18 @@ static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
 static void theme_browse_rect(void *render, void *rect)
 {
     unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
-    if (rect && (view == 3u || view == 12u)) {
+    if (rect && (view == 3u || view == 7u || view == 12u)) {
         const uint8_t *model = rect;
         uint16_t layer, box[4];
         uint32_t colour;
         memcpy(&layer, model + 0x10u, sizeof(layer));
         memcpy(box, model + 0x18u, sizeof(box));
         memcpy(&colour, model + 0x28u, sizeof(colour));
+        if (view == 7u && layer == 0x0001u && colour == 0xff1c1f00u &&
+            box[1] < 12u * 52u &&
+            ((box[0] == 8u && box[2] == 734u) || (box[0] == 735u && box[2] == 1280u)))
+            theme_utility_blue_cell = (((box[1] + 10u) / 52u) << 2) |
+                                      (box[0] == 8u ? 1u : 2u);
         if (view == 3u && layer == 0x0801u && box[0] == 0u &&
             box[1] == 50u && box[2] == 1280u && box[3] == 659u) {
             theme_browse_track_active = 0u;

@@ -18,17 +18,14 @@ static unsigned int theme_text_neutral(unsigned int colour)
     if (b < low) low = b;
     return low >= 0xc0u && high - low <= 0x18u;
 }
+/* Neutral ink goes dark on the light surfaces of BROWSE, UTILITY and SOURCE.
+   Ink over a vivid selection fill, and every semantic colour, stays native. */
 static unsigned int theme_text_colour(unsigned int light, unsigned int view,
-                                      unsigned int native_colour, unsigned int x,
-                                      unsigned int y, unsigned int selection_index,
+                                      unsigned int native_colour,
                                       unsigned int selected_background)
 {
-    unsigned int utility_selected = view == 7u && x < 734u &&
-        selection_index < 12u && y >= 11u && y < 11u + 12u * 52u &&
-        (y - 11u) / 52u == selection_index;
     if (light && (view == 3u || view == 7u || view == 12u) &&
-        theme_text_neutral(native_colour) && !selected_background &&
-        !utility_selected)
+        theme_text_neutral(native_colour) && !selected_background)
         return THEME_TEXT_DARK;
     return native_colour;
 }
