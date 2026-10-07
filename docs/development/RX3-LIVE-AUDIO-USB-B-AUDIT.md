@@ -69,7 +69,13 @@ large rewind for cue/loop. Replaying the exact recorded block positions through
 the filter retains 30.04 seconds of PCM in 30 seconds of wall time. It drops
 3,526 overlapping packets without calling them transport or queue loss. This
 also lowers expected USB-B traffic. The corrected ARM image passes the source
-audit and 29 focused tests. **It still needs its own physical run.**
+audit and 29 focused tests. After the first run, SOUND_PRO was mounted again.
+A fresh scan found 238 tracks and 236 valid phrase maps. The installer backed
+up the first image under ignored
+`local/gigs/rx3-live-audio-dedupe-2026-10-07/usb-root-backup`, installed the
+corrected image, verified both root files by read-back, verified the current
+export hash stayed unchanged, and safely ejected the stick. **The corrected
+image still needs its own physical playback capture.**
 
 ## Physical acceptance still required
 
