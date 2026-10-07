@@ -1144,8 +1144,9 @@ int main(void) {
 static unsigned performance_refresh_pending, performance_refresh_reported, overlay_panel;
 static uint64_t performance_refresh_until_us, performance_refresh_next_us;
 static int render_probe_enabled, drawing, pending, light_state, switches, passes, invalidations, window_dirty, header_pending, header_visible;
-static unsigned theme_render_active;
+static unsigned theme_render_active, theme_home_repaint_pending;
 static int theme_light_active(void) { return light_state; }
+static int test_view(void) { return 3; }
 static int theme_run_conversions(void) { return 0; }
 #define PERFORMANCE_REFRESH_WINDOW_US 1000000u
 #define PERFORMANCE_REFRESH_EVERY_US 100000u
@@ -1178,10 +1179,11 @@ static void native_render(void *manager) {
     drawing=0; passes++;
 }
 static unsigned int theme_refresh_header(void) { assert(!drawing && passes==2); header_pending=1; return 1; }
+static unsigned int theme_refresh_home_child(unsigned int target) { (void)target; return 0; }
 static int dirty_windows(void) { assert(!drawing); invalidations++; window_dirty=1; return 1; }
 #define THEME_DIRTY_WINDOWS dirty_windows
 static void (*original_theme_render_pass)(void *)=native_render;
-''' + function(theme, "hooked_theme_render_pass") + r'''
+''' + function(theme, "hooked_theme_render_pass").replace("((int (*)(void))0x001126d0u)()", "test_view()") + r'''
 int main(void) {
     hooked_theme_render_pass((void *)123);
     assert(pending && !switches && !light_state);

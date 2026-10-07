@@ -3,7 +3,7 @@
 
 ## Unreleased
 
-- Light theme: with the module chosen, the deck now starts in LIGHT; SHIFT + SHORTCUT or DISPLAY MODE in Utility switches between DARK and LIGHT at any time, and a switch made while the deck is still starting is no longer undone by the next one. Known: right after start-up, a few labels on the main screen keep a dark box until you open another screen. Checked in the emulator; not yet run on hardware.
+- Light theme: with the module chosen, the deck now starts in LIGHT; SHIFT + SHORTCUT or DISPLAY MODE in Utility switches between DARK and LIGHT at any time, and a switch made while the deck is still starting is no longer undone by the next one. Known: after switching from DARK to LIGHT, the two time counters at the top of the main screen can keep a dark box until you open another screen. Checked in the emulator; not yet run on hardware.
 
 - Light theme: BROWSE lists and both UTILITY pages now show dark text on the light background, and the selected blue row keeps its white text ([#44](https://github.com/Tratosca/rx3-toolkit/issues/44)). The SOURCE screen is readable too, and the grey squares behind the list icons are gone. In every BROWSE category the chosen category in the left column and the list cursor read correctly too. Still open: a UTILITY row is hard to read while you change its value. Checked in the emulator; not yet run on hardware.
 

@@ -188,6 +188,7 @@ static uint8_t theme_shortcut_swallowed;
  */
 static volatile int theme_toggle_pending;
 static unsigned int theme_refresh_pending;
+static unsigned int theme_home_repaint_pending;
 static int theme_last_text_view = -1;
 /* The light theme can start armed rather than active. The player paints its
    own first frame stock, and the display is taken over only once it has:
@@ -252,6 +253,7 @@ static void theme_run_pending_toggle(void)
         framework->images->select_variant(light);
         framework->text->invalidate();
         theme_waveform_apply(light);
+        theme_home_repaint_pending = light != 0;
         if (request == 2) {
             theme_refresh_pending = 0;
             if (((int (*)(void))0x001126d0)() == 7)
@@ -303,6 +305,27 @@ static unsigned int theme_refresh_header(void)
         ((void *(*)(void *))vtable[THEME_CONTROL_CHILDREN_SLOT])(header));
 }
 
+static unsigned int theme_refresh_home_child(unsigned int target)
+{
+    if (((int (*)(void))0x001126d0u)() != 1) return 0;
+    void *component = ((void *(*)(void))THEME_COMPONENT_MANAGER)();
+    void *winscape = component ?
+        ((void *(*)(void *))THEME_ACTIVE_WINSCAPE)(component) : 0;
+    if (!winscape) return 0;
+    void *children = (uint8_t *)winscape + 0x24u;
+    void **vtable = *(void ***)children;
+    void *child = ((void *(*)(void *))vtable[THEME_LIST_FIRST_SLOT])(children);
+    for (unsigned int i = 0; child && i < 3u; i++) {
+        if (i == target) {
+            void *manager = ((void *(*)(void))GET_HMI_MANAGER)();
+            ((void (*)(void *, int, void *))REFRESH_GLYPH)(manager, -1, child);
+            return 1;
+        }
+        child = ((void *(*)(void *))vtable[THEME_LIST_NEXT_SLOT])(children);
+    }
+    return 0;
+}
+
 static void theme_refresh_text_for_view(void)
 {
     int view = ((int (*)(void))0x001126d0u)();
@@ -324,8 +347,18 @@ static void hooked_theme_render_pass(void *manager)
     original_theme_render_pass(manager);
     /* A winscape entry consumes the root queue. Draw the independent header
        groups afterwards, in a second native pass on the same UI thread. */
-    if (repaint && theme_refresh_header())
+    if (theme_light_active() &&
+        ((int (*)(void))0x001126d0u)() == 1 &&
+        (theme_home_repaint_pending || repaint)) {
+        theme_home_repaint_pending = 0;
+        if (theme_refresh_home_child(1u))
+            original_theme_render_pass(manager);
+        unsigned int queued = theme_refresh_header();
+        queued += theme_refresh_home_child(2u);
+        if (queued) original_theme_render_pass(manager);
+    } else if (repaint && theme_refresh_header()) {
         original_theme_render_pass(manager);
+    }
     theme_render_active = 0;
 }
 
@@ -434,7 +467,9 @@ static int theme_feature_install(void)
 {
     if (!theme_enabled)
         return 0;
-    if (memcmp((const void *)THEME_DIRTY_WINDOWS, theme_dirty_windows_guard, 8)) {
+    if (memcmp((const void *)THEME_DIRTY_WINDOWS, theme_dirty_windows_guard, 8) ||
+        memcmp((const void *)THEME_COMPONENT_MANAGER, theme_component_manager_guard, 8) ||
+        memcmp((const void *)THEME_ACTIVE_WINSCAPE, theme_active_winscape_guard, 8)) {
         log_line("light theme: unexpected window invalidation prologue");
         return 0;
     }
@@ -478,6 +513,7 @@ static void theme_feature_remove(void)
     }
     utility_remove_theme_row();
     theme_refresh_pending = 0;
+    theme_home_repaint_pending = 0;
     int was_light = theme_light_active();
     framework->images->release_variants(&theme_enabled);
     if (framework->text) framework->text->release(&theme_enabled);

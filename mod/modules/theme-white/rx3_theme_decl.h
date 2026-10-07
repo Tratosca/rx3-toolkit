@@ -74,6 +74,15 @@ static const uint8_t theme_dirty_windows_guard[8] = {
     0xf8, 0x40, 0x2d, 0xe9, 0xcc, 0x40, 0x9f, 0xe5
 };
 
+#define THEME_COMPONENT_MANAGER ((unsigned long)0x001d0a30)
+static const uint8_t theme_component_manager_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x20, 0x40, 0x9f, 0xe5
+};
+#define THEME_ACTIVE_WINSCAPE ((unsigned long)0x001cc510)
+static const uint8_t theme_active_winscape_guard[8] = {
+    0x20, 0x00, 0x90, 0xe5, 0x1e, 0xff, 0x2f, 0xe1
+};
+
 /* Magenta. The player writes every other value to the framebuffer and skips
  * this one, so it is transparency and never a colour. Converting it would
  * punch a hole in whatever image it belongs to.
