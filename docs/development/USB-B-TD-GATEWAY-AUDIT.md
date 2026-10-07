@@ -46,6 +46,34 @@ during that request. Treat repeated excerpt sampling as unverified until a
 subsequent bench run measures requested range bytes and distinguishes budget
 exhaustion from other decode errors.
 
+## Sample length for beat diagnostics
+
+The one-second physical excerpt above was **only** a transport and decoder
+smoke test. It produced energy features, not a reliable beat estimate. For a
+future beatgrid check, start with several seconds per excerpt (four seconds is
+the existing sample-only VJ workflow's starting length), choose multiple
+interior locations across the track and different phrases, and avoid known
+phrase boundaries and breakdowns when selecting primary anchors. Compare
+detected onset times both against the rekordbox grid **within** each excerpt
+and across the known source-time gaps between excerpts. A local tempo that
+disagrees with the track majority can be investigated within its phrase;
+short or rhythmically sparse phrases should abstain and retain the trusted
+master grid. Extend a window or add an independent location when confidence
+is low rather than treating a four-second clip as inherently sufficient.
+
+This is a sampling policy, **not** an implemented audio beat detector. The
+current `audio_excerpt.py` returns coarse energy/band/onset motion features;
+it neither estimates BPM nor corrects the rekordbox beatgrid. The current
+HTTP API permits up to five seconds per request, so it can carry a four-second
+window after transfer efficiency is fixed. The successful one-second FLAC
+request followed by a failed repeat shows that the present 8 MiB deck budget
+and FFmpeg seeking behavior are not yet adequate evidence for multiple
+four-second requests. Before enabling automatic beat diagnostics, instrument
+bytes per range and per excerpt, distinguish budget exhaustion from decoding
+errors, add bounded range reuse/caching on the host, and bench-test a set of
+multi-second excerpts while playback is monitored. No full-song fallback or
+unlabelled beatgrid replacement is allowed.
+
 ## TouchDesigner data
 
 Start the existing `prodjlink_bridge.py --deck-metadata` on TCP 50130, then
