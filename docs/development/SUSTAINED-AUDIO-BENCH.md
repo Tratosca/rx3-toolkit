@@ -20,8 +20,9 @@ requests from the two tracks, throttling the host in four roughly equal byte
 segments at 8, 16, 32, and 50 Mb/s. The runner stops before the next request if
 telemetry is stale, either selected song changes or stops, the source changes,
 or the mounted rekordbox export changes, or packet cadence exceeds 500 ms.
-It also rejects a plan exceeding the
-128 MiB cumulative deck budget. Files are streamed directly to ignored host
+It also rejects a plan that comes within 4 MiB of the
+128 MiB cumulative deck budget, leaving room for previous small probes. Files
+are streamed directly to ignored host
 storage, with per-track SHA-256; the repeated first track must match phase one.
 
 With the audited bench image installed and both telemetry feeds recording:
@@ -64,5 +65,35 @@ Phase one then read the currently playing Deck 1 track (47,075,968 bytes) in
 gap; position diagnostics delivered 566 packets with a maximum 54.6 ms gap.
 Actual rates by target segment were 8.0, 15.1, 17.5, and 17.0 Mb/s for 8,
 16, 32, and 50 Mb/s targets. The plateau shows the current request path did
-not approach 50 Mb/s. It does not identify the limiting component. Subjective
-audio/dropout feedback and the two-song phase are pending.
+not approach 50 Mb/s. It does not identify the limiting component. The
+operator was not listening closely during phase one; its telemetry was normal.
+
+## Two-song physical result
+
+Deck 1 continued playing the 47,075,968-byte track. The first Deck 2 choice
+would have exceeded the session allowance, so the runner rejected it before
+audio transfer. The operator loaded a distinct 31,865,785-byte track instead.
+The two-song phase read 30,081,024 bytes before the deck-served PDB changed.
+The runner stopped, while Now Playing and position packets continued with
+maximum gaps of 41.7 and 57.3 ms. The operator heard no dropout or saw no
+freeze during that portion.
+
+For a guarded resume, the host read the new PDB twice and found it stable.
+Both selected track IDs retained the same file paths and sizes. The host
+verified the start and end of each saved partial file against fresh deck
+ranges, then read only the remaining bytes. The final Deck 1 SHA-256 matched
+the phase-one full-file hash. Both complete files totalled 78,941,753 bytes;
+the interrupted and resumed portions took 48.7 seconds together. In the
+resumed portion, measured segment rates were 14.6, 17.9, and 17.1 Mb/s for
+16, 32, and 50 Mb/s targets. Its Now Playing and position maximum gaps were
+41.7 and 65.4 ms. The operator reported no dropout or freeze during either
+portion. The documented audio requests total less than the 128 MiB helper
+allowance, including the earlier 256 KiB monitor false stop and four 64 KiB
+resume identity checks.
+
+This is evidence that these two files could be read concurrently with
+playback in one bench run, at observed rates below 18 Mb/s. It is not a
+guarantee of performance at 50 Mb/s or with different USB media, songs, or
+firmware. The export changed in content while the relevant file identities
+remained stable; future sampling should verify track-specific identity rather
+than blindly accepting or permanently blocking all PDB changes.

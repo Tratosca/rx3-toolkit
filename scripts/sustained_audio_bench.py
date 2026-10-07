@@ -20,6 +20,7 @@ import time
 from remote_metadata import MAX_AUDIO_RANGE, RemoteCatalog
 
 BENCH_BUDGET = 128 * 1024 * 1024
+BENCH_RESERVE = 4 * 1024 * 1024
 STALE_NS = 2_000_000_000
 PLAYING = (2, 3)
 RATE_STAGES_MBPS = (8, 16, 32, 50)
@@ -66,8 +67,9 @@ def gaps(db: sqlite3.Connection, start_ns: int) -> dict:
     return result
 
 
-def ranges(sizes: dict[int, int]):
-    offsets = {track_id: 0 for track_id in sizes}
+def ranges(sizes: dict[int, int], start_offsets: dict[int, int] | None = None):
+    offsets = dict(start_offsets) if start_offsets is not None else {
+        track_id: 0 for track_id in sizes}
     while any(offsets[track_id] < size for track_id, size in sizes.items()):
         for track_id, size in sizes.items():
             offset = offsets[track_id]
@@ -78,7 +80,9 @@ def ranges(sizes: dict[int, int]):
             offsets[track_id] += count
 
 
-def run(phase: str, db_path: Path, output: Path) -> dict:
+def run(phase: str, db_path: Path, output: Path, resume: bool = False) -> dict:
+    if resume and phase != "both":
+        raise ValueError("only the interrupted two-song phase can resume")
     output = output.resolve()
     if str(output).startswith("/Volumes/"):
         raise ValueError("bench output must stay on the computer, not a USB drive")
@@ -92,6 +96,11 @@ def run(phase: str, db_path: Path, output: Path) -> dict:
             raise RuntimeError("no playing track was observed")
         plan_path = output / "phase-one.json"
         previous = json.loads(plan_path.read_text()) if phase == "both" else None
+        report_path = output / f"phase-{phase}.json"
+        interrupted = json.loads(report_path.read_text()) if resume else None
+        if interrupted and (interrupted.get("status") != "stopped" or
+                            "export changed" not in interrupted.get("error", "")):
+            raise RuntimeError("only an export-identity stop can resume automatically")
         if phase == "both":
             if not previous or previous.get("status") != "complete":
                 raise RuntimeError("complete phase one before testing both songs")
@@ -112,45 +121,84 @@ def run(phase: str, db_path: Path, output: Path) -> dict:
         catalog = RemoteCatalog(source)
         generation = catalog.manifest["export_pdb_sha256"]
         if previous and (previous["source"] != source or
-                         previous["media_generation"] != generation):
+                         (previous["media_generation"] != generation and not interrupted)):
             raise RuntimeError("source/export changed since phase one")
         sizes = {track_id: catalog.audio_stat(track_id) for track_id in tracks}
         total = sum(sizes.values()) + (previous["bytes"] if previous else 0)
-        if total > BENCH_BUDGET:
-            raise RuntimeError(f"planned {total} bytes exceeds 128 MiB bench budget")
+        if total + BENCH_RESERVE > BENCH_BUDGET:
+            raise RuntimeError(f"planned {total} bytes plus 4 MiB reserve exceeds "
+                               "128 MiB bench budget")
         if not sizes or any(size <= 0 for size in sizes.values()):
             raise RuntimeError("a selected song has no readable audio file")
         paths = {track_id: catalog.tracks[str(track_id)]["metadata"]["file_path"]
                  for track_id in tracks}
         if previous and paths[first_id] != previous["paths"][str(first_id)]:
             raise RuntimeError("first song audio path changed")
+        if interrupted and (interrupted["source"] != source or
+                            interrupted["first_track_id"] != first_id or
+                            interrupted["deck_tracks"] !=
+                            {str(deck): track for track, deck in tracks.items()} or
+                            interrupted["paths"] != {str(k): v for k, v in paths.items()} or
+                            interrupted["sizes"] != {str(k): v for k, v in sizes.items()}):
+            raise RuntimeError("playing track identity, path, or size changed")
+        if interrupted:
+            time.sleep(2)
+            catalog.verify_export(max_age_s=0)
 
         start_ns = time.time_ns()
         start = time.monotonic()
-        bytes_done = 0
+        bytes_done = interrupted["bytes"] if interrupted else 0
         planned_bytes = sum(sizes.values())
-        stage_index = 0
+        stage_index = min(3, bytes_done * 4 // planned_bytes)
         stage_bytes = 0
         stage_start = time.monotonic()
         stages = []
         next_cadence_check = stage_start + 2.0
         handles = {}
         digests = {track_id: hashlib.sha256() for track_id in tracks}
+        offsets = {track_id: 0 for track_id in tracks}
+        if interrupted:
+            for track_id in tracks:
+                part = output / f"phase-{phase}-track-{track_id}.part"
+                with part.open("rb") as stream:
+                    while block := stream.read(1024 * 1024):
+                        digests[track_id].update(block)
+                offsets[track_id] = part.stat().st_size
+                if offsets[track_id] > sizes[track_id] or offsets[track_id] == 0 or (
+                        digests[track_id].hexdigest() !=
+                        interrupted["sha256"][str(track_id)]):
+                    raise RuntimeError("host partial-file length or hash changed")
+            if sum(offsets.values()) != bytes_done:
+                raise RuntimeError("host partial-file byte count changed")
+            for track_id, offset in offsets.items():
+                part = output / f"phase-{phase}-track-{track_id}.part"
+                for check_offset in (0, max(0, offset - RANGE_BYTES)):
+                    count = min(RANGE_BYTES, offset - check_offset)
+                    deck_data, actual_size = catalog.audio_range(track_id, check_offset, count)
+                    with part.open("rb") as stream:
+                        stream.seek(check_offset)
+                        host_data = stream.read(count)
+                    if actual_size != sizes[track_id] or deck_data != host_data:
+                        raise RuntimeError("deck source differs from saved partial audio")
         report = {"schema": "rx3-sustained-audio-bench/1", "phase": phase,
                   "status": "running", "source": source, "media_generation": generation,
                   "first_deck": first_deck, "first_track_id": first_id,
                   "deck_tracks": {str(deck): track for track, deck in tracks.items()},
                   "paths": {str(k): v for k, v in paths.items()},
                   "sizes": {str(k): v for k, v in sizes.items()},
-                  "planned_cumulative_bytes": total, "bytes": 0}
-        report_path = output / f"phase-{phase}.json"
+                  "planned_cumulative_bytes": total, "bytes": bytes_done}
+        if interrupted:
+            (output / "phase-both-interrupted.json").write_text(
+                json.dumps(interrupted, indent=2) + "\n")
+            report["resumed_from_bytes"] = bytes_done
+            report["prior_media_generation"] = interrupted["media_generation"]
         report_path.write_text(json.dumps(report, indent=2) + "\n")
         try:
             for track_id in tracks:
                 part = output / f"phase-{phase}-track-{track_id}.part"
-                handles[track_id] = part.open("xb")
-            next_progress = 8 * 1024 * 1024
-            for track_id, offset, count in ranges(sizes):
+                handles[track_id] = part.open("ab" if interrupted else "xb")
+            next_progress = (bytes_done // (8 * 1024 * 1024) + 1) * 8 * 1024 * 1024
+            for track_id, offset, count in ranges(sizes, offsets):
                 intended_stage = min(3, bytes_done * 4 // planned_bytes)
                 if intended_stage != stage_index:
                     stages.append({"target_Mb_s": RATE_STAGES_MBPS[stage_index],
@@ -183,8 +231,10 @@ def run(phase: str, db_path: Path, output: Path) -> dict:
                         raise RuntimeError("telemetry cadence degraded during audio read")
                     next_cadence_check = time.monotonic() + 2.0
                 if bytes_done >= next_progress:
+                    elapsed_total = (interrupted["elapsed_s"] if interrupted else 0) + \
+                                    time.monotonic() - start
                     print(f"{phase}: {bytes_done / 1048576:.1f} MiB, "
-                          f"{bytes_done / max(time.monotonic()-start, .001) / 1048576:.2f} MiB/s",
+                          f"{bytes_done / max(elapsed_total, .001) / 1048576:.2f} MiB/s",
                           flush=True)
                     next_progress += 8 * 1024 * 1024
             for track_id, handle in handles.items():
@@ -207,9 +257,11 @@ def run(phase: str, db_path: Path, output: Path) -> dict:
                 if not handle.closed:
                     handle.close()
             report.update(bytes=bytes_done,
-                          elapsed_s=round(time.monotonic() - start, 2),
+                          elapsed_s=round((interrupted["elapsed_s"] if interrupted else 0) +
+                                          time.monotonic() - start, 2),
                           throughput_MiB_s=round(bytes_done /
-                                                  max(time.monotonic()-start, .001) /
+                                                  max((interrupted["elapsed_s"] if interrupted else 0) +
+                                                      time.monotonic()-start, .001) /
                                                   1048576, 3),
                           sha256={str(k): digest.hexdigest()
                                   for k, digest in digests.items()},
@@ -225,12 +277,14 @@ def run(phase: str, db_path: Path, output: Path) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phase", choices=("one", "both"), required=True)
+    parser.add_argument("--resume", action="store_true",
+                        help="resume a two-song run stopped by an export metadata change")
     parser.add_argument("--database", type=Path,
                         default=Path("local/captures/rx3-rolling.sqlite3"))
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     try:
-        result = run(args.phase, args.database, args.out)
+        result = run(args.phase, args.database, args.out, args.resume)
     except (ValueError, RuntimeError, OSError, KeyError, sqlite3.Error) as exc:
         parser.exit(1, f"sustained audio bench stopped: {exc}\n")
     print(json.dumps({key: result[key] for key in
