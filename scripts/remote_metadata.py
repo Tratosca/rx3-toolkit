@@ -1,6 +1,7 @@
 """Read-only RX3 USB-B metadata client for the isolated on-deck file service.
 
-Only rekordbox export and analysis files are requested. No audio is transferred.
+Rekordbox export and analysis files are requested by the gateway. A separately
+bounded audio range interface can read selected tracks for explicit tests.
 The deck reads USB files in a separate process; Python parses on the computer.
 """
 from __future__ import annotations

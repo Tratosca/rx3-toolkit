@@ -4,6 +4,12 @@
  * serve bounded, read-only music-file bytes for host-side excerpt decoding.
  * The connection closes after each reply. No player audio buffer is touched.
  */
+#ifndef AUDIO_PACE_NS
+#define AUDIO_PACE_NS 4000000u
+#endif
+#if AUDIO_PACE_NS < 600000u
+#error "Audio pacing below the 50 Mb/s bench floor is not permitted"
+#endif
 #ifdef __arm__
 typedef unsigned int size_t;
 typedef int ssize_t;
@@ -26,7 +32,7 @@ static long call6(long n,long a,long b,long c,long d,long e,long f) {
 #define LISTEN(d) call6(284,d,4,0,0,0,0)
 #define ACCEPT(d,p,l) call6(285,d,(long)(p),(long)(l),0,0,0)
 #define OPTION(d,level,name,p,n) call6(294,d,level,name,(long)(p),n,0)
-#define PACE() do { long ts[2]={0,4000000};(void)call6(162,(long)ts,0,0,0,0,0); } while(0)
+#define SLEEP_NS(ns) do { long ts[2]={0,(ns)};(void)call6(162,(long)ts,0,0,0,0,0); } while(0)
 #else
 #include <stddef.h>
 #include <unistd.h>
@@ -45,7 +51,7 @@ static long call6(long n,long a,long b,long c,long d,long e,long f) {
 #define LISTEN(d) listen(d,4)
 #define ACCEPT(d,p,l) accept(d,(struct sockaddr *)(p),(socklen_t *)(l))
 #define OPTION(d,level,name,p,n) setsockopt(d,level,name,p,n)
-#define PACE() do { struct timespec ts={0,4000000};(void)nanosleep(&ts,0); } while(0)
+#define SLEEP_NS(ns) do { struct timespec ts={0,(ns)};(void)nanosleep(&ts,0); } while(0)
 #include <time.h>
 #endif
 
@@ -217,7 +223,7 @@ static void serve_audio(int client,int root,char *request) {
             if(read_count<=0) break;
             if(!send_all(client,buffer,(size_t)read_count)) break;
             remaining-=(unsigned int)read_count;
-            PACE();
+            SLEEP_NS(AUDIO_PACE_NS);
         }
     }
     CLOSE(file);return;
@@ -255,7 +261,7 @@ static void serve_client(int client,int root) {
             if((unsigned int)n>limit-total) break;
             if(!send_all(client,buffer,(size_t)n)) break;
             total+=(unsigned int)n;
-            PACE(); /* at most roughly 1 MiB/s, independently of the host */
+            SLEEP_NS(4000000u); /* Metadata stays near 1 MiB/s in every build. */
         }
     }
     CLOSE(file);

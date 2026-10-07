@@ -555,17 +555,28 @@ def compile_report_sender(source: pathlib.Path, output: pathlib.Path,
 
 
 def compile_metadata_server(source: pathlib.Path, output: pathlib.Path,
-                            compiler: str | None = None) -> None:
+                            compiler: str | None = None,
+                            bench_audio_budget_bytes: int | None = None,
+                            bench_audio_pace_ns: int | None = None) -> None:
     """Compile the isolated, read-only RX3 USB metadata process."""
     compiler = compiler or os.environ.get("CC") or shutil.which("clang")
     if not compiler:
         raise ValueError("Clang and LLD are required for RX3 metadata transport")
+    if bench_audio_budget_bytes is not None and bench_audio_budget_bytes != 128 * 1024 * 1024:
+        raise ValueError("bench audio budget must be exactly 128 MiB")
+    if bench_audio_pace_ns is not None and (bench_audio_budget_bytes is None or
+                                             bench_audio_pace_ns != 600_000):
+        raise ValueError("fast audio pacing requires the fixed bench budget and 600000 ns pace")
+    defines = ([f"-DAUDIO_SESSION_BUDGET={bench_audio_budget_bytes}u"]
+               if bench_audio_budget_bytes is not None else [])
+    if bench_audio_pace_ns is not None:
+        defines.append(f"-DAUDIO_PACE_NS={bench_audio_pace_ns}u")
     subprocess.run([
         compiler, "--target=arm-linux-gnueabi", "-march=armv7-a", "-marm",
         "-mfloat-abi=soft", "-fno-stack-protector", "-fno-builtin",
         "-ffreestanding", "-O2", "-Wall", "-Wextra", "-Werror",
         "-fuse-ld=lld", "-nostdlib", "-static", "-Wl,--build-id=none",
-        "-Wl,-e,_start", str(source), "-o", str(output),
+        "-Wl,-e,_start", *defines, str(source), "-o", str(output),
     ], check=True, capture_output=True, text=True)
     output.chmod(0o755)
 
@@ -629,6 +640,8 @@ def write_manifest(
     size: int,
     digest: str,
     build_id: str | None = None,
+    bench_audio_budget_bytes: int | None = None,
+    bench_audio_pace_ns: int | None = None,
 ) -> pathlib.Path:
     """Record what was written, beside what was written.
 
@@ -651,6 +664,11 @@ def write_manifest(
     }
     if build_id is not None:
         record["buildId"] = build_id
+    if bench_audio_budget_bytes is not None:
+        record["benchAudioBudgetBytes"] = bench_audio_budget_bytes
+        record["benchOnly"] = True
+    if bench_audio_pace_ns is not None:
+        record["benchAudioPaceNs"] = bench_audio_pace_ns
     manifest.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return manifest
 
@@ -696,6 +714,8 @@ def build_runtime(
     supplied_files: Mapping[str, Mapping[str, bytes]] | None = None,
     cancellation: Cancellation | None = None,
     progress: ProgressCallback | None = None,
+    bench_audio_budget_bytes: int | None = None,
+    bench_audio_pace_ns: int | None = None,
 ) -> BuildResult:
     """Build an atomic `autoexec.bin` from selected versioned modules.
 
@@ -724,6 +744,14 @@ def build_runtime(
             f"no module is built for firmware {firmware}; this tree knows {known}"
         )
     selected = resolve_patches(definitions, patch_ids)
+    if bench_audio_budget_bytes is not None and (
+            firmware != "1.19" or
+            [patch.patch_id for patch in selected] !=
+            ["core", "now-playing", "position-diagnostic"]):
+        raise ValueError("extended audio budget is only for the RX3 1.19 telemetry bench")
+    if bench_audio_pace_ns is not None and (bench_audio_budget_bytes != 128 * 1024 * 1024 or
+                                            bench_audio_pace_ns != 600_000):
+        raise ValueError("fast audio pacing is only for the 128 MiB bench image")
     by_module = _validate_supplied_files(supplied_files, selected)
     diagnostic_reporting = any(patch.patch_id == "position-diagnostic" for patch in selected)
     build_id = uuid.uuid4().hex if diagnostic_reporting else None
@@ -751,7 +779,9 @@ def build_runtime(
             compile_report_sender(root / "mod/lib/report_sender.c", library / "report-send-status",
                                   port=50126)
             compile_metadata_server(root / "mod/lib/metadata_server.c",
-                                    library / "metadata-server")
+                                    library / "metadata-server",
+                                    bench_audio_budget_bytes=bench_audio_budget_bytes,
+                                    bench_audio_pace_ns=bench_audio_pace_ns)
             (library / "build-id").write_text(build_id + "\n", encoding="ascii")
         compatibility_target = modules / "compatibility/module.sh"
         compatibility_target.parent.mkdir(parents=True)
@@ -808,6 +838,7 @@ def build_runtime(
             temporary_output.unlink(missing_ok=True)
 
     installed = tuple(patch.patch_id for patch in selected)
-    write_manifest(output_directory, firmware, installed, size, digest, build_id)
+    write_manifest(output_directory, firmware, installed, size, digest, build_id,
+                   bench_audio_budget_bytes, bench_audio_pace_ns)
     notify(Message("job.done"))
     return BuildResult(final_output, size, digest, installed)

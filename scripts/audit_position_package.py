@@ -18,13 +18,22 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def audit(package, key, hook, report_sender, status_sender, metadata_server):
+def audit(package, key, hook, report_sender, status_sender, metadata_server,
+          bench_audio_budget_bytes=None):
     manifest=json.loads((package.parent/'rx3-mod-manifest.json').read_text())
     contents=package.read_bytes()
     if manifest['sha256']!=digest(contents) or manifest['bytes']!=len(contents):
         raise ValueError('Package does not match manifest')
     if manifest['firmware']!='1.19' or manifest['modules']!=['core','now-playing','position-diagnostic']:
         raise ValueError('Unexpected firmware or module selection')
+    if bench_audio_budget_bytes is None:
+        if (manifest.get('benchOnly') or manifest.get('benchAudioBudgetBytes') or
+                manifest.get('benchAudioPaceNs')):
+            raise ValueError('Bench image needs an explicit budget audit')
+    elif not (manifest.get('benchOnly') is True and
+              manifest.get('benchAudioBudgetBytes')==bench_audio_budget_bytes==128*1024*1024 and
+              manifest.get('benchAudioPaceNs')==600000):
+        raise ValueError('Unexpected bench audio budget')
     build_id=manifest.get('buildId')
     if not isinstance(build_id,str) or not re.fullmatch('[0-9a-f]{32}',build_id):
         raise ValueError('Missing or invalid build ID')
@@ -66,9 +75,13 @@ def audit(package, key, hook, report_sender, status_sender, metadata_server):
     if set(seen)!=set(expected)|{'/modules/index'}: raise ValueError('Missing image file')
     imports=undefined_symbols(hook)
     if imports-ALLOWED: raise ValueError('Unexpected ARM imports: '+repr(imports-ALLOWED))
-    return {'package_sha256':digest(contents),'firmware':manifest['firmware'],
+    result={'package_sha256':digest(contents),'firmware':manifest['firmware'],
             'modules':manifest['modules'],'files':seen,'unexpected_imports':[],
             'result':'exact source and independently built hook match; not hardware certification'}
+    if bench_audio_budget_bytes is not None:
+        result['bench_audio_budget_bytes']=bench_audio_budget_bytes
+        result['bench_audio_pace_ns']=600000
+    return result
 
 
 def main():
@@ -80,9 +93,10 @@ def main():
     p.add_argument('--report-sender',type=Path,default=ROOT/'build/report-send')
     p.add_argument('--status-sender',type=Path,default=ROOT/'build/report-send-status')
     p.add_argument('--metadata-server',type=Path,default=ROOT/'build/metadata-server')
+    p.add_argument('--bench-audio-budget-bytes',type=int)
     a=p.parse_args()
     result=audit(a.package,a.key,a.hook,a.report_sender,a.status_sender,
-                 a.metadata_server)
+                 a.metadata_server,a.bench_audio_budget_bytes)
     with a.output.open('x') as output: json.dump(result,output,indent=2);output.write('\n')
     print('PASS:',len(result['files']),'files match; no unexpected ARM imports')
 

@@ -304,7 +304,8 @@ def _atomic_write(path: Path, data: bytes) -> None:
             os.unlink(name)
 
 
-def install(root: Path, cache: Path, package: Path, firmware: str) -> dict:
+def install(root: Path, cache: Path, package: Path, firmware: str,
+            allow_bench_audio: bool = False) -> dict:
     """Install only two root-level telemetry files, with a recoverable backup."""
     root = root.resolve(strict=True)
     cache = cache.resolve(strict=True)
@@ -335,6 +336,16 @@ def install(root: Path, cache: Path, package: Path, firmware: str) -> dict:
     audit_path = package / "package-audit.json"
     details = json.loads(candidate_manifest.read_text())
     audit = json.loads(audit_path.read_text())
+    is_bench = (details.get("benchOnly") or details.get("benchAudioBudgetBytes") or
+                details.get("benchAudioPaceNs"))
+    if is_bench and not allow_bench_audio:
+        raise ValueError("bench-only audio image requires explicit --bench-audio")
+    if is_bench and not (
+            details.get("benchOnly") is True and
+            details.get("benchAudioBudgetBytes") ==
+            audit.get("bench_audio_budget_bytes") == 128 * 1024 * 1024 and
+            details.get("benchAudioPaceNs") == audit.get("bench_audio_pace_ns") == 600_000):
+        raise ValueError("bench audio budget does not match the image audit")
     image = bounded_read(candidate, limit=8 * 1024 * 1024)
     if (details.get("firmware") != firmware or audit.get("firmware") != firmware or
             details.get("modules") != ["core", "now-playing", "position-diagnostic"] or
@@ -395,10 +406,13 @@ def main() -> None:
     install_p.add_argument("--cache", type=Path, required=True)
     install_p.add_argument("--package", type=Path, required=True)
     install_p.add_argument("--firmware", required=True, help="RX3 firmware displayed on the unit")
+    install_p.add_argument("--bench-audio", action="store_true",
+                           help="explicitly allow the audited 128 MiB bench-only audio image")
     args = parser.parse_args()
     try:
         result = (scan(args.usb, args.out) if args.command == "scan" else
-                  install(args.usb, args.cache, args.package, args.firmware))
+                  install(args.usb, args.cache, args.package, args.firmware,
+                          args.bench_audio))
     except (RuntimeError, ValueError, OSError, KeyError) as exc:
         parser.exit(1, f"pre-gig: {exc}\n")
     print(json.dumps(result, indent=2))
