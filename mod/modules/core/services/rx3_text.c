@@ -39,7 +39,11 @@ void rx3_text_draw_native(void *render, void *glyph,
     }
     const uint8_t *source = glyph;
     struct rx3_text_draw draw;
-    memcpy(&draw.layer, source + 0x10u, 2u);
+    /* The glyph holds a 16-bit layer; copying it into the wider field would
+       leave stack bytes in the window-table index. */
+    uint16_t layer;
+    memcpy(&layer, source + 0x10u, sizeof(layer));
+    draw.layer = layer;
     memcpy(draw.box, source + 0x18u, sizeof(draw.box));
     memcpy(&draw.native_colour, source + 0x28u, 4u);
     draw.selection_index = 0u;
