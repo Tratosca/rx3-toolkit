@@ -1,7 +1,9 @@
 # RX3 USB-B TouchDesigner gateway candidate (2026-10-07)
 
 This candidate follows the physically verified metadata checkpoint tag
-`rx3-usbb-metadata-bench-2026-10-07`. It has **not** yet been run on the RX3.
+`rx3-usbb-metadata-bench-2026-10-07`. Its bounded read and TD-format output
+have now had a single-track physical bench check; endurance and subjective
+audio quality remain unverified.
 The existing `librx3_core.so` is byte-identical to that checkpoint. The new
 deck code is an isolated `metadata-server` process; the new semantic gateway,
 sample decoder, OSC publisher and HTTP API run on the computer.
@@ -9,6 +11,33 @@ The follow-up audited image installed on SOUND_PRO has SHA-256
 `1723f3b140c925fe37a50360f03f701583343cb8aaf8faef931c205d42af0c26`.
 The installer backed up the previous USB-root image and manifest in the
 ignored host cache. The installed image hash was verified after writing.
+
+## Physical bench check, 2026-10-07
+
+With firmware 1.19 and one analyzed track playing from SOUND_PRO, the USB-B
+helper opened TCP 50131. The rolling listener received continuing Now Playing
+and position packets. A direct `STAT` and 4 KiB `RANGE` of that track's
+47,075,968-byte FLAC succeeded; its reported size stayed consistent. The
+fresh deck-served PDB contained 238 tracks. Its hash differed from the
+pre-gig scan, so the first sample attempt stopped before reading audio; the
+playing track's title, artist, audio path and analysis path still matched,
+and the fresh export hash was stable across two reads three seconds apart.
+Using that fresh identity, the host decoded a one-second excerpt at source
+time 30 seconds into four quarter-second windows in 10.64 seconds. The helper
+enforces its 8 MiB session cap, but exact bytes transferred were not measured
+in this physical run. No drop in telemetry was observed afterward; the
+rolling capture still recorded hundreds of Now Playing and position packets
+per ten-second window.
+
+The current captured packets and deck-served analysis produced a connected
+bridge snapshot with valid title, beat phase and phrase. The existing NXS2 TD
+OSC assembler accepted the output and exposed 68 deck fields. Fader and live
+audio correctly remained invalid. This validates the packet schema and
+single-track data path, **not** an actual running TouchDesigner network or a
+full DJ set. The rolling recorder did not capture a separate startup status
+packet in this insertion, although it did capture the preflight report and
+the helper/telemetry functioned. A subjective dropout/freeze observation from
+the operator is still pending.
 
 ## TouchDesigner data
 
