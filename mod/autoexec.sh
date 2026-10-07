@@ -56,6 +56,9 @@ fi
 . /mnt/iso/lib/volatile-guard.sh || exit 1
 volatile_mount_layout /proc/mounts && volatile_path_layout "" || exit 1
 RX3_STAGE=guarded
+# The resident core defaults to a /tmp log, but an inherited override could
+# redirect its append writes onto a persistent mount. Never pass one to rbp.
+unset RX3_LOG_FILE
 # Do not inherit a staging destination from the launch environment.
 RUNTIME_STAGE_DIR=/root/pdj/.rx3-stage.$$
 # Sample the held panel state before logs, module loading, locks or patching.

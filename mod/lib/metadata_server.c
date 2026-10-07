@@ -203,6 +203,9 @@ static void serve_audio(int client,int root,char *request) {
         send_all(client,(const unsigned char *)header,n);CLOSE(file);return;
     }
     if(SEEK(file,(long)offset,0)<0) { CLOSE(file);goto error; }
+    /* Charge the whole accepted range before sending. A peer that disconnects
+     * after a partial write must not recover its unused allowance by retrying. */
+    audio_bytes_sent+=count;
     header[n++]='D';header[n++]='A';header[n++]='T';header[n++]='A';header[n++]=' ';
     n+=decimal(header+n,count);header[n++]=' ';
     n+=decimal(header+n,(unsigned int)size);header[n++]='\n';
@@ -214,7 +217,6 @@ static void serve_audio(int client,int root,char *request) {
             if(read_count<=0) break;
             if(!send_all(client,buffer,(size_t)read_count)) break;
             remaining-=(unsigned int)read_count;
-            audio_bytes_sent+=(unsigned int)read_count;
             PACE();
         }
     }

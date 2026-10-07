@@ -5,6 +5,10 @@ This candidate follows the physically verified metadata checkpoint tag
 The existing `librx3_core.so` is byte-identical to that checkpoint. The new
 deck code is an isolated `metadata-server` process; the new semantic gateway,
 sample decoder, OSC publisher and HTTP API run on the computer.
+The follow-up audited image installed on SOUND_PRO has SHA-256
+`1723f3b140c925fe37a50360f03f701583343cb8aaf8faef931c205d42af0c26`.
+The installer backed up the previous USB-root image and manifest in the
+ignored host cache. The installed image hash was verified after writing.
 
 ## TouchDesigner data
 
@@ -57,6 +61,10 @@ is limited to 512 MiB, a range to 256 KiB, and a helper run to 8 MiB total
 audio. Access is limited to USB-B link-local peers, one connection at a time.
 An invalid path, symlink, traversal, exhausted budget, or I/O failure returns
 an error without touching the player process. Host tests cover these cases.
+The follow-up audit fixed partial-send accounting: the helper now charges the
+entire accepted range **before** transmitting, so disconnect/retry cycles
+cannot recover budget. The host also serializes explicit excerpt decoding to
+avoid multiple simultaneous sample jobs against the music USB.
 
 The package source audit found exactly 19 expected files and no unexpected
 ARM imports. The selected modules remain `core`, `now-playing`, and
@@ -67,6 +75,15 @@ does not select a module that writes deck settings. It does restart the player
 and patches the **RAM** copy of its executable, so a startup failure could
 interrupt playback or require a normal reboot. This is a functional risk,
 not evidence of persistent internal-storage modification.
+The resident core's log path defaults to `/tmp`, but it previously allowed an
+inherited `RX3_LOG_FILE` override. Startup now unsets that variable before
+launching the player, removing a possible redirection to a persistent path.
+The compiled helper is a static ARM EABI5 executable with no undefined
+imports. The startup shell parses cleanly; 53 focused startup/staging/safety
+tests and 11 audio-path/gateway tests pass after these changes. The broader
+suite is not a clean signal on this host because its port-binding tests
+collide with the user's rolling capture process, and unrelated optional test
+dependencies are absent.
 
 The installer writes `autoexec.bin` and `rx3-mod-manifest.json` at the **USB
 stick root**, backing up any prior files in the host cache. Startup also

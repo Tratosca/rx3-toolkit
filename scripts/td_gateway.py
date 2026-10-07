@@ -165,6 +165,8 @@ class Gateway:
         self.osc_target = (osc_host, osc_port)
         self.osc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.lock = threading.Lock()
+        # Only one requested decode may drive deck-file reads at a time.
+        self.sample_slot = threading.Lock()
         self.decks = {}
         self.samples = {}
         self.sequence = 0
@@ -317,6 +319,8 @@ def handler_for(gateway: Gateway):
             item = gateway.catalog.tracks.get(track_id)
             if item is None:
                 self.send_error(404); return
+            if not gateway.sample_slot.acquire(blocking=False):
+                self.send_error(429, "another source excerpt is in progress"); return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 128:
@@ -334,12 +338,14 @@ def handler_for(gateway: Gateway):
                         raise ValueError("three-excerpt track limit reached")
                 url = f"http://127.0.0.1:{self.server.server_port}/audio/{track_id}"
                 result = decode_url(url, start, duration)
+                with gateway.lock:
+                    gateway.samples.setdefault(track_id, []).append(result)
             except (ValueError, KeyError, TypeError):
                 self.send_error(400, "invalid or over-budget sample request"); return
             except (OSError, subprocess.TimeoutExpired):
                 self.send_error(503, "audio excerpt unavailable"); return
-            with gateway.lock:
-                gateway.samples.setdefault(track_id, []).append(result)
+            finally:
+                gateway.sample_slot.release()
             data = json.dumps(result).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

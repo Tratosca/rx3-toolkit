@@ -117,6 +117,48 @@ class GatewayTests(unittest.TestCase):
                 server.shutdown(); server.server_close(); gateway.close()
                 thread.join(timeout=2)
 
+    def test_concurrent_excerpt_jobs_do_not_compete_for_deck_reads(self):
+        gateway = Gateway(Catalog(), 1, "127.0.0.1", 4470)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(gateway))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        entered = threading.Event()
+        release = threading.Event()
+        first_result = []
+        body = json.dumps({"start_s": 1, "duration_s": 1}).encode()
+        url = f"http://127.0.0.1:{server.server_port}/samples/7"
+
+        def slow_decode(*_):
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("test release never arrived")
+            return {"windows": [], "source": "sampled_source_file_pre_fader"}
+
+        def first_request():
+            try:
+                with urlopen(Request(url, data=body), timeout=4) as response:
+                    first_result.append(response.status)
+            except Exception as exc:
+                first_result.append(exc)
+
+        worker = threading.Thread(target=first_request)
+        try:
+            with patch("td_gateway.decode_url", side_effect=slow_decode):
+                worker.start()
+                self.assertTrue(entered.wait(2))
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(Request(url, data=body), timeout=2)
+                self.assertEqual(error.exception.code, 429)
+                error.exception.close()
+                release.set()
+                worker.join(timeout=4)
+                self.assertEqual(first_result, [200])
+        finally:
+            release.set()
+            worker.join(timeout=4)
+            server.shutdown(); server.server_close(); gateway.close()
+            thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()
