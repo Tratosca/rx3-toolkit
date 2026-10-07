@@ -11,6 +11,16 @@ static int theme_enabled;
 static struct installed_hook theme_render_pass_hook;
 static void (*original_theme_render_pass)(void *manager);
 static int theme_render_pass_installed;
+static struct installed_hook theme_browse_rect_hook;
+static void (*original_theme_browse_rect)(void *render, void *rect);
+static int theme_browse_rect_installed;
+static unsigned char theme_browse_row_blue[12];
+static unsigned char theme_browse_right_row_blue[12];
+static unsigned int theme_browse_track_active;
+static unsigned char theme_source_row_blue[2];
+static const uint8_t theme_browse_rect_guard[8] = {
+    0xb0, 0x31, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
+};
 static int theme_key_registered;
 
 /* Converted pixels live in one arena the module allocates once and keeps for
@@ -47,11 +57,68 @@ static unsigned int theme_fill_channel(unsigned int fill, unsigned int shift)
 static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
 {
     unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
+    unsigned int selected_background = 0u;
+    if (view == 3u && draw->box[0] >= 108u && draw->box[0] < 1280u &&
+        draw->box[1] >= 60u &&
+        draw->box[1] < 60u + 12u * 50u) {
+        unsigned int row = (draw->box[1] - 60u) / 50u;
+        selected_background = draw->box[0] < 379u ?
+            ((draw->list_flags & 0x10u) && draw->selection_index == row) :
+            draw->box[0] < 857u ?
+            (theme_browse_track_active && theme_browse_row_blue[row]) :
+            (theme_browse_track_active && theme_browse_right_row_blue[row]);
+    }
+    if (view == 12u && draw->box[0] >= 100u && draw->box[0] < 735u &&
+        draw->box[1] >= 100u && draw->box[1] < 282u) {
+        unsigned int row = draw->box[1] < 190u ? 0u : 1u;
+        selected_background = theme_source_row_blue[row];
+    }
     return theme_text_colour(theme_light_active(), view,
                              draw->native_colour, draw->box[0], draw->box[1],
-                             draw->selection_index, draw->list_flags);
+                             draw->selection_index, selected_background);
 }
 static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
+
+/* Native list and SOURCE row rectangles carry the live selection colour,
+   even when their text models do not change with focus. */
+static void theme_browse_rect(void *render, void *rect)
+{
+    unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
+    if (rect && (view == 3u || view == 12u)) {
+        const uint8_t *model = rect;
+        uint16_t layer, box[4];
+        uint32_t colour;
+        memcpy(&layer, model + 0x10u, sizeof(layer));
+        memcpy(box, model + 0x18u, sizeof(box));
+        memcpy(&colour, model + 0x28u, sizeof(colour));
+        if (view == 3u && layer == 0x0801u && box[0] == 0u &&
+            box[1] == 50u && box[2] == 1280u && box[3] == 659u) {
+            theme_browse_track_active = 0u;
+            memset(theme_browse_row_blue, 0, sizeof(theme_browse_row_blue));
+            memset(theme_browse_right_row_blue, 0,
+                   sizeof(theme_browse_right_row_blue));
+        }
+        if (view == 3u && layer == 0x0801u &&
+            box[1] >= 50u && box[1] < 50u + 12u * 50u &&
+            box[3] == box[1] + 53u && (box[1] - 50u) % 50u == 0u) {
+            unsigned int row = (box[1] - 50u) / 50u;
+            if (box[0] == 379u && box[2] == 857u) {
+                theme_browse_track_active = 1u;
+                theme_browse_row_blue[row] = colour == 0xff1c1f00u;
+            } else if (box[0] == 857u && box[2] == 1280u) {
+                theme_browse_track_active = 1u;
+                theme_browse_right_row_blue[row] = colour == 0xff1c1f00u;
+            }
+        }
+        if (view == 12u && layer == 0x0101u && box[0] == 0u &&
+            box[2] == 735u && box[3] == box[1] + 90u &&
+            (box[1] == 100u || box[1] == 192u)) {
+            unsigned int row = box[1] == 100u ? 0u : 1u;
+            theme_source_row_blue[row] = colour == 0xff1c1f00u;
+        }
+    }
+    original_theme_browse_rect(render, rect);
+}
 
 /* Whether this fill colour is chrome rather than a decision.
  *
@@ -227,7 +294,7 @@ static void theme_refresh_text_for_view(void)
 {
     int view = ((int (*)(void))0x001126d0u)();
     if (theme_light_active() && view != theme_last_text_view &&
-        (view == 3 || view == 7))
+        (view == 3 || view == 7 || view == 12))
         framework->text->invalidate();
     theme_last_text_view = view;
 }
@@ -361,6 +428,12 @@ static int theme_feature_install(void)
     if (!original_theme_render_pass)
         return 0;
     theme_render_pass_installed = 1;
+    original_theme_browse_rect = (void (*)(void *, void *))install_hook(
+        &theme_browse_rect_hook, 0x001d2decu, theme_browse_rect_guard,
+        (void *)theme_browse_rect, (void **)&original_theme_browse_rect);
+    if (!original_theme_browse_rect)
+        return 0;
+    theme_browse_rect_installed = 1;
     if (!framework->images->claim_variants(&theme_enabled, &theme_policy))
         return 0;
     if (!framework->text || !framework->text->claim(&theme_enabled, &theme_text_policy))
@@ -379,6 +452,10 @@ static int theme_feature_install(void)
 
 static void theme_feature_remove(void)
 {
+    if (theme_browse_rect_installed && uninstall_hook(&theme_browse_rect_hook)) {
+        theme_browse_rect_installed = 0;
+        original_theme_browse_rect = 0;
+    }
     if (theme_render_pass_installed && uninstall_hook(&theme_render_pass_hook)) {
         theme_render_pass_installed = 0;
         original_theme_render_pass = 0;

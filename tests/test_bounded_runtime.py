@@ -126,6 +126,26 @@ int main(void){
 }
 ''', [], ['-Wno-unused-function', '-Wno-unused-variable'])
 
+    def test_light_list_icon_uses_row_background(self):
+        self.run_units(THEME + r'''
+int main(void){
+ record(0,0,28u*26u);
+ uint16_t width=28u,height=26u;
+ memcpy(fixture.records+4,&width,2);memcpy(fixture.records+6,&height,2);
+ fixture.records[24]=THEME_FORMAT_RGB565_KEYED;
+ for(unsigned i=0;i<28u*26u;i++)fixture.pixels[i]=0x2945u;
+ fixture.pixels[14u+13u*28u]=0xffffu;
+ light_selected=1;available=THEME_ARENA_FLOOR_KB+1024;
+ theme_prepare_conversion();theme_remap_image(0);
+ for(unsigned pass=0;pass<4 && !theme_id_done[0];pass++)theme_run_conversions();
+ assert(theme_id_done[0]);
+ const uint16_t *result=(const void *)storage;
+ assert(result[0]==COLOUR_KEY);
+ assert(result[14u+13u*28u]!=COLOUR_KEY);
+ return 0;
+}
+''', [], ['-Wno-unused-function', '-Wno-unused-variable'])
+
     def test_stems_read_and_crc_stop_between_chunks(self):
         self.run_units(r'''
 static unsigned reads,cancel_after,checks,cancel_now;

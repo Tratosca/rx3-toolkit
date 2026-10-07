@@ -3,7 +3,7 @@
 
 ## Unreleased
 
-- Light theme: BROWSE lists and both UTILITY pages now show dark text on the light background, and the selected blue row keeps its white text ([#44](https://github.com/Tratosca/rx3-toolkit/issues/44)). One case remains: while TRACK is still selected in the left column, the first track of the list stays white. Checked in the emulator; not yet run on hardware.
+- Light theme: BROWSE lists and both UTILITY pages now show dark text on the light background, and the selected blue row keeps its white text ([#44](https://github.com/Tratosca/rx3-toolkit/issues/44)). The SOURCE screen is readable too, and the grey squares behind the list icons are gone. Still open: in PLAYLIST, HISTORY, RATING and MATCHING the chosen category in the left column and the list cursor are hard to read, and so is a UTILITY row while you change its value. Checked in the emulator; not yet run on hardware.
 
 - With logging on, the session log now says whether the deck's audio output is running after the mod restarts the player, and lists the audio state when it is not. This is the first step on decks that load tracks but stay silent on PLAY after the restart ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Not yet run on hardware.
 
