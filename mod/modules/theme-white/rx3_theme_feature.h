@@ -82,8 +82,12 @@ static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
     if (view == 7u && draw->box[1] >= 11u && draw->box[1] < 11u + 12u * 52u) {
         unsigned int row = (draw->box[1] - 11u) / 52u;
         unsigned int side = draw->box[0] < 734u ? 1u : 2u;
-        selected_background = theme_utility_blue_cell ?
-            theme_utility_blue_cell == ((row << 2) | side) :
+        /* The cell can lag the cursor within one pass: rows drawn before the
+           new blue rectangle would still see the old one. Trust it only on
+           the cursor's row; elsewhere the name under the cursor is the cell. */
+        unsigned int cell = theme_utility_blue_cell;
+        selected_background = cell && (cell >> 2) == draw->selection_index ?
+            cell == ((row << 2) | side) :
             side == 1u && draw->selection_index == row;
     }
     return theme_text_colour(theme_light_active(), view, draw->native_colour,
