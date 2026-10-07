@@ -19,6 +19,9 @@ struct audio_packet {
 struct audio_ring {
     struct audio_packet packet[AUDIO_RING_SLOTS];
     volatile uint32_t head, tail, sequence, dropped, producing;
+    uint32_t last_generation, last_frames;
+    int32_t last_position;
+    uint8_t has_last;
 };
 static int16_t audio_pcm16(float sample)
 {
@@ -41,6 +44,15 @@ static void audio_enqueue(struct audio_ring *ring, uint32_t generation,
         frames = AUDIO_PACKET_SAMPLES * 2u;
         __atomic_add_fetch(&ring->dropped, 1u, __ATOMIC_RELAXED);
     }
+    /* TimeStretch can render the same reader along two overlapping paths.
+     * Keep one forward progression; a sufficiently large rewind is a cue or
+     * loop wrap. Never let the doubled callback rate become doubled audio. */
+    if (ring->has_last && generation == ring->last_generation &&
+            (int64_t)position < (int64_t)ring->last_position + ring->last_frames &&
+            (int64_t)ring->last_position - position < 4096) {
+        __atomic_store_n(&ring->producing, 0u, __ATOMIC_RELEASE);
+        return;
+    }
     uint32_t head = __atomic_load_n(&ring->head, __ATOMIC_RELAXED);
     uint32_t tail = __atomic_load_n(&ring->tail, __ATOMIC_ACQUIRE);
     if (head - tail >= AUDIO_RING_SLOTS) {
@@ -59,6 +71,10 @@ static void audio_enqueue(struct audio_ring *ring, uint32_t generation,
         p->samples[i] = audio_pcm16(mono);
     }
     __atomic_store_n(&ring->head, head + 1u, __ATOMIC_RELEASE);
+    ring->last_generation = generation;
+    ring->last_position = position;
+    ring->last_frames = frames;
+    ring->has_last = 1u;
     __atomic_store_n(&ring->producing, 0u, __ATOMIC_RELEASE);
 }
 static int audio_dequeue(struct audio_ring *ring, struct audio_packet *out)

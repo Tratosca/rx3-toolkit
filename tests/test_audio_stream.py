@@ -36,22 +36,32 @@ int main(void) {
     pcm[0]=(struct rx3_stereo){1.0f,1.0f};
     pcm[2]=(struct rx3_stereo){-1.0f,-1.0f};
     for (unsigned i=0;i<AUDIO_RING_SLOTS;i++)
-        audio_enqueue(&ring,7,1000+(int)i,pcm,1024);
+        audio_enqueue(&ring,7,1000+(int)(1024*i),pcm,1024);
     audio_enqueue(&ring,7,9999,pcm,1024);
     assert(ring.dropped==1 && ring.head==AUDIO_RING_SLOTS);
     for (unsigned i=0;i<AUDIO_RING_SLOTS;i++) {
         struct audio_packet p={0};
         assert(audio_dequeue(&ring,&p));
-        assert(p.sequence==i && p.generation==7 && p.source_position==1000+(int)i);
+        assert(p.sequence==i && p.generation==7 && p.source_position==1000+(int)(1024*i));
         assert(p.count==512 && p.samples[0]==32767 && p.samples[1]==-32768);
     }
     { struct audio_packet p; assert(!audio_dequeue(&ring,&p)); }
     audio_enqueue(&ring,8,42,pcm,1024);
     { struct audio_packet p; assert(audio_dequeue(&ring,&p));
       assert(p.sequence==32 && p.generation==8 && p.dropped==1); }
-    audio_enqueue(&ring,8,43,pcm,4096);
+    audio_enqueue(&ring,8,1066,pcm,4096);
     { struct audio_packet p; assert(audio_dequeue(&ring,&p));
       assert(p.count==512 && p.dropped==2); }
+    /* Two native render paths can interleave at an offset. The older
+     * overlapping path is ignored without incrementing queue-drop count. */
+    struct audio_ring doubled = {0};
+    audio_enqueue(&doubled,1,936505,pcm,512);
+    audio_enqueue(&doubled,1,934346,pcm,512);
+    audio_enqueue(&doubled,1,937017,pcm,512);
+    audio_enqueue(&doubled,1,934858,pcm,512);
+    assert(doubled.head==2 && doubled.dropped==0);
+    audio_enqueue(&doubled,1,800000,pcm,512); /* loop/cue rewind */
+    assert(doubled.head==3);
     return 0;
 }
 '''

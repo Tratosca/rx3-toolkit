@@ -2,9 +2,11 @@
 
 2026-10-07. This is a **bench candidate for firmware 1.19**, not a performance
 release or a claim of zero permanent-damage risk. The user requested a live
-audio feed for host-side TD analysis. The installed image SHA-256 is
+audio feed for host-side TD analysis. The first test image SHA-256 is
 `546f1eb87f4e3ed9ac9e8105522e732e67710977c82211868f9500c1c791e3ac`.
-It selects `core`, `now-playing`, and `position-diagnostic` only. The previous
+The corrected duplicate-filter candidate is
+`90140036bb43cc5177f14839db4953f534c33981fa9210a98cde14519c448350`.
+Both select `core`, `now-playing`, and `position-diagnostic` only. The previous
 known-running image (`1723f3b140c925fe37a50360f03f701583343cb8aaf8faef931c205d42af0c26`)
 is backed up under ignored `local/gigs/rx3-live-audio-2026-10-07/usb-root-backup`.
 
@@ -51,6 +53,23 @@ the mod USB absent; that stock-return procedure is not hard-brick recovery.
   verified the current PDB and analysis hashes, backed up the two root files,
   replaced only `autoexec.bin` and `rx3-mod-manifest.json`, and read back exact
   package bytes. The PDB hash stayed unchanged. SOUND_PRO was safely ejected.
+
+## First physical capture and correction
+
+The first image ran with Deck 1 playing. A 30-second host capture received
+6,127 packets with no wire sequence gaps; packet `dropped` remained at 61,672
+throughout the capture. Now Playing delivered 1,517 packets (max 31.9 ms gap)
+and position diagnostics delivered 594 (max 58 ms gap). The captured source
+positions revealed **two interleaved, overlapping render sequences** roughly
+2,159 source frames apart. A naive concatenation produced 61 seconds of PCM
+in 30 seconds of wall time, so it cannot honestly feed beat/onset detection.
+
+The correction keeps one forward source-position progression and accepts a
+large rewind for cue/loop. Replaying the exact recorded block positions through
+the filter retains 30.04 seconds of PCM in 30 seconds of wall time. It drops
+3,526 overlapping packets without calling them transport or queue loss. This
+also lowers expected USB-B traffic. The corrected ARM image passes the source
+audit and 29 focused tests. **It still needs its own physical run.**
 
 ## Physical acceptance still required
 
