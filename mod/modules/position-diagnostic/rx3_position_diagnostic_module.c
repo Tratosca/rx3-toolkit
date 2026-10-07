@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "../core/api/rx3_module_api.h"
 #include "rx3_position_snapshot.h"
+#include "rx3_audio_stream.h"
 /* Linux ARM socket ABI, same existing libc imports as Now Playing. */
 extern int socket(int, int, int);
 extern int setsockopt(int, int, int, const void *, unsigned int);
@@ -8,15 +9,21 @@ extern ssize_t sendto(int, const void *, size_t, int, const void *, unsigned int
 struct position_address { uint16_t family, port; uint32_t address; uint8_t zero[8]; };
 static const struct rx3_services *framework;
 static struct position_slot slots[2];
+static struct audio_ring audio_rings[2];
 static unsigned int running, claimed, thread_started;
 static pthread_t worker_thread;
 static int udp = -1;
+static int audio_udp = -1;
 static char owner;
 static void stream(unsigned int deck, const void *reader, int position,
                    struct rx3_stereo *output, unsigned int frames)
 {
-    (void)output; /* Never touch the player's samples. */
-    if (deck < 2u) position_observe(&slots[deck], reader, position, frames);
+    if (deck < 2u) {
+        position_observe(&slots[deck], reader, position, frames);
+        audio_enqueue(&audio_rings[deck],
+                      __atomic_load_n(&slots[deck].generation, __ATOMIC_RELAXED),
+                      position, output, frames);
+    }
 }
 static void loading(unsigned int deck, void *reader, const void *info)
 {
@@ -71,9 +78,34 @@ static void emit(unsigned int sequence)
 static void *worker(void *unused)
 {
     (void)unused; unsigned int sequence = 0;
+    struct position_address audio_to = {2, (uint16_t)((50127u>>8u)|((50127u&255u)<<8u)), 0xfffffea9u, {0}};
     while (__atomic_load_n(&running, __ATOMIC_SEQ_CST)) {
-        emit(sequence++);
-        usleep(50000u); /* <=20 sends/s, no audio-thread wake syscall. */
+        if (sequence++ % 5u == 0u) emit(sequence / 5u);
+        /* Drain outside the audio thread, at most 10 packets/deck/tick. A
+         * stalled peer cannot hold up the producer; the ring drops instead. */
+        for (unsigned int deck=0; deck<2u; ++deck)
+            for (unsigned int n=0; n<10u; ++n) {
+                struct audio_packet p;
+                if (!audio_dequeue(&audio_rings[deck], &p)) break;
+                uint8_t packet[32u + AUDIO_PACKET_SAMPLES*2u] = {0};
+                /* Wire v1: RX3A, version, deck, sample rate, sequence,
+                 * generation, source frame, drops, sample count, PCM16LE. */
+                packet[0]='R'; packet[1]='X'; packet[2]='3'; packet[3]='A';
+                packet[4]=1; packet[5]=(uint8_t)(deck+1u);
+                const uint32_t words[5] = {AUDIO_SAMPLE_RATE,p.sequence,
+                                            p.generation,(uint32_t)p.source_position,p.dropped};
+                for (unsigned int w=0; w<5u; ++w)
+                    for (unsigned int b=0; b<4u; ++b)
+                        packet[8u+4u*w+b]=(uint8_t)(words[w]>>(8u*b));
+                packet[28]=(uint8_t)p.count; packet[29]=(uint8_t)(p.count>>8u);
+                for (unsigned int i=0; i<p.count; ++i) {
+                    uint16_t value=(uint16_t)p.samples[i];
+                    packet[32u+2u*i]=(uint8_t)value;
+                    packet[33u+2u*i]=(uint8_t)(value>>8u);
+                }
+                (void)sendto(audio_udp,packet,32u+2u*p.count,0x40,&audio_to,sizeof(audio_to));
+            }
+        usleep(10000u); /* Position remains <=20 Hz below. */
     }
     return 0;
 }
@@ -88,15 +120,19 @@ static void stop(void)
     if (thread_started) { pthread_join(worker_thread,0); thread_started=0; }
     if (claimed) { framework->audio->release_deck_stream(&owner); claimed=0; }
     if (udp>=0) close(udp);
-    udp=-1;
+    if (audio_udp>=0) close(audio_udp);
+    udp=audio_udp=-1;
 }
 static int start(const struct rx3_services *s)
 {
     framework=s;
     memset(slots,0,sizeof(slots));
+    memset(audio_rings,0,sizeof(audio_rings));
     udp=socket(2,2,0);
+    audio_udp=socket(2,2,0);
     int on=1;
-    if (udp<0 || setsockopt(udp,1,6,&on,sizeof(on))) return 0;
+    if (udp<0 || audio_udp<0 || setsockopt(udp,1,6,&on,sizeof(on)) ||
+        setsockopt(audio_udp,1,6,&on,sizeof(on))) return 0;
     if (!s->audio->claim_deck_stream(&owner,stream)) return 0;
     claimed=1;
     __atomic_store_n(&running,1u,__ATOMIC_SEQ_CST);

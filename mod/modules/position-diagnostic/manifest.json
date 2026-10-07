@@ -5,7 +5,7 @@
     "fr": "Diagnostic de position"
   },
   "description": {
-    "en": "Experimental raw position capture for controlled firmware 1.19 testing. Units and track association are unverified.",
+    "en": "Experimental raw position and bounded PCM capture for controlled firmware 1.19 testing. Live audio has not passed an on-deck test.",
     "fr": "Capture exp\u00e9rimentale pour tests contr\u00f4l\u00e9s du firmware 1.19. Unit\u00e9s et association non v\u00e9rifi\u00e9es."
   },
   "firmwares": [
@@ -34,6 +34,7 @@
   ],
   "build_files": [
     "rx3_position_diagnostic_module.c",
-    "rx3_position_snapshot.h"
+    "rx3_position_snapshot.h",
+    "rx3_audio_stream.h"
   ]
 }

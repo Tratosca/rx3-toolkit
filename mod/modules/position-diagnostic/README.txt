@@ -2,7 +2,8 @@ Playback position diagnostic — experimental, firmware 1.19 only
 
 Explicit module selection: position-diagnostic (requires core + now-playing).
 Disabled by default. Do not select other performance modules for the first test.
-No hardware position validation yet. This is not a completed Beat Link adapter.
+Position telemetry has one-track hardware validation. Live audio is a new
+bench-only candidate and has not yet passed an on-deck run.
 
 What changes on the deck
 Uses the existing shared TimeStretch audio observer and PcmReader::load identity
@@ -14,11 +15,13 @@ now refuses layouts that cannot establish volatile write destinations. A failed 
 runs the existing cleanup path. With only Now Playing selected, this diagnostic
 is not started and the new identity hook is not requested.
 
-The audio callback ignores the sample buffer and publishes four scalar values
-under a one-attempt atomic gate. Contention drops a sample. No callback I/O,
-allocation, clock lookup or wait. A worker sends at <=20 Hz on UDP 50124 to the
-USB link-local broadcast; nothing listens for commands. Existing Now Playing
-UDP 50123 is unchanged. No firmware, bootloader, settings or audio writes added.
+The callback publishes position scalars under a one-attempt atomic gate and
+copies a bounded, decimated mono PCM block to fixed memory for host analysis.
+Contention or a full queue drops the block. No callback I/O, allocation, clock
+lookup or wait. A worker sends position at <=20 Hz on UDP 50124 and PCM16LE
+at 22,050 samples/s on UDP 50127 to the USB link-local broadcast; nothing
+listens for commands. Existing Now Playing UDP 50123 is unchanged. No firmware,
+bootloader, settings or audio writes added.
 
 Wire data
 JSON type=position-diagnostic, version=1, sequence=uint32, units=unverified.
@@ -28,7 +31,10 @@ Two deck entries numbered 1/2:
   observation (uint32 counter), rawPosition (signed 32-bit), frames (uint32).
 Repeated observations are exported again; the host tracks their age. They do
 not prove current playback or audibility. Values wrap at their integer width.
-No pointers, titles, track IDs or audio leave through this new message.
+No pointers, titles or track IDs leave through this position message. The
+separate RX3A binary packets on 50127 include deck, reader generation, source
+frame, packet sequence, drop count and up to 512 mono samples. The host must
+join them with Now Playing and reject a mismatched generation.
 
 Reader generation is not a rekordbox ID or source-media ID. It is deliberately
 not joined with the independent Now Playing feed. The existing core load hook
@@ -48,4 +54,6 @@ teardown or prove recovery from arbitrary crashes. Volatile privileged hooks
 still can crash or interrupt playback; this is not a no-risk certification.
 
 See testing/rx3-1.19/POSITION-TEST.txt for the controlled test procedure and
-scripts/position_diagnostic.py for the receive-only recorder.
+scripts/position_diagnostic.py for position. See
+docs/development/RX3-LIVE-AUDIO-USB-B-AUDIT.md and
+scripts/receive_live_audio.py for the receive-only audio bench.
