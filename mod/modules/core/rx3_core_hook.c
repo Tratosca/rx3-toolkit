@@ -866,8 +866,10 @@ static void draw_message_header(void *render,const void *model)
     set_u16(top_text,0x10,TOP_NOTICE_LAYER);
     set_u16(top_text,0x48,message_small_font_ready?
             message_small_font_id:*(const uint16_t *)((const uint8_t *)model+0x48u));
-    set_u32(top_text,0x28,pad_native_fill_colour(
-            rx3_image_is_light()?0x00000000u:0x00ffffffu));
+    /* Text colour 0 is the native default style, which paints white: dark
+       ink on the light theme has to be a direct ARGB value. */
+    set_u32(top_text,0x28,rx3_image_is_light()?0xff252525u:
+            pad_native_fill_colour(0x00ffffffu));
     set_u32(top_text,0x40,0u);
     top_text[0x3c]=0u;
     int origin_x=0,origin_y=0;
