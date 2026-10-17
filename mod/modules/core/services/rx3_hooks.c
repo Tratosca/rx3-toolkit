@@ -149,6 +149,16 @@ void *install_pc_ldr_hook(struct installed_hook *handle, unsigned long address,
 {
     return install_owned_hook(handle, address, guard, replacement, published, 1);
 }
+/* The eight bytes a prologue check should compare: the stock bytes while one
+   of our detours sits on this address, the live code otherwise. A function
+   another feature detoured is still the function its caller verified. */
+const uint8_t *hook_original_code(unsigned long address)
+{
+    for (unsigned int i = 0; i < RX3_HOOK_LIMIT; i++)
+        if (records[i].owner && !records[i].detached && records[i].address == address)
+            return records[i].original;
+    return (const uint8_t *)address;
+}
 int hook_is_installed(const struct installed_hook *handle)
 {
     return handle && handle->record && handle->record->owner == handle;

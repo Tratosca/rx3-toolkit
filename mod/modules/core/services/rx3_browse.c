@@ -750,7 +750,7 @@ static int install_sort_hooks(void)
         {0x112e10,0xe30f38b8,0xe3403326},{0x256030,0xe92d4ff0,0xe1a09002},
         {0x1d2dec,0xe1d131b0,0xe92d4ff0},{0x110c50,0xe92d4070,0xe24dd010}};
     for(unsigned i=0;i<sizeof(guards)/sizeof(*guards);i++)
-        if(memcmp((void *)(unsigned long)guards[i].address,&guards[i].a,8))return 0;
+        if(memcmp(hook_original_code(guards[i].address),&guards[i].a,8))return 0;
     static const uint8_t req_guard[]={0x38,0x40,0x2d,0xe9,0x01,0x50,0xa0,0xe1};
     static const uint8_t sel_guard[]={0xf0,0x4f,0x2d,0xe9,0xc8,0x8f,0x06,0xe3};
     original_sort_select=(void *)install_hook(&sort_hooks[1],0x2596ccu,sel_guard,(void *)sort_select, (void **)&original_sort_select);
@@ -936,7 +936,7 @@ static int install_scroll_hooks(void)
         {0x18e260,0xe92d4070,0xe24dd008},{0x18e2a0,0xe92d4070,0xe1a04001},
         {0x18e730,0xe92d4010,0xe1a04000},{0x1cec2c,0xe3500000,0x0a00000a}};
     for(unsigned i=0;i<sizeof(guards)/sizeof(*guards);i++)
-        if(memcmp((void *)(unsigned long)guards[i].address,&guards[i].a,8))return 0;
+        if(memcmp(hook_original_code(guards[i].address),&guards[i].a,8))return 0;
     static const uint8_t prep[]={0x80,0x30,0x80,0xe0,0xb0,0x22,0x9f,0xe5};
     static const uint8_t start[]={0xf0,0x4f,0x2d,0xe9,0x74,0xa0,0xa0,0xe3};
     static const uint8_t run[]={0xf0,0x4f,0x2d,0xe9,0x74,0x40,0xa0,0xe3};

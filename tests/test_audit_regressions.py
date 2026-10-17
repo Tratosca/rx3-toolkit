@@ -57,6 +57,36 @@ int main(void){
 }
 ''', ['core/services/rx3_hooks.c'], ['-Dmmap=audit_map', '-Dmunmap=audit_unmap', '-Dmprotect=audit_protect'])
 
+    def test_prologue_check_sees_stock_bytes_under_our_own_detour(self):
+        # The light theme detours the native rectangle painter; the browse
+        # columns check that same prologue before they start. Seeing the detour
+        # instead of the stock bytes refused the columns and the whole runtime.
+        patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
+        writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
+        self.run_units(r'''
+#include "core/services/rx3_hooks.h"
+#include "core/firmware/rx3_patch.h"
+static uint32_t arena[1024];
+void *mmap(void *a,size_t n,int p,int f,int d,off_t o) {
+ (void)a;(void)n;(void)p;(void)f;(void)d;(void)o;return arena;
+}
+int munmap(void *p,size_t n){(void)p;(void)n;return 0;}
+int mprotect(void *p,size_t n,int f){(void)p;(void)n;(void)f;return 0;}
+void clear_instruction_cache(unsigned long a,unsigned long b){assert(b>a);}
+''' + writer + r'''
+int main(void){
+ uint32_t code[4]={0xe1d131b0,0xe92d4ff0,0,0};uint8_t stock[8];memcpy(stock,code,8);
+ void *original=0;struct installed_hook hook={0};
+ assert(hook_original_code((unsigned long)code)==(const uint8_t *)code);
+ assert(install_hook(&hook,(unsigned long)code,stock,(void *)1234,&original));
+ assert(memcmp(code,stock,8));                                  /* detour live */
+ assert(!memcmp(hook_original_code((unsigned long)code),stock,8)); /* check passes */
+ assert(uninstall_hook(&hook));
+ assert(hook_original_code((unsigned long)code)==(const uint8_t *)code);
+ return 0;
+}
+''', ['core/services/rx3_hooks.c'], ['-Dmmap=audit_map', '-Dmunmap=audit_unmap', '-Dmprotect=audit_protect'])
+
     def test_patch_failure_restores_bytes_before_trampoline_release(self):
         patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
         writer = 'int write_code(' + patch.split('int write_code(', 1)[1]

@@ -8,6 +8,7 @@
  */
 #include "../api/rx3_hook_types.h"
 int hook_is_installed(const struct installed_hook *);
+const uint8_t *hook_original_code(unsigned long);
 int detach_hook(struct installed_hook *);
 int release_hook(struct installed_hook *);
 void *install_hook(struct installed_hook *, unsigned long, const uint8_t[8], void *, void **);
