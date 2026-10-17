@@ -72,6 +72,37 @@ static inline int theme_is_artwork(const uint16_t *pixels, unsigned int count)
     return opaque != 0 && opaque * THEME_ARTWORK_PERCENT <= vivid * 100u;
 }
 
+/* A small artwork bitmap that is mostly near-black neutral is a glyph on a
+ * black plate: the MASTER BPM digits, the arcs of the playing deck, the loop
+ * length labels. The colour makes it count as artwork, but the plate is
+ * chrome and turns light with the panel it sits on.
+ */
+#define THEME_PLATE_MAX_SIDE 64u
+#define THEME_PLATE_LUMA 0x20u
+static int theme_plate_rgb(unsigned int red, unsigned int green, unsigned int blue)
+{
+    return theme_spread(red, green, blue) < THEME_NEUTRAL_SPREAD &&
+           theme_luma(red, green, blue) < THEME_PLATE_LUMA;
+}
+
+static int theme_plate_pixel(uint16_t pixel)
+{
+    unsigned int red;
+    unsigned int green;
+    unsigned int blue;
+    if (pixel == COLOUR_KEY)
+        return 0;
+    theme_unpack(pixel, &red, &green, &blue);
+    return theme_plate_rgb(red, green, blue);
+}
+
+static int theme_is_plated(unsigned int width, unsigned int height,
+                           unsigned int opaque, unsigned int plate)
+{
+    return width <= THEME_PLATE_MAX_SIDE && height <= THEME_PLATE_MAX_SIDE &&
+           opaque != 0 && plate * 2u >= opaque;
+}
+
 /* One pixel, for a lit room.
  *
  * Artwork keeps its hue and only loses the glare. Chrome is inverted into a

@@ -146,6 +146,38 @@ int main(void){
 }
 ''', [], ['-Wno-unused-function', '-Wno-unused-variable'])
 
+    def test_light_glyph_on_black_plate_gets_a_light_plate(self):
+        self.run_units(THEME + r'''
+/* An orange glyph on a black plate, keyed corners like the deck arcs. */
+static void glyph(unsigned id,unsigned start,unsigned width,unsigned height,unsigned stroke){
+ record(id,start,width*height);
+ uint16_t w=width,h=height;
+ memcpy(fixture.records+id*44+4,&w,2);memcpy(fixture.records+id*44+6,&h,2);
+ fixture.records[id*44+24]=THEME_FORMAT_RGB565_KEYED;
+ for(unsigned i=0;i<width*height;i++)fixture.pixels[start+i]=0x0000u;
+ for(unsigned y=0;y<height;y++)for(unsigned x=0;x<stroke;x++)fixture.pixels[start+y*width+x]=0xfc00u;
+ fixture.pixels[start]=COLOUR_KEY;fixture.pixels[start+width*height-1u]=COLOUR_KEY;
+}
+int main(void){
+ glyph(0,0,20,30,8);        /* small, mostly plate */
+ glyph(1,600,20,30,16);     /* small, mostly colour */
+ glyph(2,1200,100,100,40);  /* mostly plate but too large to be a glyph */
+ light_selected=1;available=THEME_ARENA_FLOOR_KB+1024;
+ theme_prepare_conversion();theme_remap_image(0);theme_remap_image(1);theme_remap_image(2);
+ for(unsigned pass=0;pass<16 && (theme_id_done[0]&7)!=7;pass++)theme_run_conversions();
+ assert((theme_id_done[0]&7)==7);
+ const uint16_t *plated=(const void *)storage, *colour=plated+600, *large=colour+600;
+ assert(theme_is_artwork(fixture.pixels,600) && theme_is_artwork(fixture.pixels+600,600));
+ /* Plate turns light like chrome, the glyph keeps its own colour. */
+ assert(plated[19]==theme_pixel_light_for_image(0,0x0000u,0) && plated[19]!=0x0000u);
+ assert(plated[20]==theme_pixel_light_for_image(0,0xfc00u,1));
+ /* Not glyphs on a plate: artwork as before, black included. */
+ assert(colour[19]==theme_pixel_light_for_image(1,0x0000u,1));
+ assert(large[99]==theme_pixel_light_for_image(2,0x0000u,1));
+ return 0;
+}
+''', [], ['-Wno-unused-function', '-Wno-unused-variable'])
+
     def test_stems_read_and_crc_stop_between_chunks(self):
         self.run_units(r'''
 static unsigned reads,cancel_after,checks,cancel_now;
