@@ -18,14 +18,23 @@ static unsigned int theme_text_neutral(unsigned int colour)
     if (b < low) low = b;
     return low >= 0xc0u && high - low <= 0x18u;
 }
-/* Neutral ink goes dark on the light surfaces of BROWSE, UTILITY and SOURCE.
-   Ink over a vivid selection fill, and every semantic colour, stays native. */
-static unsigned int theme_text_colour(unsigned int light, unsigned int view,
+/* Where the theme turns the surface under native text light: the lists of
+   BROWSE, UTILITY and SOURCE, and on HOME only each deck strip's track title
+   row and the left column's track lines. HOME's own cells stay dark. */
+static unsigned int theme_text_light_surface(unsigned int view, unsigned int layer,
+                                             unsigned int top)
+{
+    if (view == 3u || view == 7u || view == 12u) return 1u;
+    return view == 1u &&
+        (((layer == 0x201u || layer == 0x301u) && top < 50u) || layer == 0x1101u);
+}
+/* Neutral ink goes dark on those light surfaces. Ink over a vivid selection
+   fill, and every semantic colour, stays native. */
+static unsigned int theme_text_colour(unsigned int light, unsigned int light_surface,
                                       unsigned int native_colour,
                                       unsigned int selected_background)
 {
-    if (light && (view == 3u || view == 7u || view == 12u) &&
-        theme_text_neutral(native_colour) && !selected_background)
+    if (light && light_surface && theme_text_neutral(native_colour) && !selected_background)
         return THEME_TEXT_DARK;
     return native_colour;
 }

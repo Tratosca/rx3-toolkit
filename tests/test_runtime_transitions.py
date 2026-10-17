@@ -1147,7 +1147,10 @@ static int render_probe_enabled, drawing, pending, light_state, switches, passes
 static unsigned theme_render_active, theme_home_repaint_pending;
 static int theme_light_active(void) { return light_state; }
 static int test_view(void) { return 3; }
-static int theme_run_conversions(void) { return 0; }
+static int converted_next, requests_left;
+static unsigned theme_browse_refresh_due, theme_refresh_pending;
+static int theme_run_conversions(void) { int c=converted_next; converted_next=0; return c; }
+static int theme_requests_pending(void) { return requests_left; }
 #define PERFORMANCE_REFRESH_WINDOW_US 1000000u
 #define PERFORMANCE_REFRESH_EVERY_US 100000u
 static uint64_t monotonic_enough_us(void) { return 100; }
@@ -1178,7 +1181,7 @@ static void native_render(void *manager) {
     }
     drawing=0; passes++;
 }
-static unsigned int theme_refresh_header(void) { assert(!drawing && passes==2); header_pending=1; return 1; }
+static unsigned int theme_refresh_header(void) { assert(!drawing && (passes==2 || passes>=4)); header_pending=1; return 1; }
 static unsigned int theme_refresh_home_child(unsigned int target) { (void)target; return 0; }
 static int dirty_windows(void) { assert(!drawing); invalidations++; window_dirty=1; return 1; }
 #define THEME_DIRTY_WINDOWS dirty_windows
@@ -1191,6 +1194,13 @@ int main(void) {
     assert(!pending && switches==1 && light_state && invalidations==1 && header_visible);
     hooked_theme_render_pass((void *)123);
     assert(switches==1 && passes==4 && invalidations==1 && header_visible && !header_pending);
+    /* BROWSE: one native refresh, and only once nothing is left to convert. */
+    converted_next=1; requests_left=1;
+    hooked_theme_render_pass((void *)123);
+    assert(theme_browse_refresh_due && !theme_refresh_pending);
+    requests_left=0;
+    hooked_theme_render_pass((void *)123);
+    assert(!theme_browse_refresh_due && theme_refresh_pending);
     return 0;
 }
 ''')

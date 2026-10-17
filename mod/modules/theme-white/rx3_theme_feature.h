@@ -90,8 +90,9 @@ static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
             cell == ((row << 2) | side) :
             side == 1u && draw->selection_index == row;
     }
-    return theme_text_colour(theme_light_active(), view, draw->native_colour,
-                             selected_background);
+    return theme_text_colour(theme_light_active(),
+                             theme_text_light_surface(view, draw->layer, draw->box[1]),
+                             draw->native_colour, selected_background);
 }
 static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
 
@@ -353,6 +354,8 @@ static void theme_refresh_text_for_view(void)
     theme_last_text_view = view;
 }
 
+static unsigned int theme_browse_refresh_due;
+static int theme_requests_pending(void);
 static void hooked_theme_render_pass(void *manager)
 {
     if (theme_render_active) { original_theme_render_pass(manager); return; }
@@ -360,7 +363,16 @@ static void hooked_theme_render_pass(void *manager)
     int previous_theme = theme_light_active();
     theme_run_pending_toggle();
     theme_refresh_text_for_view();
-    int repaint = theme_run_conversions() || previous_theme != theme_light_active();
+    int converted = theme_run_conversions();
+    int repaint = converted || previous_theme != theme_light_active();
+    /* Rail tiles drawn before their conversion was published keep the stock
+       pixels: the dirty-window pass does not reach them. Once nothing is left
+       to convert, ask BROWSE for one native refresh. */
+    if (converted && ((int (*)(void))0x001126d0u)() == 3) theme_browse_refresh_due = 1u;
+    if (theme_browse_refresh_due && !theme_requests_pending()) {
+        theme_browse_refresh_due = 0u;
+        theme_refresh_pending = 1u;
+    }
     if (repaint) ((int (*)(void))THEME_DIRTY_WINDOWS)();
     original_theme_render_pass(manager);
     /* A winscape entry consumes the root queue. Draw the independent header
@@ -381,6 +393,13 @@ static void hooked_theme_render_pass(void *manager)
 }
 
 #include "rx3_theme_conversion.h"
+static int theme_requests_pending(void)
+{
+    if (theme_job.source) return 1;
+    for (unsigned int i = 0; i < sizeof(theme_requested); i++)
+        if (theme_requested[i]) return 1;
+    return 0;
+}
 
 /* The pane's palette as the firmware ships it. Two entries hold whichever mode
  * is current, so both values are accepted for those and exactly one for the
