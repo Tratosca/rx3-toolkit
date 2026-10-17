@@ -246,6 +246,18 @@ static int theme_key(const struct rx3_key_event *event)
     return 0;
 }
 
+/* Make each deck strip repaint its message and backing in the new mode: the
+   next native counter update sees a caution ID it has not drawn. */
+static void theme_forget_counter_cautions(void)
+{
+    if (memcmp((const void *)THEME_COUNTER_CAUTION_CACHE,
+               theme_counter_caution_cache_guard, 8))
+        return;
+    volatile uint32_t *ids = (volatile uint32_t *)THEME_COUNTER_CAUTION_IDS;
+    ids[0] = 0xffffffffu;
+    ids[1] = 0xffffffffu;
+}
+
 /* Called at the render-pass boundary, before the native queue is consumed.
    Changing the table from a per-glyph callback mixes two themes in one pass.
    The key and Utility callbacks only publish requests. */
@@ -271,6 +283,7 @@ static void theme_run_pending_toggle(void)
         int light = !theme_light_active();
         framework->images->select_variant(light);
         framework->text->invalidate();
+        theme_forget_counter_cautions();
         theme_waveform_apply(light);
         theme_home_repaint_pending = light != 0;
         if (request == 2) {

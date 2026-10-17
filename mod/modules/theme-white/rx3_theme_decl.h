@@ -74,6 +74,17 @@ static const uint8_t theme_dirty_windows_guard[8] = {
     0xf8, 0x40, 0x2d, 0xe9, 0xcc, 0x40, 0x9f, 0xe5
 };
 
+/* ui_Counter_DrawCautionWindow (0x002863f8) repaints a deck strip's message
+   ("Not Loaded.") and its filled backing only when the deck's caution ID, state
+   or language changes, so a theme switch alone leaves the old backing. The
+   guard is its movw/movt loading the cache base 0x00526850; the caution IDs are
+   at +8, one word per deck. */
+#define THEME_COUNTER_CAUTION_CACHE ((unsigned long)0x00286420)
+static const uint8_t theme_counter_caution_cache_guard[8] = {
+    0x50, 0x28, 0x06, 0xe3, 0x52, 0x20, 0x40, 0xe3
+};
+#define THEME_COUNTER_CAUTION_IDS ((unsigned long)0x00526858)
+
 #define THEME_COMPONENT_MANAGER ((unsigned long)0x001d0a30)
 static const uint8_t theme_component_manager_guard[8] = {
     0x10, 0x40, 0x2d, 0xe9, 0x20, 0x40, 0x9f, 0xe5
