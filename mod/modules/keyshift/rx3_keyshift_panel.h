@@ -127,10 +127,8 @@ static int keyshift_needs_refresh(void)
     previous=current;
     return (__atomic_exchange_n(&keyshift_refresh_pending, 0u, __ATOMIC_SEQ_CST) != 0u) || changed;
 }
-static void keyshift_effective_poll(void);
 static void keyshift_capture_text(const struct rx3_text_observation *observation)
 {
-    keyshift_effective_poll();
     if(keyshift_metadata_active)return;
     const uint16_t *box=observation->box;
     int deck=keyshift_text_deck(observation->layer,box[0],box[1],box[2],box[3]);

@@ -582,6 +582,7 @@ static void *watch_patch_state(void *unused)
             install_tab_assets("image table route: watcher thread");
         if (render_probe_enabled)
             probe_flush();
+        rx3_modules_tick();
         /* Nothing else invalidates the pad windows while a row animates, so
            the row says when it needs the redraw; it decides the cadence. */
         const struct rx3_pad_row *row = row_for_id(overlay_panel);

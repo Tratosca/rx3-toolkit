@@ -115,6 +115,13 @@ void rx3_modules_text_observed(const struct rx3_text_observation *text)
             rx3_bundle[i]->text_observed(text);
     leave_notification();
 }
+void rx3_modules_tick(void)
+{
+    if (!enter_notification()) return;
+    for (unsigned int i=0; i<rx3_bundle_count; i++)
+        if (active[i] && rx3_bundle[i]->tick) rx3_bundle[i]->tick();
+    leave_notification();
+}
 void rx3_modules_report(void)
 {
     if (!enter_notification()) return;

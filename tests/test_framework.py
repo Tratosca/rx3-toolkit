@@ -250,8 +250,8 @@ static int start_a(const struct rx3_services *s) { assert(s->log_line); started[
 static int start_b(const struct rx3_services *s) { assert(s->install_hook); started[1]++; return !fail; }
 static void stop_a(void) { stopped[0]=++sequence; }
 static void stop_b(void) { stopped[1]=++sequence; }
-const struct rx3_module rx3_search_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"a",configured,start_a,stop_a,0,0,0,0,0};
-const struct rx3_module rx3_now_playing_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"b",configured,start_b,stop_b,0,0,0,0,0};
+const struct rx3_module rx3_search_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"a",configured,start_a,stop_a,0,0,0,0,0,0};
+const struct rx3_module rx3_now_playing_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"b",configured,start_b,stop_b,0,0,0,0,0,0};
 const struct rx3_module *const rx3_bundle[]={&rx3_search_module,&rx3_now_playing_module};
 const unsigned int rx3_bundle_count=2;
 void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o) {(void)o;

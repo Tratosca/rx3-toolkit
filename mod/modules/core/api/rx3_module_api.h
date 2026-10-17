@@ -15,7 +15,7 @@
 #include "rx3_audio_api.h"
 #include "rx3_memory_api.h"
 #include "rx3_loader_api.h"
-#define RX3_MODULE_API_VERSION 20u
+#define RX3_MODULE_API_VERSION 21u
 /* Static composition contract, not a promise of a stable dynamic ABI.
  * All descriptors have process lifetime. Startup is serial and explicit.
  * A failed start is followed by stop, including partial installation.
@@ -87,5 +87,8 @@ struct rx3_module {
     void (*report)(void);
     /* Invalidate old metadata before the native load can publish new text. */
     void (*track_will_load)(unsigned int deck, void *reader, const void *track_info);
+    /* Watcher thread, every 50 ms, even when rbp draws nothing. Return
+       promptly: no allocation, I/O or waiting. */
+    void (*tick)(void);
 };
 #endif

@@ -18,5 +18,5 @@ static int start(const struct rx3_services *services)
 }
 const struct rx3_module rx3_search_module = {
     RX3_MODULE_API_VERSION, sizeof(struct rx3_module), "search-latin",
-    search_latin_feature_configured, start, search_latin_feature_remove, 0, 0, 0, 0, 0
+    search_latin_feature_configured, start, search_latin_feature_remove, 0, 0, 0, 0, 0, 0
 };

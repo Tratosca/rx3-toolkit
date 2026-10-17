@@ -100,7 +100,8 @@ static void keyshift_effective_gui(int deck)
     }
     __atomic_sub_fetch(&effective_callbacks,1u,__ATOMIC_SEQ_CST);
 }
-/* Called from the render path; reads the tempo ten times a second at most. */
+/* Core watcher thread: a still HOME draws no text, so the render path cannot
+ * drive this. Reads the tempo ten times a second at most. */
 static void keyshift_effective_poll(void)
 {
     if(!effective_enabled)return;
@@ -113,7 +114,16 @@ static void keyshift_effective_poll(void)
         if(state==__atomic_exchange_n(&effective_state[deck],state,__ATOMIC_SEQ_CST))continue;
         /* The next Ui_CycleTask pass copies the line again, through our hook. */
         __atomic_store_n((unsigned *)(unsigned long)(EFFECTIVE_TITLE_REFRESH+deck*4u),1u,__ATOMIC_SEQ_CST);
-        keyshift_publish_key(deck,keyshift_base_key(deck));
+        /* Republish without storing the key: the render and load threads
+         * store first, then publish, so a key read before theirs is redone. */
+        int key;
+        do {
+            key=keyshift_base_key(deck);
+            if(framework->browse && framework->browse->deck_key)
+                framework->browse->deck_key(deck,rx3_camelot_shifted(key,keyshift_tempo_semitones(deck)),
+                                            rx3_keyshift_semitones(deck));
+        } while(key!=keyshift_base_key(deck));
+        __atomic_store_n(&keyshift_refresh_pending,1u,__ATOMIC_SEQ_CST);
     }
 }
 static void keyshift_effective_remove(void)

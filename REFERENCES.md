@@ -2812,7 +2812,7 @@ guarantee of restored page permissions or atomic live patching. The core retains
 original callbacks on cleanup failure. Search Latin and Now Playing detach
 their hooks and drain admitted native callbacks before releasing trampolines.
 
-`track_will_load` runs on the native loading thread before the original load, allowing metadata invalidation before new text can be observed. `track_did_load` runs after the original load and the existing providers' load callbacks. Mix observations may run on the waveform thread. A provider must return promptly without allocation, I/O or waiting, and its code must remain resident after withdrawal. Logging and hook installation are not audio-thread services. Workers remain owned and joined by their modules.
+`track_will_load` runs on the native loading thread before the original load, allowing metadata invalidation before new text can be observed. `track_did_load` runs after the original load and the existing providers' load callbacks. `tick` runs on the core watcher thread every 50 ms, whether or not rbp draws anything, for state that must follow the deck on a still screen. Mix observations may run on the waveform thread. A provider must return promptly without allocation, I/O or waiting, and its code must remain resident after withdrawal. Logging and hook installation are not audio-thread services. Workers remain owned and joined by their modules.
 
 <a id="doc-runtime-framework--ownership-map"></a>
 ##### Ownership map

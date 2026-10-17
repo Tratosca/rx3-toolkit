@@ -10,6 +10,7 @@ struct rx3_text_observation;
 void rx3_modules_audio_started(unsigned int);
 void rx3_modules_text_observed(const struct rx3_text_observation *);
 void rx3_modules_report(void);
+void rx3_modules_tick(void);
 int rx3_modules_uses_audio(void);
 void rx3_modules_bind_writer(int (*)(unsigned long, const void *, const void *, unsigned int));
 #endif

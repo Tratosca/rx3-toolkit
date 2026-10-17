@@ -15,6 +15,8 @@
 
 - Add optional **Heard key** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)): with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. KEY shifts add up, and Key Sync, the KEY tab and the KEY MATCH colours in BROWSE follow the heard key. Checked in the emulator (loads, screen unchanged at 0%); the tempo fader response is not yet run on hardware.
 
+- Heard key now follows the deck on a still main screen: moving TEMPO, switching MASTER TEMPO or pressing KEY updates the deck's key line, the Key Sync button and the BROWSE key colours within a second, without opening another screen. Checked in the emulator; not yet run on hardware.
+
 - Removing the vocals no longer leaves a doubled voice on MP3 files whose encoder info the separator and the deck read differently ([#25](https://github.com/Tratosca/rx3-toolkit/issues/25)): the separator now hears the track exactly as the deck plays it. Stems already prepared for those files are made again on the next run; every other stem is kept. Checked on the reported file (25 ms early before, aligned after); not yet run on hardware.
 
 - The mod now hands each hook its way back to the player before the hook goes live, so a player thread can never reach a half-installed hook (from Evan Purkhiser's [#35](https://github.com/Tratosca/rx3-toolkit/pull/35)); it also loads only inside the player itself, and a build refuses a hook that would silently fail to load. Checked in the emulator; not yet run on hardware.
