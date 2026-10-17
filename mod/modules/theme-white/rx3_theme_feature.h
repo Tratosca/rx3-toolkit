@@ -284,6 +284,12 @@ static void theme_run_pending_toggle(void)
         framework->images->select_variant(light);
         framework->text->invalidate();
         theme_forget_counter_cautions();
+        /* The main screen's ground is painted when the screen is entered and
+           never again. Enter it once more, as leaving SHORTCUT does, so the
+           ground and the waveform pane edge follow the new mode. */
+        if (((int (*)(void))0x001126d0u)() == 1 &&
+            !memcmp((const void *)THEME_SHOW_SCREEN, theme_show_screen_guard, 8))
+            ((int (*)(unsigned int))THEME_SHOW_SCREEN)(0u);
         theme_waveform_apply(light);
         theme_home_repaint_pending = light != 0;
         if (request == 2) {

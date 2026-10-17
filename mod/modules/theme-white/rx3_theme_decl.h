@@ -85,6 +85,14 @@ static const uint8_t theme_counter_caution_cache_guard[8] = {
 };
 #define THEME_COUNTER_CAUTION_IDS ((unsigned long)0x00526858)
 
+/* ui_com_draw_ShowScreen: activates a winscape by ID (0 is the main screen,
+   what the start screen hands over to). Entering a winscape reloads its
+   resources, which recreates and clears every window it owns. */
+#define THEME_SHOW_SCREEN ((unsigned long)0x0018e024)
+static const uint8_t theme_show_screen_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+
 #define THEME_COMPONENT_MANAGER ((unsigned long)0x001d0a30)
 static const uint8_t theme_component_manager_guard[8] = {
     0x10, 0x40, 0x2d, 0xe9, 0x20, 0x40, 0x9f, 0xe5
