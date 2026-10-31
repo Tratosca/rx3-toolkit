@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- A track whose length ends exactly on a millisecond boundary no longer fails while its waveforms are calculated. That was about one track in forty.
+
 - Tracks with an accent in the title, artist or file name can be prepared on Windows. The finished stem package was saved in the wrong encoding, so these tracks failed at the very last step, after separation had already run. Checked on an RX3 running 1.20.
 
 - The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.

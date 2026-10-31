@@ -62,8 +62,11 @@ class Bank:
             last=min(len(peaks[i]),(stop*cadence+rate-1)//rate)
             boundaries=(np.arange(first,last+1,dtype=np.int64)*rate+cadence-1)//cadence-offset
             if i>=2:boundaries[-1]=min(boundaries[-1],valid)
-            sliced=data[:boundaries[-1]];starts=boundaries[:-1]
-            values=np.maximum(np.maximum.reduceat(sliced,starts),-np.minimum.reduceat(sliced,starts))
+            # Audio ending on a cell boundary leaves the last cell empty, and
+            # reduceat refuses an index at the end. Reduce only real intervals.
+            sliced=data[:boundaries[-1]];starts=boundaries[:-1][boundaries[:-1]<boundaries[-1]]
+            values=np.zeros(last-first)
+            values[:len(starts)]=np.maximum(np.maximum.reduceat(sliced,starts),-np.minimum.reduceat(sliced,starts))
             if i>=2:values=values*32768
             peaks[i][first:last]=np.minimum(32767,np.trunc(values)).astype(np.int64)
         offset=stop
