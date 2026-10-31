@@ -25,13 +25,20 @@ class PackageTests(unittest.TestCase):
             self.inputs[role] = p
         self.template = analysis.Template(b'PWV5',b'\0'*30,15,(), '11'*32)
 
-    def make(self, count=3):
+    def test_manifest_survives_names_outside_the_platform_encoding(self):
+        # Read back as UTF-8 whatever the machine's locale; cp1252 cannot even
+        # write the combining accent, and its e-acute is not valid UTF-8.
+        title = 'Beyonc\u00e9 INTRO PILE\u0301'
+        out = self.make(metadata={'title': title})
+        self.assertEqual(package.read(out)['manifest']['title'], title)
+
+    def make(self, count=3, metadata=None):
         inputs = dict(list(self.inputs.items())[:count])
         wave = self.root/'track.rx3wave'
         roles = dict((r,(bytes([0,4*(i+1)])*15,'22'*32)) for i,r in enumerate(list(waveform.ROLE_IDS)[:count+1]))
         waveform.write(wave,self.template,self.frames,'33'*32,roles)
         out=self.root/'track.rx3stem'
-        package.write(out,inputs,wave,{'title':'test'})
+        package.write(out,inputs,wave,metadata or {'title':'test'})
         return out
 
     def test_single_file_self_describes_each_selected_set_and_audition(self):

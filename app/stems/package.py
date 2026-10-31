@@ -148,7 +148,7 @@ def write(output, inputs, wave, metadata):
             wave = pathlib.Path(directory) / 'absent-waveform'
             wave.touch()
         description = pathlib.Path(directory) / 'manifest.json'
-        description.write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, allow_nan=False) + '\n')
+        description.write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, allow_nan=False) + '\n', encoding='utf-8')
         parts = [(PCM, ROLE_BITS[r], r, p) for r, p in inputs.items()] + [(WAVE, 0, 'waveform', wave), (MANIFEST, 0, 'manifest', description)]
         offset = 64 + len(parts) * 64
         directory = bytearray()
