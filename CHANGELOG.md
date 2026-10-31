@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- A track whose name Rekordbox cut just after a space or a dot now gets its stem package under the name the deck asks for. The app used to trim that character, so it reported the track as ready while the deck found no stems. A package prepared before this fix needs preparing again. Checked on an RX3 running 1.20.
+
 - A track whose length ends exactly on a millisecond boundary no longer fails while its waveforms are calculated. That was about one track in forty.
 
 - Tracks with an accent in the title, artist or file name can be prepared on Windows. The finished stem package was saved in the wrong encoding, so these tracks failed at the very last step, after separation had already run. Checked on an RX3 running 1.20.

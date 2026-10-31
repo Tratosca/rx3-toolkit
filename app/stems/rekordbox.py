@@ -95,10 +95,14 @@ def file_url_to_path(value: str) -> pathlib.Path:
 
 
 def safe_stem(value: str) -> str:
-    """Reduce a filename stem to what the RX3 load interface can match."""
+    """Reduce a filename stem to what the RX3 load interface can match.
+
+    The deck compares names byte for byte, and a name Rekordbox cut can end in
+    the space or dot the cut left behind, so neither end is trimmed.
+    """
     value = unicodedata.normalize("NFC", value).replace("/", "_").replace(":", "_")
-    value = "".join(character for character in value if ord(character) >= 32).strip(" .")
-    return value[:180] or "track"
+    value = "".join(character for character in value if ord(character) >= 32)
+    return value[:180] if value.strip(" .") else "track"
 
 
 def export_stem(value: str) -> str:
