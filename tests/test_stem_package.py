@@ -210,7 +210,24 @@ int main(int argc,char **argv) {
    assert(packed[15*stride]==99);
   }
   assert(stems_waveform(0,7,2,packed,15)==0);
-  assert(stems_waveform(0,7,2,packed,14)==0xffffffffu);
+  /* Rekordbox's axis for a lossy source lands a few columns from the decoder's:
+     the shared columns are copied, a missing tail stays silent. */
+  uint8_t wide[32];
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,11)==11);
+  for(unsigned i=0;i<11;i++) assert(wide[i]==7);
+  assert(wide[11]==99);
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,23)==23);
+  for(unsigned i=0;i<15;i++) assert(wide[i]==7);
+  for(unsigned i=15;i<23;i++) assert(wide[i]==0);
+  assert(wide[23]==99);
+  /* A larger gap is another recording, and the native waveform stays. */
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,6)==0xffffffffu);
+  assert(stems_waveform(0,7,0,wide,24)==0xffffffffu);
+  assert(stems_waveform(0,7,0,wide,0)==0xffffffffu);
+  for(unsigned i=0;i<sizeof(wide);i++) assert(wide[i]==99);
   munmap(next[0].block,next[0].block_size);close(fd);return 0;
  }
  uint8_t amplitudes[46];memset(amplitudes,99,sizeof(amplitudes));

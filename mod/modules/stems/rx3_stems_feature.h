@@ -105,21 +105,29 @@ static unsigned int stems_waveform(unsigned int deck, unsigned int mask,
     if(header->version==4u && (stride!=header->stride || format==2u)) {
         copied=0xfffffffeu; goto done;
     }
-    if(count!=header->count) { copied=0xffffffffu; goto done; }
+    /* Rekordbox measures a lossy source a few columns from the decoder that built
+       the package, as much as four across a real library. Copy the columns both
+       axes share and leave a missing tail silent; only a larger gap, or a legacy
+       file, keeps the native waveform. */
+    unsigned int shared=count<header->count?count:header->count;
+    unsigned int gap=count<header->count?header->count-count:count-header->count;
+    if(!count || gap>(header->version>=2u?8u:0u)) { copied=0xffffffffu; goto done; }
     if(mask & ~stems_available(context)) goto done;
     if(!mask) { memset(out,0,count*stride); copied=count; goto done; }
     const struct rx3_wave_entry *entries=(const void *)(wave+128u);
     if(header->version==4u) {
         if(mask>header->roles) goto done;
-        memcpy(out,wave+(unsigned int)entries[mask-1u].offset,count*stride);
+        memcpy(out,wave+(unsigned int)entries[mask-1u].offset,shared*stride);
+        memset(out+shared*stride,0,(count-shared)*stride);
         copied=count;
     } else if(header->version>=2u) {
         if((format==3u && header->version!=3u) || (format==2u && header->version!=2u)) goto done;
         if(mask>header->roles) goto done;
         const uint8_t *data=wave+(unsigned int)entries[mask-1u].offset;
         unsigned int offset=format==0u?0u:format==1u?1u:3u;
-        for(unsigned int i=0;i<count;i++)
+        for(unsigned int i=0;i<shared;i++)
             memcpy(out+i*stride,data+i*6u+offset,stride);
+        memset(out+shared*stride,0,(count-shared)*stride);
         copied=count;
     } else {
         /* Old files only contain single-role curves in one display format.
