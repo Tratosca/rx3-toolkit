@@ -64,6 +64,11 @@ static void stems_reset_mix(struct stems_deck_context *context)
         context->gain[i] = context->from[i] = context->target[i] = 1.0f;
     context->transition_cursor = 256u;
     stems_set_mask(context, context->selection & 15u);
+    /* The loader drained the audio thread, so nothing of the last track rings on. */
+    __atomic_store_n(&context->echo_request, 0u, __ATOMIC_SEQ_CST);
+    for (unsigned int i = 0; i < 3u; i++)
+        __atomic_store_n(&context->echo[i].frames, 0u, __ATOMIC_SEQ_CST);
+    context->echo_valid = 0;
 }
 
 static void stems_mix(struct stems_deck_context *context, int position,

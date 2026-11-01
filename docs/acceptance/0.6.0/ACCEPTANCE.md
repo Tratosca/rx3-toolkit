@@ -199,7 +199,7 @@ Prévoir plusieurs séances, pas une seule longue liste à exécuter sans pause.
 
 > **ST-03 — pads Stems / deck 1**<br>
 > Préparation : profil COMPLET hash …, SYN3 chargé sur D1, D2 arrêté, niveaux 100 %, capture audio et logs démarrés.<br>
-> **À faire :** appuyez sur SLIP LOOP jusqu’à voir INST / VOCAL / DRUMS. Lancez PLAY. Appuyez une fois sur pad 6, attendez deux secondes, puis rappuyez.<br>
+> **À faire :** appuyez sur SLIP LOOP jusqu’à voir INST / VOCAL / DRUMS. Lancez PLAY. Appuyez une fois sur pad 2, attendez deux secondes, puis rappuyez.<br>
 > **À constater :** seule la composante VOCAL disparaît puis revient; le bouton et la LED suivent.<br>
 > **Votre retour :** « OK » ou le premier écart entendu/vu. Je récupère la capture, mesure, note le verdict et prépare la suite. Je ne vous demande pas de chercher le fichier suivant.
 
@@ -413,7 +413,7 @@ Statut initial de tous les cas : **NON EXÉCUTÉ**. Lire [le protocole](#doc-acc
 |---|---|---|---|---|---|
 | ST-01 | P0 / A+F | Paquet SYN3 et piste M01 préparés; D1 puis D2 | F charge et ouvre STEMS; attend la fin de chargement | Trois rôles disponibles, états lisibles; aucun rôle de l’ancienne piste durant le chargement | VIDEO+LOG |
 | ST-02 | P0 / A+F | SYN3 dont chaque composante est connue | F écoute les 7 combinaisons non vides puis tout coupe; A enregistre | Chaque combinaison correspond au mix attendu; INST conserve la basse; tout activé retrouve le mix; silence quand tout est coupé | AUDIO+ORACLE |
-| ST-03 | P0 / A+F | SYN3, écran STEMS et mode SLIP LOOP | F alterne pads 5 INST, 6 VOCAL, 7 DRUMS et commandes tactiles; essaie pad 8 | Audio, LED et écran cohérents; pad 8 garde sa boucle native | VIDEO+AUDIO |
+| ST-03 | P0 / A+F | SYN3, écran STEMS et mode SLIP LOOP | F alterne pads 1 INST, 2 VOCAL, 3 DRUMS et commandes tactiles; essaie pad 4 | Audio, LED et écran cohérents; pad 4 garde sa boucle native | VIDEO+AUDIO |
 | ST-04 | P0 / A+F | STEMS 100 %; panneau combiné boutons/sliders | F fait un tap, puis maintien >350 ms et glisse vers 50/0/100 % | Tap mute/active; drag règle sans saut initial ni toggle final; 0 éteint; à 100 slider se masque après environ 2 s | VIDEO+AUDIO |
 | ST-05 | P0 / A+F | Deux pistes différentes simultanées | F modifie tous les niveaux sur D1 puis D2 et recharge un deck | Indépendance des decks; niveaux réinitialisés au nouveau morceau; pas de contamination croisée | VIDEO+AUDIO |
 | ST-06 | P0 / A+F | M01 en lecture; stems tous actifs puis isolés | F fait 30 toggles rapides, tempo, MT, loops, Beat Jump et scratch | Pas de désynchronisation, clic anormal récurrent ou fragment ancien; transition cohérente avec le transport | AUDIO+VIDEO |

@@ -49,7 +49,7 @@ Stems, Samples, the newer screen controls and Browse changes have **not yet pass
 
 The computer does the separation before your set. The RX3 plays your original track and the prepared stem package together; it does not separate music live. One `.rx3stem` package per track lives in `RX3_STEMS` on the USB drive. The current preparation flow makes **VOCAL + DRUMS + INST**; INST is the part of the original mix left after the prepared vocal and drums are removed. Older vocal-only packages still load. There is no separate bass pad in the current layout.
 
-On a prepared track, the intended **Slip Loop** pad layout is **5 INST** (red), **6 VOCAL** (green), **7 DRUMS** (blue); **8** keeps its native loop. The **STEMS** touchscreen panel shows the parts available for that track. Tap a part to turn it off or back on; hold and drag to set its level. On a track without a valid stem package, Slip Loop stays native. This mapping is verified in code and the emulator, **not yet accepted on hardware**. [Stem controls and limits](mod/modules/stems/README.md).
+On a prepared track, the intended **Slip Loop** pad layout is **1 INST** (red), **2 VOCAL** (green), **3 DRUMS** (blue). The pads below them, **5 to 7**, echo that stem out: it cuts and its last beat repeats four times, quieter each time. **4** and **8** keep their native loops. The **STEMS** touchscreen panel shows the parts available for that track. Tap a part to turn it off or back on; hold and drag to set its level. On a track without a valid stem package, Slip Loop stays native. This mapping is verified in native tests and has run on one RX3 at firmware 1.20; **full hardware acceptance is still open**. [Stem controls and limits](mod/modules/stems/README.md).
 
 ### 🎹 Key Shift and Key Sync
 
@@ -181,7 +181,7 @@ Try a selected feature with a suitable track. **Session logging** is off by defa
 
 ## Playing with it
 
-On a track you prepared, open **STEMS** or the matching **Slip Loop** pad page. Tap **VOCAL** or **DRUMS** to take that part out and tap again to restore it. Use **INST** for the remaining instruments and bass. On the touchscreen, hold and drag a part to set its level. A track without prepared stems keeps its normal Slip Loop controls.
+On a track you prepared, open **STEMS** or the matching **Slip Loop** pad page. Tap **VOCAL** or **DRUMS** to take that part out and tap again to restore it. Use **INST** for the remaining instruments and bass. On the touchscreen, hold and drag a part to set its level. On the Slip Loop pads, the pad below a part echoes it out over four beats. A track without prepared stems keeps its normal Slip Loop controls.
 
 Tap **KEY** for manual Key Shift. The left and right controls move the selected deck one semitone at a time; tap its centre key to reset. If you enabled Key Sync, check the proposed shift against the MASTER deck before applying it. Key Match suggestions in BROWSE are suggestions for a transition, not a guarantee that two melodies will sound good together.
 

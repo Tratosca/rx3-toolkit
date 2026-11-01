@@ -3,6 +3,7 @@
 #define RX3_STEMS_FEATURE_H
 
 #include "rx3_stems_loader.h"
+#include "rx3_stems_echo.h"
 
 static int block_is_silent(const struct rx3_stereo *output, unsigned int frames)
 {
@@ -20,28 +21,42 @@ static void stems_stream(unsigned int deck, const void *reader, int position,
     if (deck >= 2u || !__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST)) return;
     struct stems_deck_context *context = &stems_decks[deck];
     __sync_add_and_fetch(&context->readers_active, 1u);
-    if (__atomic_load_n(&context->reader, __ATOMIC_SEQ_CST) == reader &&
-        !block_is_silent(output, frames))
-        stems_mix(context, position, output, frames);
+    if (__atomic_load_n(&context->reader, __ATOMIC_SEQ_CST) == reader) {
+        int silent = block_is_silent(output, frames);
+        int advanced = stems_echo_begin(context, position, frames);
+        /* Silence that does not move is a stopped deck: the echo holds. */
+        if (!silent || advanced) {
+            stems_echo_capture(context, position, output, frames);
+            if (!silent) stems_mix(context, position, output, frames);
+            stems_echo_render(context, position, output, frames);
+        }
+    }
     __sync_sub_and_fetch(&context->readers_active, 1u);
 }
 
-/* SLIP LOOP pads 5 to 8 toggle the prepared roles once the set is resident.
-   A captured press also takes its release, so the native loop never sees half
-   of a gesture. */
+/* SLIP LOOP pads 1 to 3 toggle the prepared roles once the set is resident and
+   pads 5 to 7 echo them out; pads 4 and 8 have no role and stay native. A
+   captured press also takes its release, so the native loop never sees half of
+   a gesture. */
 static int stems_pad(const struct rx3_pad_event *event)
 {
     unsigned int code = event->code;
     if (!__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST) ||
-        code < 0x411bu || code > 0x411eu || event->deck >= 2u) return 0;
+        code < 0x4117u || code > 0x411eu || event->deck >= 2u) return 0;
     unsigned int operation = event->operation;
-    unsigned int deck = event->deck, pad = code - 0x411bu, captured = 1u << pad;
+    unsigned int deck = event->deck, pad = code - 0x4117u, captured = 1u << pad;
     struct stems_deck_context *context = &stems_decks[deck];
-    unsigned int bit = stems_display_order[pad];
+    unsigned int bit = stems_display_order[pad & 3u];
     if (!operation && event->pad_mode == 2u &&
         context->status == 2u && context->reader && context->armed && (stems_available(context) & bit)) {
         __atomic_fetch_or(&captured_pad_mask[deck], captured, __ATOMIC_SEQ_CST);
-        stems_toggle(context, bit);
+        if (pad < 4u) {
+            stems_toggle(context, bit);
+        } else {
+            int bpm = framework->audio->deck_bpm(deck);
+            __atomic_store_n(&context->echo_report, (unsigned int)bpm + 1u, __ATOMIC_SEQ_CST);
+            stems_echo_out(context, bit, stems_beat_frames(bpm));
+        }
         return 1;
     }
     if (__atomic_load_n(&captured_pad_mask[deck], __ATOMIC_SEQ_CST) & captured) {
@@ -52,22 +67,30 @@ static int stems_pad(const struct rx3_pad_event *event)
     return 0;
 }
 
-/* SLIP LOOP pads 5 to 8 blink while the set loads, then hold their role
-   colour, dimmed when the role is off. Pads without a role stay native. */
+/* SLIP LOOP pads blink while the set loads. Then pads 1 to 3 hold their role
+   colour, dimmed when the role is off, and pads 5 to 7 sit dimmed while they
+   have a role to echo, blink while it rings and go dark while it is off. Pads
+   without a role stay native. */
 static void stems_light(unsigned int deck, unsigned int control, struct rx3_light *light)
 {
-    if (deck >= 2u || control < 4u || control > 7u) return;
+    if (deck >= 2u || control > 7u) return;
     struct stems_deck_context *context = &stems_decks[deck];
     if (!__atomic_load_n(&stems_callbacks_enabled, __ATOMIC_SEQ_CST) ||
         !context->reader || !context->armed) return;
-    unsigned int pad = control - 4u, bit = stems_display_order[pad];
+    unsigned int slot = control & 3u, bit = stems_display_order[slot];
     if (!(stems_available(context) & bit)) return;
-    const struct stems_rgb *c = &stems_pad_colour[pad];
+    const struct stems_rgb *c = &stems_pad_colour[slot];
     light->rgb = ((uint32_t)c->red << 16u) | ((uint32_t)c->green << 8u) | c->blue;
-    if (!context->payloads[0].data)
+    if (!context->payloads[0].data) {
         light->state = RX3_LIGHT_BLINK;
-    else
+    } else if (control < 4u) {
         light->state = stems_selected(context) & bit ? RX3_LIGHT_ON : RX3_LIGHT_DIM;
+    } else if (stems_echo_running(context, bit)) {
+        light->state = RX3_LIGHT_BLINK;
+    } else {
+        light->state = RX3_LIGHT_DIM;
+        if (!(stems_selected(context) & bit)) light->rgb = 0u;
+    }
     if (!stems_any_deck_loading()) stems_blink_idle();
 }
 

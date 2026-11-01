@@ -5,8 +5,8 @@
     "fr": "Stems"
   },
   "description": {
-    "en": "Mute or enable each stem on screen or with the SLIP LOOP pads. The waveform follows active stems when available.\nPrepare your tracks on the app’s Stems screen.",
-    "fr": "Coupez ou activez chaque stem à l’écran ou avec les pads SLIP LOOP. La forme d’onde suit les stems actifs lorsqu’elle est disponible.\nPréparez vos morceaux dans l’écran Stems de l’application."
+    "en": "Mute or enable each stem on screen or with the SLIP LOOP pads, and echo a stem out from the pads below. The waveform follows active stems when available.\nPrepare your tracks on the app’s Stems screen.",
+    "fr": "Coupez ou activez chaque stem à l’écran ou avec les pads SLIP LOOP, et sortez un stem en écho avec les pads du dessous. La forme d’onde suit les stems actifs lorsqu’elle est disponible.\nPréparez vos morceaux dans l’écran Stems de l’application."
   },
   "firmwares": [
     "1.19",
@@ -64,6 +64,7 @@
     "rx3_stems_feature.h",
     "rx3_stems_panel.h",
     "rx3_stems_audio.h",
+    "rx3_stems_echo.h",
     "rx3_stems_loader.h",
     "rx3_stems_package.h",
     "rx3_stems_io.h",
@@ -80,15 +81,15 @@
   "messages": {
     "en": {
       "stemAccess.title": "Use stems",
-      "stemAccess.label": "SLIP LOOP pads 5 to 7 control prepared stems. Press a pad to mute its stem, then press again to enable it.",
-      "stemAccess.press": "Press SLIP LOOP once. Prepared stems appear on pads 5–7: instrumental, vocals, then drums when available. Pads 1–4 keep their native loops.",
-      "stemAccess.play": "Press a pad to mute its stem. Press it again to bring the stem back.",
-      "stemAccess.muteVocal": "Mute the vocal · pad 6",
-      "stemAccess.restore": "Bring the vocal back · pad 6",
-      "stemAccess.muteDrums": "Mute the drums · pad 7",
+      "stemAccess.label": "SLIP LOOP pads 1 to 3 control prepared stems and pads 5 to 7 echo them out. Press a top pad to mute its stem, then press again to enable it.",
+      "stemAccess.press": "Press SLIP LOOP once. Prepared stems appear on pads 1–3: instrumental, vocals, then drums when available. The pad below each one echoes that stem out over four beats. Pads 4 and 8 keep their native loops.",
+      "stemAccess.play": "Press a top pad to mute its stem. Press it again to bring the stem back. Press the pad below to echo the stem out instead.",
+      "stemAccess.muteVocal": "Mute the vocal · pad 2",
+      "stemAccess.restore": "Bring the vocal back · pad 2",
+      "stemAccess.muteDrums": "Mute the drums · pad 3",
       "stemAccess.native": "SLIP LOOP · no prepared stems",
       "stemAccess.ready": "Track with prepared stems",
-      "stemAccess.count": "1 press · stems on pads 5–7",
+      "stemAccess.count": "1 press · stems on pads 1–3",
       "stemAccess.pressCount": {
         "one": "{count} press",
         "other": "{count} presses"
@@ -100,9 +101,9 @@
       "stemAccess.holdDrag": "Hold + drag",
       "stemAccess.touchLabel": "Tap a stem to mute or enable it. Hold, then drag to adjust its volume.",
       "stemAccess.padStep0": "Start in HOT CUE.",
-      "stemAccess.padStep1": "Press SLIP LOOP: pads 5–7 control prepared stems.",
-      "stemAccess.padStep2": "Press pad 6 to mute the vocal.",
-      "stemAccess.padStep3": "Press pad 6 again to restore the vocal.",
+      "stemAccess.padStep1": "Press SLIP LOOP: pads 1–3 control prepared stems, pads 5–7 echo them out.",
+      "stemAccess.padStep2": "Press pad 2 to mute the vocal.",
+      "stemAccess.padStep3": "Press pad 2 again to restore the vocal.",
       "stemAccess.padStep4": "Press HOT CUE to return to your hot cues. The displayed panel stays unchanged.",
       "stemAccess.touchStep0": "The pads start in HOT CUE. Tap STEMS on the touchscreen.",
       "stemAccess.touchStep1": "The STEMS panel is open.",
@@ -112,15 +113,15 @@
     },
     "fr": {
       "stemAccess.title": "Utiliser les stems",
-      "stemAccess.label": "Les pads 5 à 7 de SLIP LOOP contrôlent les stems préparés. Appuyez sur un pad pour couper son stem, puis de nouveau pour le réactiver.",
-      "stemAccess.press": "Appuyez une fois sur SLIP LOOP. Les stems préparés apparaissent sur les pads 5 à 7 : instrumental, voix, puis batterie si disponible. Les pads 1 à 4 conservent leurs boucles natives.",
-      "stemAccess.play": "Appuyez sur un pad pour couper son stem. Appuyez de nouveau pour le réactiver.",
-      "stemAccess.muteVocal": "Couper la voix · pad 6",
-      "stemAccess.restore": "Rétablir la voix · pad 6",
-      "stemAccess.muteDrums": "Couper la batterie · pad 7",
+      "stemAccess.label": "Les pads 1 à 3 de SLIP LOOP contrôlent les stems préparés et les pads 5 à 7 les sortent en écho. Appuyez sur un pad du haut pour couper son stem, puis de nouveau pour le réactiver.",
+      "stemAccess.press": "Appuyez une fois sur SLIP LOOP. Les stems préparés apparaissent sur les pads 1 à 3 : instrumental, voix, puis batterie si disponible. Le pad du dessous sort ce stem en écho sur quatre temps. Les pads 4 et 8 conservent leurs boucles natives.",
+      "stemAccess.play": "Appuyez sur un pad du haut pour couper son stem. Appuyez de nouveau pour le réactiver. Appuyez sur le pad du dessous pour le sortir en écho.",
+      "stemAccess.muteVocal": "Couper la voix · pad 2",
+      "stemAccess.restore": "Rétablir la voix · pad 2",
+      "stemAccess.muteDrums": "Couper la batterie · pad 3",
       "stemAccess.native": "SLIP LOOP · sans stems préparés",
       "stemAccess.ready": "Morceau avec stems préparés",
-      "stemAccess.count": "1 appui · stems sur les pads 5 à 7",
+      "stemAccess.count": "1 appui · stems sur les pads 1 à 3",
       "stemAccess.pressCount": {
         "one": "{count} appui",
         "other": "{count} appuis"
@@ -132,9 +133,9 @@
       "stemAccess.holdDrag": "Maintenir + glisser",
       "stemAccess.touchLabel": "Touchez un stem pour le couper ou le réactiver. Maintenez puis glissez pour régler son volume.",
       "stemAccess.padStep0": "HOT CUE est le mode de départ.",
-      "stemAccess.padStep1": "Appuyez sur SLIP LOOP : les pads 5 à 7 contrôlent les stems préparés.",
-      "stemAccess.padStep2": "Appuyez sur le pad 6 pour couper la voix.",
-      "stemAccess.padStep3": "Appuyez de nouveau sur le pad 6 pour rétablir la voix.",
+      "stemAccess.padStep1": "Appuyez sur SLIP LOOP : les pads 1 à 3 contrôlent les stems préparés, les pads 5 à 7 les sortent en écho.",
+      "stemAccess.padStep2": "Appuyez sur le pad 2 pour couper la voix.",
+      "stemAccess.padStep3": "Appuyez de nouveau sur le pad 2 pour rétablir la voix.",
       "stemAccess.padStep4": "Appuyez sur HOT CUE pour retrouver vos hot cues. Le panneau affiché reste inchangé.",
       "stemAccess.touchStep0": "Les pads sont en HOT CUE. Touchez STEMS sur l’écran.",
       "stemAccess.touchStep1": "Le panneau STEMS est ouvert.",
