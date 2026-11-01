@@ -465,7 +465,7 @@ The computer separates the selected parts before a set. The RX3 reads a prepared
 
 ### Playback and controls
 
-The runtime loads and verifies a package before publishing its roles to the deck. A malformed package is refused as a unit. Each deck keeps its own selection; both decks share a memory budget. On the current intended Slip Loop layout, pads 5, 6 and 7 address INST, VOCAL and DRUMS, while pad 8 remains native. The STEMS touch panel can toggle or adjust the available roles. The [module guide](mod/modules/stems/README.md) records user behavior; the [panel contract](#doc-runtime-framework--panels-buttons-and-sliders-api-version-3) records ownership and gesture rules. Integrated playback, transitions and the complete two-deck memory budget still need physical acceptance.
+The runtime loads and verifies a package before publishing its roles to the deck. A malformed package is refused as a unit. Each deck keeps its own selection; both decks share a memory budget. On the current intended Slip Loop layout, pads 1, 2 and 3 address INST, VOCAL and DRUMS, pads 5, 6 and 7 echo the same roles out, and pads 4 and 8 remain native. The STEMS touch panel can toggle or adjust the available roles. The [module guide](mod/modules/stems/README.md) records user behavior; the [panel contract](#doc-runtime-framework--panels-buttons-and-sliders-api-version-3) records ownership and gesture rules. Integrated playback, transitions and the complete two-deck memory budget still need physical acceptance.
 
 ### Package and waveforms
 
@@ -3092,7 +3092,9 @@ LEDs and toggles keep one parity. No module sees an LED ID.
 each: the deck stream after TimeStretch (deck, reader, position, frames) and
 the master bus before the talkover attenuator. Deck identity is published by
 the core's PcmReader::load adapter. Stage callbacks may not allocate, read
-files or wait; release drains them before returning.
+files or wait; release drains them before returning. `deck_bpm` reads the
+player's BPM for a deck in hundredths, behind a guard, and returns 0 when there
+is none. It calls into the player, so it is for input and worker threads.
 
 **Images.** `services->images` owns the private extended table and the
 optional light table, their publication and their selection. Logo replaces a
@@ -3822,8 +3824,8 @@ A drive that was removed and pushed back in without a power cycle used to report
 
 Either way, attach the full `session.txt` when reporting the problem.
 
-<a id="doc-troubleshooting--slip-loop-pads-7-and-8-still-create-loops"></a>
-##### Slip Loop pads 7 and 8 still create loops
+<a id="doc-troubleshooting--slip-loop-pads-still-create-loops"></a>
+##### Slip Loop pads still create loops
 
 No valid `.rx3stem` matched the loaded track. This is the intended fallback, not a failure: an unprepared track behaves exactly like stock.
 

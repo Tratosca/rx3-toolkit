@@ -13,9 +13,9 @@ static const uint16_t stems_text_failed[] = {'S','T','E','M','S',' ','E','R','R'
 /* Last committed full-volume adjustment, in the core's millisecond clock. */
 static unsigned int stems_slider_until[2][4];
 
-/* SLIP LOOP pads 5 to 8 and the touch controls, left to right: INST, VOCAL,
-   DRUMS. Pad 8 has no role and keeps its native loop. A legacy bass payload
-   has no bit here: it plays at the INST level. */
+/* Both rows of SLIP LOOP pads and the touch controls, left to right: INST,
+   VOCAL, DRUMS. Pads 4 and 8 have no role and keep their native loops. A legacy
+   bass payload has no bit here: it plays at the INST level. */
 static const unsigned int stems_display_order[4] = {1u,2u,4u,0u};
 struct stems_rgb { uint8_t red, green, blue; };
 static const struct stems_rgb stems_pad_colour[4] = {
@@ -119,6 +119,7 @@ static int stems_panel_needs_refresh(void)
         if(stems_decks[deck].overcue)
             __atomic_store_n(&stems_decks[deck].status,rx3_overcue_status(deck),__ATOMIC_SEQ_CST);
 #endif
+        stems_echo_report(deck);
         unsigned int status = __atomic_load_n(&stems_decks[deck].status, __ATOMIC_SEQ_CST);
         unsigned int selection = __atomic_load_n(&stems_decks[deck].selection, __ATOMIC_SEQ_CST);
         unsigned int levels = __atomic_load_n(&stems_decks[deck].levels, __ATOMIC_SEQ_CST);

@@ -251,9 +251,9 @@ class LoaderBoundaryTests(unittest.TestCase):
 
 @unittest.skipUnless(COMPILER, "a native C compiler is required")
 class PadTests(unittest.TestCase):
-    """SLIP LOOP pads 5 to 8 and the touch controls read one table."""
+    """Both rows of SLIP LOOP pads and the touch controls read one table."""
 
-    def test_order_colours_and_native_pad_eight(self):
+    def test_order_colours_and_native_last_column(self):
         with tempfile.TemporaryDirectory() as directory:
             source = pathlib.Path(directory) / "pads.c"
             source.write_text(r'''
@@ -270,6 +270,7 @@ typedef struct rx3_stereo Float2;
 static int blink_phase_is_on(void){return 1;}
 static int stems_any_deck_loading(void){return 0;}
 static void stems_blink_idle(void){}
+static void stems_echo_report(unsigned int deck){(void)deck;}
 static unsigned int now_ms(void){return 0;}
 #include "stems/rx3_stems_panel.h"
 int main(void){
@@ -294,7 +295,7 @@ int main(void){
             subprocess.run([COMPILER, "-std=c11", "-I" + str(ROOT / "mod/modules"), str(source), "-o", str(exe)],
                            check=True, capture_output=True)
             lines = subprocess.run([str(exe)], check=True, capture_output=True, text=True).stdout.splitlines()
-        # Pad 5 INST red, pad 6 VOCAL green, pad 7 DRUMS blue, pad 8 no role.
+        # Column 1 INST red, 2 VOCAL green, 3 DRUMS blue, 4 no role.
         self.assertEqual(lines[:4], ["1 255 0 0", "2 0 255 0", "4 120 200 255", "0 0 0 0"])
         self.assertEqual(lines[4], "3 2 INSTRUMENTAL:f800 VOCAL:07e0")
         self.assertEqual(lines[5], "7 3 INST:f800 VOCAL:07e0 DRUMS:001f")

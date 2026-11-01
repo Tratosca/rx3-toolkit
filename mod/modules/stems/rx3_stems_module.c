@@ -58,7 +58,19 @@ static int blink_phase_is_on(void)
 /* Nothing of this module blinks: the next indication starts on its on phase. */
 static void stems_blink_idle(void)
 {
-    framework->input->blink_restart();
+    if (!stems_echo_running(&stems_decks[0], 7u) && !stems_echo_running(&stems_decks[1], 7u))
+        framework->input->blink_restart();
+}
+
+/* Watcher thread while the STEMS tab is open, since a pad handler may not
+   write. What the last echo press read: the tempo fader's effect on it can only
+   be seen on a deck. */
+static void stems_echo_report(unsigned int deck)
+{
+    unsigned int report = __atomic_exchange_n(&stems_decks[deck].echo_report, 0u, __ATOMIC_SEQ_CST);
+    if (!report) return;
+    log_number("stem echo deck = ", deck + 1u);
+    log_number("stem echo bpm x100 = ", report - 1u);
 }
 
 static void release_payload(struct stem_payload *payload)

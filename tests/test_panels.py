@@ -54,6 +54,7 @@ typedef struct rx3_stereo Float2;
 static int blink_phase_is_on(void){return 1;}
 static int stems_any_deck_loading(void){return 0;}
 static void stems_blink_idle(void){}
+static void stems_echo_report(unsigned int deck){(void)deck;}
 static unsigned int tick;
 static unsigned int now_ms(void){return tick;}
 #include "stems/rx3_stems_panel.h"

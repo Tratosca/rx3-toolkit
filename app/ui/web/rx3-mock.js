@@ -324,17 +324,17 @@
         var loops=["1/16","1/8","1/4","1/2","1","2","1/3","3/4"];
                 for(var i=0;i<8;i++) {
           var x=487+(i%4)*109,y=110+Math.floor(i/4)*113;
-          var stemPad=prepared && i>=4 && i<=6;
-          var off=stemPad && (step===2 && i===5);
+          var stemPad=prepared && i<=2,echoPad=prepared && i>=4 && i<=6;
+          var off=stemPad && (step===2 && i===1);
           var playing=!stems && (step===2 || step===3) && i===0;
-          var colour=stemPad?colours[i-4]:slip;
+          var colour=stemPad?colours[i]:echoPad?colours[i-4]:slip;
           box(x,y,97,95,bg);
           p.strokeStyle=off?muted:colour;p.lineWidth=off?2:4;
           p.strokeRect(x+5,y+5,87,85);
           if(playing||(stemPad&&!off))box(x+10,y+10,77,75,colour);
-          var label=stemPad?["INST","VOCAL","DRUMS"][i-4]:native?String.fromCharCode(65+i):stems?loops[i]:String(i+1);
-          text(label,x+48,y+47,stemPad?17:27,off?muted:stemPad?(i===4||i===6?fg:bg):playing?bg:fg);
-          text(stemPad?String(i+1):"",x+48,y+71,15,stemPad&&!off?(i===4||i===6?fg:bg):muted);
+          var label=stemPad?["INST","VOCAL","DRUMS"][i]:echoPad?"ECHO":native?String.fromCharCode(65+i):stems?loops[i]:String(i+1);
+          text(label,x+48,y+47,stemPad||echoPad?17:27,off?muted:stemPad?(i===0||i===2?fg:bg):playing?bg:fg);
+          text(stemPad||echoPad?String(i+1):"",x+48,y+71,15,stemPad&&!off?(i===0||i===2?fg:bg):muted);
         }
 
       }

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Stem controls
 
-The STEMS tab offers INST and VOCAL for a track prepared with the vocal, and INST, VOCAL and DRUMS for a track prepared with the vocal and drums. INST is never a file: it is rebuilt from the original mix minus the prepared stems, so it carries the bass. In Slip Loop mode, pad 5 is INST (red), pad 6 VOCAL (green) and pad 7 DRUMS (blue); pad 8 keeps its native loop.
+The STEMS tab offers INST and VOCAL for a track prepared with the vocal, and INST, VOCAL and DRUMS for a track prepared with the vocal and drums. INST is never a file: it is rebuilt from the original mix minus the prepared stems, so it carries the bass. In Slip Loop mode, pad 1 is INST (red), pad 2 VOCAL (green) and pad 3 DRUMS (blue). Pads 5 to 7 echo the same parts out. Pads 4 and 8 keep their native loops, and a part the track does not have leaves both of its pads native.
 
 The Toolkit exports one self-describing `.rx3stem` package per track, with
 all prepared PCM roles, an internal manifest and optional embedded waveforms.
@@ -29,6 +29,10 @@ A failed waveform calculation leaves the existing package untouched.
 
 
 Touch controls follow the same order and omit unavailable roles. The package is loaded and validated as a unit; corrupt packages are rejected rather than partly activated.
+
+An echo pad cuts its stem and repeats the last beat it played four times, at 71, 35, 18 and 9 percent, then stops. The beat comes from the player's BPM at the moment of the press, and because exactly one beat repeats, the echo stays on the grid wherever the press lands. The pad above brings the stem back and ends the echo within the usual 256-frame fade. A stem held low by its slider echoes at that level. A track with no BPM is muted without an echo, and below 60 BPM the beat is halved. The echo runs in the deck stream, ahead of the channel fader and EQ, so closing the fader closes the echo too. The touch controls have no echo.
+
+The echo is addressed by track position, like the stems themselves, because the deck's stream re-reads frames and steps back. VOCAL and DRUMS repeat from the resident package. INST is the original mix without them, so the last second of each deck's mix is kept, 0.7 MB across both decks, on every track with stems whether or not a pad is pressed. A stopped deck holds its echo until it plays again, and a jump keeps the echo in time. Native tests cover its levels, timing, read order, block sizes and track changes. On an RX3 at firmware 1.20, all three stems stayed on the beat by ear, with the tempo fader off centre and with Master Tempo. Stopping the deck or jumping during an echo, two decks at once and Key Shift have not been run there. While the STEMS tab is open, each press logs the BPM it read.
 
 The Toolkit no longer separates bass. Legacy `.rx3stem`, `.rx3drums` and `.rx3bass` files, and packages holding bass, remain readable: their bass plays, and its waveform is drawn, at the INST level. It has no pad or control of its own.
 Legacy optional files can reduce the available set when invalid.

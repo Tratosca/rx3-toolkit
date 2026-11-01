@@ -55,7 +55,7 @@ stems_prepare()
 stems_after_launch()
 {
     [ "$STEMS_READY" = "1" ] || return 0
-    say "SLIP LOOP: pads 5=instrumental, 6=vocal, 7=drums when prepared"
+    say "SLIP LOOP: pads 1=instrumental, 2=vocal, 3=drums when prepared; pads 5 to 7 echo them out"
     say "STEMS tab: INST and VOCAL, plus DRUMS when prepared; legacy bass follows INST"
     say "available pads blink while loading; the three-role port needs hardware validation"
     say "without a matching stem, audio and pads remain stock"

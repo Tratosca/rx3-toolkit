@@ -17,9 +17,13 @@ static const uint8_t stream_guard[8] = {0xf8,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1}
 /* The master bus, just before the microphone talkover attenuator. */
 #define MIC_TALKOVER ((unsigned long)0x0009c750)
 static const uint8_t master_guard[8] = {0x03,0xc0,0xd0,0xe5,0x04,0x40,0x2d,0xe5};
+/* Called, not hooked. The player's accessor, in hundredths of a BPM. */
+#define PLAY_BPM ((unsigned long)0x000fd1fc)
+static const uint8_t play_bpm_guard[8] = {0x08,0x40,0x2d,0xe9,0x00,0x10,0xa0,0xe1};
 
 typedef unsigned long (*stream_fn)(void *, unsigned long, struct rx3_stereo *, unsigned long);
 typedef void (*talkover_fn)(void *, void *, struct rx3_stereo *, int);
+typedef int (*deck_int_fn)(unsigned int);
 
 struct stage {
     struct installed_hook hook;
@@ -107,6 +111,13 @@ static int claim_master(const void *owner, rx3_master_fn client)
 }
 static void release_master(const void *owner) { release(&master_stage, owner); }
 
+static int deck_bpm(unsigned int deck)
+{
+    if (deck >= 2u || memcmp((const void *)PLAY_BPM, play_bpm_guard, 8)) return 0;
+    int bpm = ((deck_int_fn)PLAY_BPM)(deck);
+    return bpm > 0 && bpm != 0xffff ? bpm : 0;
+}
+
 /* PcmReader::load runs on the native loading thread. The old reader stops
    naming a deck before the load; the new one only after it. */
 void rx3_audio_track_loading(unsigned int deck)
@@ -130,5 +141,5 @@ unsigned int rx3_audio_count(void)
 }
 
 const struct rx3_audio_service rx3_audio = {
-    claim_deck_stream, release_deck_stream, claim_master, release_master
+    claim_deck_stream, release_deck_stream, claim_master, release_master, deck_bpm
 };

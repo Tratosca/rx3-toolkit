@@ -69,7 +69,8 @@ static const struct rx3_input_service input = {.register_pad = register_pad, .re
     .register_lights = register_lights, .claim_mode_keys = claim_modes,
     .unregister_owner = unregister_owner, .shift_held = shift_held,
     .blink_on = blink_on, .blink_restart = blink_restart};
-static const struct rx3_audio_service audio = {claim_stream, release_stream, claim_master, release_master};
+static int deck_bpm(unsigned d) { (void)d; return 12000; }
+static const struct rx3_audio_service audio = {claim_stream, release_stream, claim_master, release_master, deck_bpm};
 static const struct rx3_services services = {.log_line = quiet, .log_number = quiet_number,
     .panels = &panels, .input = &input, .audio = &audio, .memory = &memory_mock,
     .provide_mix = provide_mix, .withdraw_mix = withdraw_mix,
@@ -166,8 +167,10 @@ int main(void) {
     rx3_stems_module.track_did_load(0, (void *)1, "/usb/Contents/track.wav");
     struct rx3_mix_state state = mix(0);
     assert(!state.available && !state.ready);
-    struct rx3_pad_event press = {0x411b, 0, 1, 0, 2};
-    assert(!pad(&press));
+    for (unsigned code = 0x4117; code <= 0x411e; code++) {
+        struct rx3_pad_event press = {code, 0, 1, 0, 2};
+        assert(!pad(&press));
+    }
     struct rx3_stereo out[2] = {{1, -1}, {1, -1}};
     stream(0, (void *)1, 0, out, 2);
     assert(out[0].left == 1 && out[1].right == -1);

@@ -25,6 +25,9 @@ struct rx3_audio_service {
     void (*release_deck_stream)(const void *owner);
     int (*claim_master)(const void *owner, rx3_master_fn);
     void (*release_master)(const void *owner);
+    /* The player's BPM for a deck in hundredths, 0 when it has none. A call
+       into the player: never from an audio callback. */
+    int (*deck_bpm)(unsigned int deck);
 };
 extern const struct rx3_audio_service rx3_audio;
 #endif
