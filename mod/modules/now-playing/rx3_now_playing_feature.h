@@ -244,19 +244,44 @@ static void now_playing_read_deck(unsigned int index, struct now_playing_deck *c
     }
 }
 
+static int now_playing_screen_title;
+
+/* The deck's title as its screen line shows it. The UI thread rewrites that
+   line on a load, so a copy whose length moved meanwhile is read again. */
+static void now_playing_read_title(unsigned int index, uint16_t *title)
+{
+    const uint8_t *line = (const uint8_t *)(unsigned long)
+        (NOW_PLAYING_GUI_TITLE + index * NOW_PLAYING_GUI_STRIDE);
+    const volatile uint16_t *length = (const volatile uint16_t *)(line + NOW_PLAYING_GUI_LENGTH);
+    for (unsigned int attempt = 0; attempt < 3u; attempt++) {
+        uint16_t count = *length;
+        unsigned int units = count < NOW_PLAYING_TITLE_UNITS ? count : NOW_PLAYING_TITLE_UNITS - 1u;
+        memcpy(title, line + NOW_PLAYING_GUI_TEXT, units * sizeof(uint16_t));
+        title[units] = 0;
+        if (*length == count)
+            return;
+    }
+}
+
 /* Every datagram carries both decks whole, so a listener that missed one, or
    started late, is right again at the next. The units are the player's own:
    BPM in hundredths, tempo and play mode as read, until a capture on hardware
    says what their values mean. */
-static void now_playing_send(const char *reason)
+static struct now_playing_text now_playing_last_decks;
+
+/* `changes_only` drops a datagram whose decks match the last one sent: the
+   player reports status many times a second while nothing a listener sees
+   has moved. The heartbeat still goes out every NOW_PLAYING_HEARTBEAT_MS. */
+static int now_playing_send(const char *reason, int changes_only)
 {
     struct now_playing_text text;
     text.length = 0;
     now_playing_literal(&text, "{\"type\":\"now-playing\",\"version\":1,\"sequence\":");
-    now_playing_unsigned(&text, now_playing_sequence++, 0);
+    now_playing_unsigned(&text, now_playing_sequence, 0);
     now_playing_literal(&text, ",\"reason\":\"");
     now_playing_literal(&text, reason);
     now_playing_literal(&text, "\",\"decks\":[");
+    unsigned int decks_start = text.length;
     for (unsigned int index = 0; index < 2u; index++) {
         struct now_playing_deck deck;
         now_playing_read_deck(index, &deck);
@@ -280,10 +305,20 @@ static void now_playing_send(const char *reason)
         now_playing_signed(&text,
             ((now_playing_deck_int_fn)NOW_PLAYING_PLAY_MODE)(index));
         now_playing_literal(&text, ",\"title\":");
+        if (deck.loaded && now_playing_screen_title)
+            now_playing_read_title(index, deck.title);
         now_playing_title(&text, deck.loaded ? deck.title : now_playing_no_title);
         now_playing_literal(&text, "}");
     }
     now_playing_literal(&text, "]}\n");
+
+    unsigned int decks_length = text.length - decks_start;
+    if (changes_only && decks_length == now_playing_last_decks.length &&
+        !memcmp(text.bytes + decks_start, now_playing_last_decks.bytes, decks_length))
+        return 0;
+    memcpy(now_playing_last_decks.bytes, text.bytes + decks_start, decks_length);
+    now_playing_last_decks.length = decks_length;
+    now_playing_sequence++;
 
     struct now_playing_address to;
     memset(&to, 0, sizeof(to));
@@ -293,9 +328,19 @@ static void now_playing_send(const char *reason)
     /* No computer on the link is the ordinary case, not an error. */
     (void)sendto(now_playing_socket, text.bytes, text.length, NOW_PLAYING_DONTWAIT,
                  &to, sizeof(to));
+    return 1;
 }
 
 /* The worker -------------------------------------------------------------------- */
+
+struct now_playing_timeval { long seconds, microseconds; };
+static unsigned int now_playing_ms(void)
+{
+    struct now_playing_timeval value;
+    if (gettimeofday(&value, 0)) return 0;
+    return (unsigned int)(((uint64_t)(unsigned long)value.seconds * 1000000u +
+                           (uint64_t)(unsigned long)value.microseconds) / 1000u);
+}
 
 static void *now_playing_worker(void *unused)
 {
@@ -303,15 +348,20 @@ static void *now_playing_worker(void *unused)
     struct pollfd wake;
     wake.fd = now_playing_wake[1];
     wake.events = NOW_PLAYING_POLLIN;
-    now_playing_send("start");
+    now_playing_send("start", 0);
+    unsigned int last_sent = now_playing_ms();
     while (__atomic_load_n(&now_playing_running, __ATOMIC_SEQ_CST)) {
         wake.revents = 0;
         int ready = poll(&wake, 1u, NOW_PLAYING_HEARTBEAT_MS);
         if (!__atomic_load_n(&now_playing_running, __ATOMIC_SEQ_CST))
             break;
-        if (ready <= 0) {
-            now_playing_send("heartbeat");
-            continue;
+        /* Status events arrive many times a second while a deck plays, so the
+           poll alone would never time out: the heartbeat goes by the clock. */
+        if (ready <= 0 || now_playing_ms() - last_sent >= NOW_PLAYING_HEARTBEAT_MS) {
+            now_playing_send("heartbeat", 0);
+            last_sent = now_playing_ms();
+            if (ready <= 0)
+                continue;
         }
         uint8_t drained[32];
         while (recv(now_playing_wake[1], drained, sizeof(drained),
@@ -320,8 +370,9 @@ static void *now_playing_worker(void *unused)
         /* A load raises status, load and mixer events within a few
            milliseconds. One datagram for all of them. */
         usleep(10000u);
-        if (__sync_lock_test_and_set(&now_playing_pending, 0u))
-            now_playing_send("change");
+        if (__sync_lock_test_and_set(&now_playing_pending, 0u) &&
+            now_playing_send("change", 1))
+            last_sent = now_playing_ms();
     }
     return 0;
 }
@@ -379,6 +430,10 @@ static int now_playing_feature_install(void)
         framework->log_line("now playing refused: an accessor prologue differs");
         return 0;
     }
+    now_playing_screen_title = !memcmp((const void *)NOW_PLAYING_TITLE_LITERALS,
+                                       now_playing_title_literals_guard, 8);
+    if (!now_playing_screen_title)
+        framework->log_line("now playing: title line not found, titles come from the load record");
     if (socketpair(NOW_PLAYING_AF_UNIX, NOW_PLAYING_DGRAM | NOW_PLAYING_NONBLOCK, 0,
                    now_playing_wake)) {
         now_playing_wake[0] = now_playing_wake[1] = -1;

@@ -5,6 +5,8 @@
 
 - Samples: the pads now play. The bank's pad levels, loop mode and SHIFT silence never reached the deck, so every pad played at zero level and a loop stopped after one pass. Checked in the emulator with both decks stopped (pad sound, loop past the end of the sample, SHIFT silence); not yet run on hardware.
 
+- Now Playing: the title is the one the deck shows (it was always empty), and a datagram goes out when something changes plus once every two seconds, instead of about fifty identical ones per second ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Checked in the emulator; not yet run on hardware.
+
 - A drive built with Logo chosen but no artwork now keeps the stock logo and starts every other mod, instead of falling back to the stock player. Not yet run on hardware.
 
 - UTILITY ends with an RX3 TOOLKIT section: the toolkit VERSION, then one line per mod on the drive, showing ON or OFF and the revision it was built from (layout after Evan Purkhiser's [#48](https://github.com/Tratosca/rx3-toolkit/pull/48)). DISPLAY MODE stays available with the light theme. Not yet run on hardware.

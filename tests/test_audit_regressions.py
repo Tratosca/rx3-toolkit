@@ -348,6 +348,62 @@ int main(void){
 }
 ''', [])
 
+    def test_now_playing_sends_a_change_only_when_a_deck_changed(self):
+        source = MODULES / 'now-playing/rx3_now_playing_feature.h'
+        parts = ''.join(function(source, name) + '\n' for name in (
+            'now_playing_put', 'now_playing_literal', 'now_playing_unsigned',
+            'now_playing_signed', 'now_playing_title', 'now_playing_read_deck'))
+        text = source.read_text()
+        # Its string literals hold braces, so cut at the closing brace in column 0.
+        start = text.index('static int now_playing_send(')
+        send = text[start:text.index('\n}\n', start) + 3]
+        self.run_units(r'''
+#include <assert.h>
+#define NOW_PLAYING_TITLE_UNITS 128u
+#define NOW_PLAYING_DATAGRAM_MAX 2048u
+#define NOW_PLAYING_AF_INET 2
+#define NOW_PLAYING_PORT 50123u
+#define NOW_PLAYING_BROADCAST 0u
+#define NOW_PLAYING_DONTWAIT 0
+typedef int (*now_playing_deck_int_fn)(unsigned int);
+typedef int (*now_playing_on_air_fn)(unsigned int, int);
+static int bpm_value = 12800;
+static int stub_int(unsigned int deck) { (void)deck; return bpm_value; }
+static int stub_air(unsigned int deck, int x) { (void)x; return deck == 0; }
+#define NOW_PLAYING_PLAY_BPM   ((unsigned long)stub_int)
+#define NOW_PLAYING_PLAY_TEMPO ((unsigned long)stub_int)
+#define NOW_PLAYING_PLAY_MODE  ((unsigned long)stub_int)
+#define NOW_PLAYING_ON_AIR     ((unsigned long)stub_air)
+struct now_playing_address { uint16_t family, port; uint32_t address; uint8_t zero[8]; };
+struct now_playing_deck { volatile unsigned int revision; uint8_t loaded; uint32_t track_id;
+                          uint16_t title[NOW_PLAYING_TITLE_UNITS]; };
+struct now_playing_text { char bytes[NOW_PLAYING_DATAGRAM_MAX]; unsigned int length; };
+static struct now_playing_deck now_playing_decks[2];
+static unsigned int now_playing_sequence;
+static struct now_playing_text now_playing_last_decks;
+static int now_playing_screen_title;
+static void now_playing_read_title(unsigned int index, uint16_t *title) { (void)index; (void)title; }
+static int now_playing_socket;
+static const uint16_t now_playing_no_title[1] = {0};
+static unsigned int sent;
+static char last[NOW_PLAYING_DATAGRAM_MAX];
+static long sendto(int fd, const void *data, size_t n, int flags, const void *to, unsigned int size)
+{ (void)fd; (void)flags; (void)to; (void)size; memcpy(last, data, n); last[n] = 0; sent++; return (long)n; }
+''' + parts + send + r'''
+int main(void){
+ now_playing_decks[0].loaded = 1; now_playing_decks[0].track_id = 2;
+ now_playing_decks[0].title[0] = 'D'; now_playing_decks[0].title[1] = 'O';
+ now_playing_send("start", 0); assert(sent == 1 && strstr(last, "\"sequence\":0"));
+ /* The player's status updates repeat; nothing a listener sees moved. */
+ for (int i = 0; i < 50; i++) now_playing_send("change", 1);
+ assert(sent == 1);
+ bpm_value = 12900; now_playing_send("change", 1);
+ assert(sent == 2 && strstr(last, "\"sequence\":1") && strstr(last, "\"bpmX100\":12900"));
+ now_playing_send("heartbeat", 0); assert(sent == 3 && strstr(last, "\"title\":\"DO\""));
+ return 0;
+}
+''', [])
+
     def test_now_playing_retains_live_hooks_and_drains_before_release(self):
         remove = function(MODULES / 'now-playing/rx3_now_playing_feature.h', 'now_playing_feature_remove')
         self.run_units(r'''
