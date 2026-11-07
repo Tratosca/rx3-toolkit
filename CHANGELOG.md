@@ -24,13 +24,13 @@
 
 - The mod now hands each hook its way back to the player before the hook goes live, so a player thread can never reach a half-installed hook (from Evan Purkhiser's [#35](https://github.com/Tratosca/rx3-toolkit/pull/35)); it also loads only inside the player itself, and a build refuses a hook that would silently fail to load. Checked in the emulator; not yet run on hardware.
 
-- The waveform now follows your stems on MP3 and M4A tracks too. Rekordbox and the app measure these files a few columns apart, and a single column was enough for the deck to keep the normal waveform. Up to eight columns are accepted now; a larger gap still keeps the normal waveform. Checked on an RX3 running 1.20 in Blue, RGB and 3Band.
+- The waveform now follows your stems on MP3 and M4A tracks too. Rekordbox and the app measure these files a few columns apart, and a single column was enough for the deck to keep the normal waveform. Up to eight columns are accepted now; a larger gap still keeps the normal waveform. Checked on an RX3 running 1.20 in Blue, RGB and 3Band (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
 
-- A track whose name Rekordbox cut just after a space or a dot now gets its stem package under the name the deck asks for. The app used to trim that character, so it reported the track as ready while the deck found no stems. A package prepared before this fix needs preparing again. Checked on an RX3 running 1.20.
+- A track whose name Rekordbox cut just after a space or a dot now gets its stem package under the name the deck asks for. The app used to trim that character, so it reported the track as ready while the deck found no stems. A package prepared before this fix needs preparing again. Checked on an RX3 running 1.20 (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
 
-- A track whose length ends exactly on a millisecond boundary no longer fails while its waveforms are calculated. That was about one track in forty.
+- A track whose length ends exactly on a millisecond boundary no longer fails while its waveforms are calculated. That was about one track in forty (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
 
-- Tracks with an accent in the title, artist or file name can be prepared on Windows. The finished stem package was saved in the wrong encoding, so these tracks failed at the very last step, after separation had already run. Checked on an RX3 running 1.20.
+- Tracks with an accent in the title, artist or file name can be prepared on Windows. The finished stem package was saved in the wrong encoding, so these tracks failed at the very last step, after separation had already run. Checked on an RX3 running 1.20 (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
 
 - The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.
 
