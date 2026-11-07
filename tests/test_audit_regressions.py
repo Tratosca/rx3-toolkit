@@ -323,6 +323,31 @@ int main(void){
 }
 ''', [], ['-pthread'])
 
+    def test_samples_settings_reach_the_pads(self):
+        """A bank's loop mode, pad trims and SHIFT silence used to stay at zero:
+        only colours and volume were published, so every pad played at gain 0."""
+        publish = function(MODULES / 'samples/rx3_samples_feature.h', 'samples_publish_config')
+        self.run_units(r'''
+#include <assert.h>
+#define SAMPLES_PAD_COUNT 8u
+struct samples_config { unsigned int volume, colour[SAMPLES_PAD_COUNT], mode[SAMPLES_PAD_COUNT],
+                        gain[SAMPLES_PAD_COUNT], shift_silence; };
+static struct samples_config samples_config;
+static unsigned int samples_volume, samples_volume_touched;
+''' + publish + r'''
+int main(void){
+ struct samples_config wanted = {0};
+ for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++) {
+  wanted.colour[pad] = pad + 1u; wanted.mode[pad] = pad & 3u; wanted.gain[pad] = 100u - pad; }
+ wanted.volume = 75u; wanted.shift_silence = 1u;
+ samples_publish_config(&wanted);
+ for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++)
+  assert(samples_config.gain[pad] == 100u - pad && samples_config.mode[pad] == (pad & 3u));
+ assert(samples_config.shift_silence == 1u && samples_volume == 75u);
+ return 0;
+}
+''', [])
+
     def test_now_playing_retains_live_hooks_and_drains_before_release(self):
         remove = function(MODULES / 'now-playing/rx3_now_playing_feature.h', 'now_playing_feature_remove')
         self.run_units(r'''

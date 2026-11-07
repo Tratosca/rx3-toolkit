@@ -13,9 +13,13 @@ static int samples_enabled;
 
 static void samples_publish_config(const struct samples_config *wanted)
 {
-    for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++)
+    for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++) {
         __atomic_store_n(&samples_config.colour[pad], wanted->colour[pad], __ATOMIC_SEQ_CST);
+        __atomic_store_n(&samples_config.mode[pad], wanted->mode[pad], __ATOMIC_SEQ_CST);
+        __atomic_store_n(&samples_config.gain[pad], wanted->gain[pad], __ATOMIC_SEQ_CST);
+    }
     __atomic_store_n(&samples_config.volume, wanted->volume, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&samples_config.shift_silence, wanted->shift_silence, __ATOMIC_SEQ_CST);
     if (!__atomic_load_n(&samples_volume_touched, __ATOMIC_SEQ_CST))
         __atomic_store_n(&samples_volume, wanted->volume, __ATOMIC_SEQ_CST);
 }
