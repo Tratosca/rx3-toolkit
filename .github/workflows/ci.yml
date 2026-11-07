@@ -170,6 +170,13 @@ jobs:
         # none of these runners has a display server.
         run: python app/ui/shell.py --self-test
 
+      - name: Check the DJ journey in the window
+        # Every screen and flow against synthetic bridge replies (no key, drive
+        # or network). Only macOS runners have a window server for the webview.
+        if: matrix.platform == 'macOS Apple Silicon'
+        timeout-minutes: 20
+        run: python app/ui/web/design-audit/verify_ui.py --ci
+
       - name: Build desktop application
         env:
           RX3_PREBUILT_HOOK: ${{ github.workspace }}/prebuilt/librx3_core.so
