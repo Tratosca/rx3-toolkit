@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- A drive built without the Toolkit's settings files (command-line builds) now starts KEY SYNC in harmonic mode and KEY MATCH with no added suggestion, the same defaults as the Toolkit. Not yet run on hardware.
+
 - Samples: the pads now play. The bank's pad levels, loop mode and SHIFT silence never reached the deck, so every pad played at zero level and a loop stopped after one pass. Checked in the emulator with both decks stopped (pad sound, loop past the end of the sample, SHIFT silence); not yet run on hardware.
 
 - Now Playing: the title is the one the deck shows (it was always empty), and a datagram goes out when something changes plus once every two seconds, instead of about fifty identical ones per second ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Checked in the emulator; not yet run on hardware.

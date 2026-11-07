@@ -82,8 +82,8 @@ register_prepare_hook(){ :; }
 module_disabled_by_switch(){ return 1; }
 module_export(){ printf '%s=%s\\n' "$1" "$2"; }
 '''
-            cases = [(None, 2), *[(str(n), n & 14) for n in range(16)],
-                     ('16', 2), ('$(touch injected)', 2)]
+            cases = [(None, 0), *[(str(n), n & 14) for n in range(16)],
+                     ('16', 0), ('$(touch injected)', 0)]
             for raw, expected in cases:
                 if raw is not None:
                     config.write_text(raw + '\n')

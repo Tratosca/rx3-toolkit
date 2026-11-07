@@ -16,13 +16,14 @@ key_sync_prepare()
         *) KEY_SYNC_RANGE=1 ;;
     esac
     module_export RX3_KEY_SYNC_RANGE "$KEY_SYNC_RANGE" "Key sync range"
-    KEY_SYNC_MODE=identical
+    # Same default as the Toolkit.
+    KEY_SYNC_MODE=harmonic
     if [ -r /mnt/iso/modules/key-sync/sync-mode.txt ]; then
         IFS= read -r KEY_SYNC_MODE < /mnt/iso/modules/key-sync/sync-mode.txt
     fi
     case "$KEY_SYNC_MODE" in
         identical|harmonic) ;;
-        *) KEY_SYNC_MODE=identical ;;
+        *) KEY_SYNC_MODE=harmonic ;;
     esac
     module_export RX3_KEY_SYNC_MODE "$KEY_SYNC_MODE" "Key sync mode"
     say "Key Sync prepared"

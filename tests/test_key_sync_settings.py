@@ -85,7 +85,7 @@ module_export(){ printf '%s=%s\\n' "$1" "$2"; }
                 result=subprocess.run(['sh'],input=prefix+script+'\nkey_sync_prepare\n',text=True,capture_output=True,check=True,cwd=temp)
                 self.assertIn(f'RX3_KEY_SYNC_RANGE={expected}\n',result.stdout)
                 self.assertFalse((pathlib.Path(temp)/'injected').exists())
-            for raw,expected in ((None,'identical'),('harmonic','harmonic'),('identical','identical'),('$(touch injected)','identical')):
+            for raw,expected in ((None,'harmonic'),('harmonic','harmonic'),('identical','identical'),('$(touch injected)','harmonic')):
                 if raw is not None: mode.write_text(raw+'\n')
                 result=subprocess.run(['sh'],input=prefix+script+'\nkey_sync_prepare\n',text=True,capture_output=True,check=True,cwd=temp)
                 self.assertIn(f'RX3_KEY_SYNC_MODE={expected}\n',result.stdout)
