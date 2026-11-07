@@ -1,6 +1,52 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
+## 1.0.0-alpha.1
+
+First alpha of the 1.0 line. It has not been tested on hardware: bring a stock USB drive as a spare.
+
+### What is new
+
+- **Heard key**: with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. Key Sync, the KEY tab and the BROWSE colours follow it.
+- **Light theme**: the deck starts in LIGHT. SHIFT + SHORTCUT, or DISPLAY MODE in UTILITY, switches between DARK and LIGHT at any time.
+- **Sample pads**: tap SAMPLES on the touchscreen, tap it again to go back to STATUS. Each pad plays once, while held, in a loop, or as a latch (press again to stop). Each pad has its own level, SHIFT alone can silence them all, and up to four play at once.
+- **Stems**: the STEMS tab offers INST and VOCAL, or INST, VOCAL and DRUMS, with ON/OFF and LEVEL per deck. The waveform follows your stems, now on MP3 and M4A tracks too. Preparation fixes from LycheeAPPF's #51: tracks whose name Rekordbox cut after a space or a dot, tracks with an accent on Windows, and about one track in forty that failed while its waveforms were calculated.
+- **Third BROWSE column**: BPM, Key (Camelot), Artist or Duration beside the two stock columns. Tap a heading to sort the list, tap it again to reverse.
+- **Key Match**: BROWSE colours the tracks that work with the MASTER deck, with optional Energy Boost +2 (yellow), +7 (orange) and +4 (red, experimental).
+- **Key Sync**: the KEY row shows the shift that puts both decks in key and takes it in one press, within the limit you set (1 to 12 semitones, Same key or Key Match rules).
+- **Accent-insensitive search**: type Bebe and find the track however its title is accented (thanks to eDuSHMix).
+- **Asshole mode**: tap the eye at the start of a deck's title to hide or show it. Each deck has its own, and both titles come back at startup.
+- **Now Playing**: sends what each deck plays (title, BPM, tempo, on air) to the computer on the rear USB port, for a stream overlay or a set list. Built on Evan Purkhiser's #32 and jacksight's #20.
+- **Logo**: your artwork in place of the stock logo on the main screen, with an optional second image for LIGHT.
+- **UTILITY ends with an RX3 TOOLKIT section**: the Toolkit version, then each mod on the drive, ON or OFF (layout after Evan Purkhiser's #48).
+- Firmware 1.19 and 1.20.
+- Hold SHIFT on either deck while you plug in the USB drive to play stock for that session.
+- Beat Jump -32/+32 and Immediate Beat Jump have their own Beat Jump group in the Toolkit.
+
+### What is fixed
+
+- Some firmware 1.20 decks that the Toolkit turned away as an unsupported player (#47) are accepted.
+- Sample pads play: their levels, loop mode and SHIFT silence reach the deck. Before, every pad played at zero level and a loop stopped after one pass.
+- LIGHT is readable: BROWSE lists, both UTILITY pages and SOURCE show dark text on the light background, the selected blue row keeps white text (#44), and track titles, keys and the MASTER BPM no longer sit on black plates.
+- Removing the vocals no longer leaves a doubled voice on some MP3 files (#25). Stems already prepared for those files are made again on the next run.
+- With LIGHT and the third BROWSE column both chosen, the mod no longer refuses to start.
+- A drive with Logo chosen but no artwork keeps the stock logo and starts every other mod.
+- UTILITY shows SAMPLES as OFF when the drive carries no sample bank.
+- Now Playing sends the title the deck shows, and only when something changes plus once every two seconds.
+- After the mod restarts the player, the USB drive appears in SOURCE again without unplugging it.
+- The mod can no longer catch the player half way through starting (from Evan Purkhiser's #35).
+- Beat Jump -32/+32 now says beats in the Toolkit, not bars.
+- Stem preparation installs again on Intel Macs (#21).
+
+### Known limits
+
+- Not yet tested on hardware: everything above was checked in an emulator only.
+- #41, no sound on PLAY after the mod restarts the player (reported on firmware 1.20), is not reproduced and still open. With logging on, the session log now records the deck's audio state to help track it down.
+- LIGHT leftovers: after a switch, a thin strip at the far left and right edges of the deck strips can keep the old colour until you open another screen; in UTILITY, a row name stays pale while you change its value; the first DARK to LIGHT switch of a session shows dark boxes for a moment, until the screen has been converted.
+- Intel Macs: stem preparation was only tested under Rosetta, not on a real Intel Mac (#21).
+
+The full list of changes since 0.5.2 is in the Unreleased section below.
+
 ## Unreleased
 
 - UTILITY lists SAMPLES as OFF when the drive carries no sample bank, instead of ON while the pads do nothing. Not yet run on hardware.
