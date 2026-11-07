@@ -28,6 +28,7 @@ RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 LOADED_MODULES=""
 DISABLED_MODULES=""
+INACTIVE_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -84,14 +85,16 @@ class ModuleApiTests(unittest.TestCase):
                 'module_begin logging logging || exit 12\n'
                 'module_begin telnet telnet || exit 13\n'
                 'DISABLED_MODULES=" stems"\n'
+                'module_inactive logging\n'
                 'rbp_environment_value() { :; }\n'
                 'reconcile_module_set || exit 14\n'
                 'printf "%s" "$RX3_UTILITY_ROWS"\n'
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+            # Switched off and loaded-but-idle both read OFF.
             self.assertEqual(
                 result.stdout.splitlines()[-1],
-                "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|ON 1d824ea+",
+                "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|OFF 1d824ea+",
             )
 
     def test_logo_without_artwork_is_skipped_not_fatal(self):

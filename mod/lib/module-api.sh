@@ -457,7 +457,7 @@ reconcile_module_set()
     [ -r "$_rx3_utility" ] && while IFS='|' read -r _rx3_id _rx3_label _rx3_revision; do
         case " $LOADED_MODULES " in *" $_rx3_id "*) ;; *) continue ;; esac
         case "$_rx3_label$_rx3_revision" in *[!A-Za-z0-9' ().+-']*) continue ;; esac
-        case " $DISABLED_MODULES " in
+        case " $DISABLED_MODULES $INACTIVE_MODULES " in
             *" $_rx3_id "*) _rx3_state=OFF ;;
             *) _rx3_state=ON ;;
         esac
@@ -497,6 +497,16 @@ module_switch_path() { printf '/tmp/rx3-%s.off' "$1"; }
 # all, so a switch meant to take out one module would take out every one of
 # them. That is the opposite of what it is for, and it is not hypothetical: it
 # shipped that way once and cost a session on hardware.
+# A module that loaded but has nothing to do on this drive (Samples without a
+# bank). Utility then lists it as OFF rather than ON.
+module_inactive()
+{
+    case " $INACTIVE_MODULES " in
+        *" $1 "*) ;;
+        *) INACTIVE_MODULES="$INACTIVE_MODULES $1" ;;
+    esac
+}
+
 module_disabled_by_switch()
 {
     _rx3_switch=$(module_switch_path "$1")
