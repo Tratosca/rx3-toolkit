@@ -37,6 +37,17 @@ version_file = repository / "build/toolkit-version"
 version_file.parent.mkdir(parents=True, exist_ok=True)
 version_file.write_text(version + "\n", encoding="ascii")
 resources.append((str(version_file), "resources/mod"))
+# Utility shows each module's last commit; the frozen app reads it from here.
+revisions = {}
+for manifest in sorted((repository / "mod/modules").glob("*/manifest.json")):
+    revisions[json.loads(manifest.read_text(encoding="utf-8"))["id"]] = subprocess.run(
+        ["git", "-C", str(repository), "log", "-1", "--format=%h", "--",
+         manifest.parent.relative_to(repository).as_posix()],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+revisions_file = repository / "build/module-revisions.json"
+revisions_file.write_text(json.dumps(revisions, sort_keys=True) + "\n", encoding="ascii")
+resources.append((str(revisions_file), "resources/mod"))
 for compatibility in (repository / "mod").glob("*/compatibility.sh"):
     destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
     resources.append((str(compatibility), destination))

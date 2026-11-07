@@ -67,6 +67,33 @@ class ModuleApiTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_summary_exports_utility_rows_for_loaded_modules_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "modules").mkdir()
+            (Path(directory) / "modules/utility").write_text(
+                "stems|STEMS|8351ffc\n"
+                "logging|TROUBLESHOOTING REPORT|1d824ea+\n"
+                "keyshift|KEY SHIFT|3f2a9c1\n"
+                "telnet|BAD;ROW|1234567\n",
+                encoding="ascii",
+            )
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin core core || exit 10\n'
+                'module_begin stems stems || exit 11\n'
+                'module_begin logging logging || exit 12\n'
+                'module_begin telnet telnet || exit 13\n'
+                'DISABLED_MODULES=" stems"\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                'printf "%s" "$RX3_UTILITY_ROWS"\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                result.stdout.splitlines()[-1],
+                "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|ON 1d824ea+",
+            )
+
     def test_image_without_a_version_still_loads_and_exports_the_count(self):
         with tempfile.TemporaryDirectory() as directory:
             result = run_shell(

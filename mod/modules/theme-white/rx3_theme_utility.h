@@ -91,7 +91,8 @@ static void utility_install_theme_row(void)
     uint32_t source = *(const uint32_t *)utility_count_literals[0];
     if (!source) return;
     uint32_t source_count = *(const uint32_t *)(unsigned long)source;
-    if ((source_count != 33u && source_count != 34u) ||
+    /* Stock 33 rows, or the core's RX3 TOOLKIT section appended after them. */
+    if (source_count < 33u || source_count > 62u ||
         *(const uint32_t *)0x0013d9e4 != source + 4u ||
         *(const uint32_t *)0x0051410c != 0x0013a924u ||
         *(const uint32_t *)0x00514118 != 0x0013c360u ||
@@ -102,11 +103,12 @@ static void utility_install_theme_row(void)
     for (unsigned int i = 0; i < 6u; i++)
         if (*(const uint32_t *)utility_count_literals[i] != source)
             return;
-    if (source_count == 34u &&
-        (*(const uint32_t *)(unsigned long)(source + 4u + 32u * 56u + 28u) !=
-             0x0013abd0u ||
-         !*(const uint32_t *)(unsigned long)(source + 4u + 33u * 56u + 28u)))
+    if (source_count > 33u &&
+        *(const uint32_t *)(unsigned long)(source + 4u + 32u * 56u + 28u) != 0x0013abd0u)
         return;
+    for (uint32_t i = 33u; i < source_count; i++)
+        if (!*(const uint32_t *)(unsigned long)(source + 4u + i * 56u + 28u))
+            return;
     uint32_t bytes = 4u + (source_count + 1u) * 56u;
     uint8_t *table = mmap(0, bytes, PROT_READ | PROT_WRITE,
                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

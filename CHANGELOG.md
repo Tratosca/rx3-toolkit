@@ -3,7 +3,7 @@
 
 ## Unreleased
 
-- Add a read-only RX3 TOOLKIT version line below VERSION No. in UTILITY > GENERAL; keep DISPLAY MODE available when the light theme is installed. Both rows were captured in the emulator; not yet run on hardware.
+- UTILITY ends with an RX3 TOOLKIT section: the toolkit VERSION, then one line per mod on the drive, showing ON or OFF and the revision it was built from (layout after Evan Purkhiser's [#48](https://github.com/Tratosca/rx3-toolkit/pull/48)). DISPLAY MODE stays available with the light theme. Not yet run on hardware.
 
 - Show a four-second native boot summary when the Toolkit is active, with its build version and enabled mod count in the selected screen language. The native top strip clears when the notice expires. Verified on cold boot and autoexec relaunch in the emulator; not yet run on hardware.
 

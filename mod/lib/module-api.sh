@@ -450,6 +450,20 @@ reconcile_module_set()
         esac
     done
     module_export RX3_ACTIVE_MODULES "$_rx3_count" "Module summary" || :
+    # Utility lists each loaded module as NAME|ON rev, rows joined by ";". The
+    # build wrote names and revisions; only the state is decided here.
+    _rx3_rows=
+    _rx3_utility="${RX3_ISO_ROOT:-/mnt/iso}/modules/utility"
+    [ -r "$_rx3_utility" ] && while IFS='|' read -r _rx3_id _rx3_label _rx3_revision; do
+        case " $LOADED_MODULES " in *" $_rx3_id "*) ;; *) continue ;; esac
+        case "$_rx3_label$_rx3_revision" in *[!A-Za-z0-9' ().+-']*) continue ;; esac
+        case " $DISABLED_MODULES " in
+            *" $_rx3_id "*) _rx3_state=OFF ;;
+            *) _rx3_state=ON ;;
+        esac
+        _rx3_rows="$_rx3_rows${_rx3_rows:+;}$_rx3_label|$_rx3_state $_rx3_revision"
+    done < "$_rx3_utility"
+    module_export RX3_UTILITY_ROWS "$_rx3_rows" "Utility rows" || :
     # The version is only shown to the operator: an image without a valid one
     # still loads, and the boot message leaves the number out.
     _rx3_version=$(cat "${RX3_ISO_ROOT:-/mnt/iso}/toolkit-version" 2>/dev/null) ||
