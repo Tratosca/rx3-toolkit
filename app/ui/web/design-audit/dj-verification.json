@@ -4078,15 +4078,15 @@
       ]
     },
     {
-      "operation": "stems_preview_close",
-      "args": [
-        "fixture"
-      ]
-    },
-    {
       "operation": "drive_report",
       "args": [
         "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_preview_close",
+      "args": [
+        "fixture"
       ]
     },
     {
@@ -5825,7 +5825,7 @@
               }
             },
             {
-              "id": "1794085001437-0.8827927629824229",
+              "id": "1794085923312-0.5012137928554199",
               "value": {
                 "name": "Bank-1",
                 "volume": 50,
@@ -5953,7 +5953,7 @@
           "active": "bank-0",
           "savedActive": "bank-0",
           "deleted": [],
-          "selected": "1794085001437-0.8827927629824229"
+          "selected": "1794085923312-0.5012137928554199"
         }
       ]
     },
@@ -6210,7 +6210,7 @@
               }
             },
             {
-              "id": "1794085001437-0.8827927629824229",
+              "id": "1794085923312-0.5012137928554199",
               "value": {
                 "name": "Bank-1",
                 "volume": 50,
@@ -6595,7 +6595,7 @@
               }
             },
             {
-              "id": "1794085001437-0.8827927629824229",
+              "id": "1794085923312-0.5012137928554199",
               "value": {
                 "name": "Bank-1",
                 "volume": 50,

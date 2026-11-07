@@ -182,7 +182,11 @@ def verify():
         check('First installation is inside installation',js('document.getElementById("installation").contains(document.getElementById("tutorial-start"))'))
         check('Emergency instructions are permanent and offer renaming',js('!document.querySelector(".emergency-help").closest("details") && t("ui.restoreSteps").includes("autoexec.bin.disabled")'))
         check('Associated modules section removed',js('!document.querySelector(".module-relations") && !document.getElementById("modules").textContent.includes(t("ui.dependencies"))'))
-        js('show("modules");document.getElementById("module-tutorial-samples").open=true;document.querySelector("#module-tutorial-samples .guide-player").click();')
+        # With "reduce motion" on (CI runners) a tutorial starts paused: resume it first.
+        js('show("modules");document.getElementById("module-tutorial-samples").open=true;')
+        if js('document.querySelector("#module-tutorial-samples canvas").dataset.manualStep!==undefined'):
+            js('document.querySelector("#module-tutorial-samples .guide-player").click();')
+        js('document.querySelector("#module-tutorial-samples .guide-player").click();')
         check('Module tutorial can pause',js('document.querySelector("#module-tutorial-samples canvas").dataset.manualStep!==undefined'))
         frozen=js('document.querySelector("#module-tutorial-samples canvas").dataset.manualStep')
         js('renderModules();')
