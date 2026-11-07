@@ -22,6 +22,12 @@ First alpha of the 1.0 line. It has not been tested on hardware: bring a stock U
 - Firmware 1.19 and 1.20.
 - Hold SHIFT on either deck while you plug in the USB drive to play stock for that session.
 - Beat Jump -32/+32 and Immediate Beat Jump have their own Beat Jump group in the Toolkit.
+- **The Toolkit gets the deck's key for you**: after you accept the terms, it downloads the key from Pioneer's own servers and checks every file against fixed fingerprints. No more hunting for it by hand. **Delete the key** removes it again.
+- **A new Toolkit window**: a sidebar of screens, French and English switchable while it runs, a light, dark or system appearance, and the modules already on your USB drive ticked when you choose it.
+- **Prepare before the set, in the Toolkit**: a pad editor where you hear each pad in its mode and at its level; a logo framer to drag, zoom and preview your artwork in DARK and LIGHT; a stems screen that estimates the time and space before you start and lets you listen to each part. Stems already prepared are reused rather than separated again.
+- **A short notice on the deck at startup**: the Toolkit version and how many mods are on, for four seconds, in the deck's language.
+- **OverCue export (experimental)**: an option that also prepares stems for CDJ-3000 decks running OverCue, on the same USB drive.
+- **Detailed troubleshooting report**: an optional, more complete session log written to the USB drive.
 
 ### What is fixed
 
@@ -37,9 +43,12 @@ First alpha of the 1.0 line. It has not been tested on hardware: bring a stock U
 - The mod can no longer catch the player half way through starting (from Evan Purkhiser's #35).
 - Beat Jump -32/+32 now says beats in the Toolkit, not bars.
 - Stem preparation installs again on Intel Macs (#21).
+- BROWSE scrolls faster with the third column: it reads about 70% less per track from the USB drive. A first test on an RX3 with 980 tracks scrolled clearly faster.
+- Your USB drive is safer: a sample bank is saved in one go, so a failed save no longer leaves a half-replaced bank, and stem preparation checks free space and verifies every file before replacing anything.
 
 ### Known limits
 
+- On Linux, the Toolkit now draws its window with the system web view: WebKit must be installed (for example `gir1.2-webkit2-4.1` on Debian and Ubuntu).
 - Not yet tested on hardware: everything above was checked in an emulator only.
 - #41, no sound on PLAY after the mod restarts the player (reported on firmware 1.20), is not reproduced and still open. With logging on, the session log now records the deck's audio state to help track it down.
 - LIGHT leftovers: after a switch, a thin strip at the far left and right edges of the deck strips can keep the old colour until you open another screen; in UTILITY, a row name stays pale while you change its value; the first DARK to LIGHT switch of a session shows dark boxes for a moment, until the screen has been converted.
