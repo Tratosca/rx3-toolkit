@@ -45,14 +45,16 @@ logo_prepare()
     module_disabled_by_switch logo && return 0
 
     for logo_pair in $LOGO_FILES; do
-        logo_source=/mnt/iso/modules/logo/${logo_pair%%:*}
+        logo_source=${RX3_ISO_ROOT:-/mnt/iso}/modules/logo/${logo_pair%%:*}
         [ -r "$logo_source" ] || continue
         logo_install_file "$logo_source" "${logo_pair#*:}" || return 1
         LOGO_SLOTS=$((LOGO_SLOTS+1))
     done
+    # A build made without artwork keeps the stock wordmark; refusing here
+    # would send every other mod on the drive back to the stock player.
     [ "$LOGO_SLOTS" -gt 0 ] || {
-        say "Logo disabled: no wordmark artwork in the image"
-        return 1
+        say "Logo skipped: no wordmark artwork in the image, stock logo kept"
+        return 0
     }
 
     LOGO_READY=1

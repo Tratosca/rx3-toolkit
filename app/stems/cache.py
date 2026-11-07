@@ -23,7 +23,12 @@ def signature(settings, architecture, roles):
     return {"model": settings.model, "architecture": architecture,
             "preset": settings.mode, "arguments": settings.arguments(architecture),
             "sample_format": "s16_gain", "stem_version": 3, "encoder_version": 2,
-            "roles": list(roles)}
+            "separator_input": "untrimmed", "roles": list(roles)}
+
+
+def legacy_signature(processing):
+    """The same processing as recorded before the separator read the deck's decode."""
+    return {name: value for name, value in processing.items() if name != "separator_input"}
 
 
 def key(source_hash, processing):

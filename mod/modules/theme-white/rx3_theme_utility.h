@@ -5,6 +5,8 @@
 #define RX3_THEME_UTILITY_H
 
 static uint8_t *utility_theme_table;
+static uint32_t utility_theme_source;
+static uint32_t utility_theme_source_count;
 static const unsigned long utility_count_literals[6] = {
     0x0013c9a8, 0x0013cbcc, 0x0013cd1c,
     0x0013cf30, 0x0013cfc4, 0x0013d9ec
@@ -69,13 +71,15 @@ static void utility_remove_theme_row(void)
     if (!utility_theme_table) return;
     uint32_t rows = (uint32_t)(unsigned long)(utility_theme_table + 4u);
     uint32_t count = (uint32_t)(unsigned long)utility_theme_table;
-    int failed = !utility_write_literal(0x0013d9e4, rows, 0x005140bcu);
+    int failed = !utility_write_literal(0x0013d9e4, rows, utility_theme_source + 4u);
     for (unsigned int i = 0; i < 6u; i++)
-        failed |= !utility_write_literal(utility_count_literals[i], count, 0x005140b8u);
+        failed |= !utility_write_literal(utility_count_literals[i], count, utility_theme_source);
     /* A failed restoration can leave the firmware pointing at this allocation. */
     if (!failed) {
-        munmap(utility_theme_table, 0x774u);
+        munmap(utility_theme_table, 4u + (utility_theme_source_count + 1u) * 56u);
         utility_theme_table = 0;
+        utility_theme_source = 0;
+        utility_theme_source_count = 0;
     } else {
         log_line("light theme: Utility table retained after restore failure");
     }
@@ -84,8 +88,12 @@ static void utility_remove_theme_row(void)
 static void utility_install_theme_row(void)
 {
     if (utility_theme_table) return;
-    if (*(const uint32_t *)0x005140b8 != 33u ||
-        *(const uint32_t *)0x0013d9e4 != 0x005140bcu ||
+    uint32_t source = *(const uint32_t *)utility_count_literals[0];
+    if (!source) return;
+    uint32_t source_count = *(const uint32_t *)(unsigned long)source;
+    /* Stock 33 rows, or the core's RX3 TOOLKIT section appended after them. */
+    if (source_count < 33u || source_count > 62u ||
+        *(const uint32_t *)0x0013d9e4 != source + 4u ||
         *(const uint32_t *)0x0051410c != 0x0013a924u ||
         *(const uint32_t *)0x00514118 != 0x0013c360u ||
         *(const uint32_t *)0x00514128 != 0x0013a99cu ||
@@ -93,14 +101,22 @@ static void utility_install_theme_row(void)
         *(const uint32_t *)0x005146ac < 2u)
         return;
     for (unsigned int i = 0; i < 6u; i++)
-        if (*(const uint32_t *)utility_count_literals[i] != 0x005140b8u)
+        if (*(const uint32_t *)utility_count_literals[i] != source)
             return;
-    uint8_t *table = mmap(0, 0x774u, PROT_READ | PROT_WRITE,
+    if (source_count > 33u &&
+        *(const uint32_t *)(unsigned long)(source + 4u + 32u * 56u + 28u) != 0x0013abd0u)
+        return;
+    for (uint32_t i = 33u; i < source_count; i++)
+        if (!*(const uint32_t *)(unsigned long)(source + 4u + i * 56u + 28u))
+            return;
+    uint32_t bytes = 4u + (source_count + 1u) * 56u;
+    uint8_t *table = mmap(0, bytes, PROT_READ | PROT_WRITE,
                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (table == MAP_FAILED) return;
-    memcpy(table + 4u, (const void *)0x005140bc, 0x620u);
-    memcpy(table + 0x65cu, (const void *)0x005146dc, 0x118u);
-    *(uint32_t *)table = 34u;
+    memcpy(table + 4u, (const void *)(unsigned long)(source + 4u), 0x620u);
+    memcpy(table + 0x65cu, (const void *)(unsigned long)(source + 0x624u),
+           (source_count - 28u) * 56u);
+    *(uint32_t *)table = source_count + 1u;
     uint32_t row[14] = {
         (uint32_t)(unsigned long)utility_theme_title,
         (uint32_t)(unsigned long)utility_theme_choices,
@@ -113,9 +129,11 @@ static void utility_install_theme_row(void)
     uint32_t rows = (uint32_t)(unsigned long)(table + 4u);
     uint32_t count = (uint32_t)(unsigned long)table;
     utility_theme_table = table;
-    int failed = !utility_write_literal(0x0013d9e4, 0x005140bcu, rows);
+    utility_theme_source = source;
+    utility_theme_source_count = source_count;
+    int failed = !utility_write_literal(0x0013d9e4, source + 4u, rows);
     for (unsigned int i = 0; !failed && i < 6u; i++)
-        failed = !utility_write_literal(utility_count_literals[i], 0x005140b8u, count);
+        failed = !utility_write_literal(utility_count_literals[i], source, count);
     if (failed) utility_remove_theme_row();
     else log_line("light theme: DISPLAY MODE installed in Utility");
 }

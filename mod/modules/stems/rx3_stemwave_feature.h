@@ -108,7 +108,7 @@ static int stemwave_feature_install(void)
         return 0;
     original_ex_wave_renew_check = (ex_wave_renew_check_fn)framework->install_hook(
         &ex_wave_renew_hook, EX_WAVE_RENEW_CHECK, ex_wave_renew_guard,
-        hooked_ex_wave_renew_check);
+        hooked_ex_wave_renew_check, (void **)&original_ex_wave_renew_check);
     if (!original_ex_wave_renew_check)
         return 0;
     framework->log_line("stem waveform: refresh hook installed");

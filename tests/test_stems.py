@@ -47,6 +47,14 @@ class RekordboxTests(unittest.TestCase):
                          "B.M.S (by my side) - Rambo goyard")
         self.assertEqual(export_stem("   "), "track")
 
+    def test_export_stem_keeps_the_end_of_a_name_already_cut_on_the_drive(self):
+        # The drive reader starts from the shortened name. The deck asks for it
+        # byte for byte, so the space or dot the cut left behind has to stay.
+        for name in ("Jay-Z ft Alicia Keys - Empire State Of Mind ",
+                     "04 - Usher, Lil Jon, Ludacris - Yeah! (feat."):
+            with self.subTest(name=name):
+                self.assertEqual(export_stem(name), name)
+
 
 class JobTests(unittest.TestCase):
     def setUp(self):

@@ -74,6 +74,34 @@ static const uint8_t theme_dirty_windows_guard[8] = {
     0xf8, 0x40, 0x2d, 0xe9, 0xcc, 0x40, 0x9f, 0xe5
 };
 
+/* ui_Counter_DrawCautionWindow (0x002863f8) repaints a deck strip's message
+   ("Not Loaded.") and its filled backing only when the deck's caution ID, state
+   or language changes, so a theme switch alone leaves the old backing. The
+   guard is its movw/movt loading the cache base 0x00526850; the caution IDs are
+   at +8, one word per deck. */
+#define THEME_COUNTER_CAUTION_CACHE ((unsigned long)0x00286420)
+static const uint8_t theme_counter_caution_cache_guard[8] = {
+    0x50, 0x28, 0x06, 0xe3, 0x52, 0x20, 0x40, 0xe3
+};
+#define THEME_COUNTER_CAUTION_IDS ((unsigned long)0x00526858)
+
+/* ui_com_draw_ShowScreen: activates a winscape by ID (0 is the main screen,
+   what the start screen hands over to). Entering a winscape reloads its
+   resources, which recreates and clears every window it owns. */
+#define THEME_SHOW_SCREEN ((unsigned long)0x0018e024)
+static const uint8_t theme_show_screen_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+
+#define THEME_COMPONENT_MANAGER ((unsigned long)0x001d0a30)
+static const uint8_t theme_component_manager_guard[8] = {
+    0x10, 0x40, 0x2d, 0xe9, 0x20, 0x40, 0x9f, 0xe5
+};
+#define THEME_ACTIVE_WINSCAPE ((unsigned long)0x001cc510)
+static const uint8_t theme_active_winscape_guard[8] = {
+    0x20, 0x00, 0x90, 0xe5, 0x1e, 0xff, 0x2f, 0xe1
+};
+
 /* Magenta. The player writes every other value to the framebuffer and skips
  * this one, so it is transparency and never a colour. Converting it would
  * punch a hole in whatever image it belongs to.

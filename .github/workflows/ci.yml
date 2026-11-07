@@ -116,6 +116,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # The packaged app stamps `git describe`; a shallow clone has no tags.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -166,6 +169,17 @@ jobs:
         # at import time fails here rather than in front of an operator, and
         # none of these runners has a display server.
         run: python app/ui/shell.py --self-test
+
+      - name: Check the DJ journey in the window
+        # Every screen and flow against synthetic bridge replies (no key, drive
+        # or network). Only macOS runners have a window server for the webview.
+        if: matrix.platform == 'macOS Apple Silicon'
+        timeout-minutes: 20
+        # The check rewrites its tracked report; restore it so the packaged app
+        # stamps a clean version rather than "-dirty".
+        run: |
+          python app/ui/web/design-audit/verify_ui.py --ci
+          git checkout -- app/ui/web/design-audit/dj-verification.json
 
       - name: Build desktop application
         env:
@@ -244,6 +258,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+        # A tag with a suffix (v1.0.0-alpha.1, -beta.2, -rc.1) is a pre-release:
+        # it must not replace the latest stable release on the project page.
         run: >-
           gh release create
           "${GITHUB_REF_NAME}"
@@ -251,3 +267,4 @@ jobs:
           --verify-tag
           --notes-file notes.md
           --title "XDJ-RX3 Toolkit ${GITHUB_REF_NAME}"
+          ${{ contains(github.ref_name, '-') && '--prerelease' || '' }}

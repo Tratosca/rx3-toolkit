@@ -116,10 +116,14 @@ static void rx3_log_configure(void){}
 static void log_line(const char *s){(void)s;}
 static void log_number(const char *s,unsigned long n){(void)s;(void)n;}
 static int rx3_message_allowed(void){return 1;}
+static void rx3_utility_install(void){}
+static void rx3_utility_remove(void){}
 static uint64_t monotonic_enough_us(void){return 1;}
 static void rx3_input_trace_keys(unsigned n){(void)n;}
 static void leave_performance_panel(void){}
 static void refresh_performance_ui(void){}
+static void refresh_message_header(void){}
+static void (*rx3_message_refresh)(void);
 static int rx3_write_guarded(unsigned long a,const void *e,const void *r,unsigned n){(void)a;(void)e;(void)r;(void)n;return 1;}
 static void rx3_input_bind_mode_keys(void (*f)(void)){bound+=f==leave_performance_panel;}
 static void rx3_panels_bind_refresh(void (*f)(void)){bound+=f==refresh_performance_ui;}
@@ -134,7 +138,7 @@ static unsigned rx3_panel_count(void){return !!(selection&(2|4|16|64));}
 static void rx3_modules_stop(void){stops++;}
 static void uninstall_performance_hooks(void){cleanup++;}
 static void publish_ready(void){ready=1;}
-static void *install_hook(void *h,unsigned long a,const void *g,void *r){
+static void *install_hook(void *h,unsigned long a,const void *g,void *r,void **o){(void)o;
     (void)h;(void)a;(void)g;(void)r;hook_calls++;return hook_calls==reject_hook?0:(void *)1;
 }
 #define pthread_create(a,b,c,d) (0)
@@ -170,26 +174,23 @@ int main(void) {
     def test_player_identity_rejects_inherited_preload_and_read_failures(self):
         code = function(MODULES/'core/rx3_core_hook.c', 'is_player_process')
         self.run_c('''
-#define O_RDONLY 0
-static const char *comm;
-static int closes;
-static int open(const char *path,int mode) {
-    assert(!strcmp(path,"/proc/self/comm"));assert(mode==O_RDONLY);
-    return comm?3:-1;
+#include <sys/types.h>
+static const char *executable;
+static ssize_t readlink(const char *path,char *out,size_t size) {
+    assert(!strcmp(path,"/proc/self/exe"));
+    if(!executable)return -1;
+    size_t length=strlen(executable);if(length>size)length=size;
+    memcpy(out,executable,length);return (ssize_t)length;
 }
-static int read(int fd,void *out,unsigned size) {
-    assert(fd==3);unsigned n=strlen(comm);if(n>size)n=size;
-    memcpy(out,comm,n);return n;
-}
-static void close(int fd){assert(fd==3);closes++;}
 ''' + code + '''
 int main(void) {
-    comm="rbp\\n";assert(is_player_process());
-    comm="sh\\n";assert(!is_player_process());
-    comm="udhcpc\\n";assert(!is_player_process());
-    comm="rbp-helper\\n";assert(!is_player_process());
-    comm="";assert(!is_player_process());
-    comm=0;assert(!is_player_process());assert(closes==5);
+    executable="/root/pdj/rbp";assert(is_player_process());
+    executable="rbp";assert(!is_player_process());
+    executable="/tmp/rbp";assert(!is_player_process());
+    executable="/root/pdj/rbp-helper";assert(!is_player_process());
+    executable="/root/pdj/rbp (deleted)";assert(!is_player_process());
+    executable="";assert(!is_player_process());
+    executable=0;assert(!is_player_process());
     return 0;
 }
 ''')
@@ -204,6 +205,7 @@ static void join_thread(int t,void *p){(void)t;(void)p;assert(0);}
 #define pthread_join join_thread
 /* Modules release their own resident state from stop(). */
 static void rx3_modules_stop(void){stops++;}
+static void rx3_utility_remove(void){}
 static void uninstall_performance_hooks(void){cleanup++;}
 ''' + code + '''
 int main(void) {

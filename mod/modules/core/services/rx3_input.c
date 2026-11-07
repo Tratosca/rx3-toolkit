@@ -83,8 +83,8 @@ static int acquire(struct shared_hook *hook, unsigned long address, const uint8_
                    void *replacement, int literal)
 {
     if (hook->original) return 1;
-    hook->original = literal ? install_pc_ldr_hook(&hook->hook, address, guard, replacement)
-                             : install_hook(&hook->hook, address, guard, replacement);
+    hook->original = literal ? install_pc_ldr_hook(&hook->hook, address, guard, replacement, &hook->original)
+                             : install_hook(&hook->hook, address, guard, replacement, &hook->original);
     return hook->original != 0;
 }
 

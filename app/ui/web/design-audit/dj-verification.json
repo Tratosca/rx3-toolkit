@@ -1,22 +1,2795 @@
 {
   "sourceHashes": {
     "stems-listen.js": "71f17100dd3d825b7acbb06e98756db59016c908d5dada830c589e2235e777d7",
-    "index.html": "e098b6e574f6d3aee8821427a8a5e7af5fb34df78b4f7c3160b29b92e0153249",
+    "index.html": "74a18eacde23c02d61fb1fdb1a6ae8874efc6ef9e4977a5fe35f106c1d9c5d0b",
     "stems-audio.js": "91218a0123377fedbbcd236892a033be0c2d67726d42ab14d3b8a505b6f80f25",
     "stems-wave-worker.js": "3dd1c228cd1560b890c0d566df1d5911ffa883d1b92e87bff27e75613c460786",
-    "app.css": "b147ec8ce7bfb61c8a32ae5de068ddf4b14cc3ad1594daf6a89a324dee0799bf",
-    "stems.js": "6fdc4a3d9fc3c3fe39f38a1b20ea40fa82519c084b40fee33b99fe1f419281c7",
+    "app.css": "d5ba52928ca8b31793baf821ffb00089f514b310c7438c12431023c1ba639edc",
+    "stems.js": "2c57542eadbecfbe2c4901b75a5f0321e9daaa69b6d7b7702d7e651df54e64a1",
     "components.js": "66938a41ce7a171f3e9fe00450bb00ada38ca0f5e6b2b4a5bfab8a047d4895e5",
-    "rx3-mock.js": "4921de375642f0dd36045e1a36238259c4940680c44d26442d823a0aca512dbd",
-    "samples.js": "7bac61f5a501e42f7706aaedc67be6973cfc5ff9c186e26662e08963c847d59f",
+    "rx3-mock.js": "041c517cc16f8f85de57ebc744bea7795158f0942a75cba894a64f6bd55576b7",
+    "samples.js": "3c3d7adba6d3e814c074923dbcad163a2015384e3f013c466f0e957d0d79ba04",
     "logo.js": "dfd6e5c5b7627073500514c5ef7a489da0a301bd9e540a7b250891e3e5c9c1b8",
     "i18n.js": "e63ae6c8be937feb6b324653a24f793343524520a1c5302865c635448a30aefc",
-    "app.js": "56d4fb8636bbcd4f6e6e5dad2b425466ce884ec95aacb07c0ac873078ea028b4"
+    "app.js": "5961b051eeff0e752a1da184d202cbd603cc7f7caf742cb6777ac641a8130bf5"
   },
   "fixture": true,
   "renderer": "pywebview native",
   "page": "file://app/ui/web/index.html",
-  "matrix": [],
+  "matrix": [
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-samples",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-stems",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-match",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "installation-options",
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-samples",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-stems",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-match",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "installation-options",
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-samples",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-stems",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-match",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "installation-options",
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "drive",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "samples",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "logo",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "width": 880,
+      "height": 528,
+      "screen": "settings",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-samples",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-stems",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-match",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 880,
+      "height": 528,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        880,
+        560
+      ],
+      "variant": "installation-options",
+      "width": 880,
+      "height": 528,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-samples",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-stems",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "installation-options",
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-samples",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-stems",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "installation-options",
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "drive",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "samples",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "logo",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "settings",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-samples",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-stems",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "installation-options",
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "drive",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "samples",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "logo",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "width": 1180,
+      "height": 788,
+      "screen": "settings",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-samples",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-stems",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1180,
+      "height": 788,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1180,
+        820
+      ],
+      "variant": "installation-options",
+      "width": 1180,
+      "height": 788,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-samples",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-stems",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "installation-options",
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-samples",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-stems",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "installation-options",
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "fr",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-samples",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-stems",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "installation-options",
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "en",
+      "theme": "light",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "drive",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "samples",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "logo",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "stems",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "width": 1440,
+      "height": 868,
+      "screen": "settings",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-samples",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-stems",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-match",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-now-playing",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-keyshift",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "module-guide-key-sync",
+      "width": 1440,
+      "height": 868,
+      "screen": "modules",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    },
+    {
+      "requested": [
+        1440,
+        900
+      ],
+      "variant": "installation-options",
+      "width": 1440,
+      "height": 868,
+      "screen": "installation",
+      "language": "en",
+      "theme": "dark",
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "unresolved": [],
+      "horizontal": false
+    }
+  ],
   "checks": [
     {
       "name": "Both language catalogs are complete",
@@ -101,10 +2874,673 @@
     {
       "name": "Module tutorial resumes automatically",
       "passed": true
+    },
+    {
+      "name": "Module tutorial animation loop restarts",
+      "passed": true
+    },
+    {
+      "name": "Harmonic mock has no reveal button",
+      "passed": true
+    },
+    {
+      "name": "Harmonic mock stays inline",
+      "passed": true
+    },
+    {
+      "name": "Choosing a drive opens no stems dialog",
+      "passed": true
+    },
+    {
+      "name": "USB identity remains visible",
+      "passed": true
+    },
+    {
+      "name": "Drive refresh preserves and explains different destination",
+      "passed": true
+    },
+    {
+      "name": "Listening is available from preparation",
+      "passed": true
+    },
+    {
+      "name": "Adding a sample keeps the filled pad selected",
+      "passed": true
+    },
+    {
+      "name": "Choosing artwork enables Logo automatically",
+      "passed": true
+    },
+    {
+      "name": "Hardware tutorials live with their modules: module-tutorial-keyshift, module-tutorial-key-match, module-tutorial-key-sync, module-tutorial-samples, module-tutorial-stems, module-tutorial-now-playing",
+      "passed": true
+    },
+    {
+      "name": "Stem preparation offers no format choice",
+      "passed": true
+    },
+    {
+      "name": "Preview contains the track picker",
+      "passed": true
+    },
+    {
+      "name": "No output chooser or waveform option in Stems",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 880 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 880 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 880 fr light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 880 fr light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 880 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 880 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 880 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 880 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 880 en light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 880 en light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 880 en light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 880 en light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 880 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 880 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 880 en dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 880 en dark",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1180 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1180 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1180 fr light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1180 fr light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1180 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1180 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1180 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1180 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1180 en light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1180 en light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1180 en light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1180 en light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1180 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1180 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1180 en dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1180 en dark",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1440 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1440 fr light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1440 fr light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1440 fr light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1440 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1440 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1440 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1440 fr dark",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1440 en light",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1440 en light",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1440 en light",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1440 en light",
+      "passed": true
+    },
+    {
+      "name": "Sidebar fits with Tutorial 1440 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module category content is not clipped 1440 en dark",
+      "passed": true
+    },
+    {
+      "name": "Module options remain visible 1440 en dark",
+      "passed": true
+    },
+    {
+      "name": "Install confirmation stays in view 1440 en dark",
+      "passed": true
+    },
+    {
+      "name": "Key result failed",
+      "passed": true
+    },
+    {
+      "name": "Key error retains its diagnostic data",
+      "passed": true
+    },
+    {
+      "name": "Key result cancelled",
+      "passed": true
+    },
+    {
+      "name": "Cancelled job has no full progress bar",
+      "passed": true
+    },
+    {
+      "name": "Key result done",
+      "passed": true
+    },
+    {
+      "name": "Key success never writes USB automatically",
+      "passed": true
+    },
+    {
+      "name": "Key download uses decimal MB from real counters",
+      "passed": true
+    },
+    {
+      "name": "Closing progress survives polling without cancelling",
+      "passed": true
+    },
+    {
+      "name": "Running task has a persistent badge",
+      "passed": true
+    },
+    {
+      "name": "Tasks panel reuses live progress and cancellation",
+      "passed": true
+    },
+    {
+      "name": "Closing the panel restores the hidden strip",
+      "passed": true
+    },
+    {
+      "name": "Next operation can show progress again",
+      "passed": true
+    },
+    {
+      "name": "Text contrast on designed surfaces",
+      "passed": true
+    },
+    {
+      "name": "Every screen, guide and size rendered",
+      "passed": true
+    },
+    {
+      "name": "Module focus survives selection",
+      "passed": true
+    },
+    {
+      "name": "Destructive default focus is Cancel",
+      "passed": true
+    },
+    {
+      "name": "No deletion before confirmation",
+      "passed": true
+    },
+    {
+      "name": "Cancel preserves deletion boundary",
+      "passed": true
+    },
+    {
+      "name": "Dialog restores invoking focus",
+      "passed": true
+    },
+    {
+      "name": "Progress 23",
+      "passed": true
+    },
+    {
+      "name": "Progress None",
+      "passed": true
+    },
+    {
+      "name": "Drive error is inline",
+      "passed": true
+    },
+    {
+      "name": "Drive retry recovers",
+      "passed": true
+    },
+    {
+      "name": "Confirmed deletion sent once",
+      "passed": true
+    },
+    {
+      "name": "No key deletion before confirmation",
+      "passed": true
+    },
+    {
+      "name": "Confirmed key deletion has no arguments",
+      "passed": true
+    },
+    {
+      "name": "A drive without the mod clears the selection",
+      "passed": true
+    },
+    {
+      "name": "Installation leads to consent when needed",
+      "passed": true
+    },
+    {
+      "name": "Consent is unchecked and download disabled",
+      "passed": true
+    },
+    {
+      "name": "Consent becomes available only after scrolling",
+      "passed": true
+    },
+    {
+      "name": "Retrieved key returns to installation confirmation",
+      "passed": true
+    },
+    {
+      "name": "Retrieval alone does not install",
+      "passed": true
+    },
+    {
+      "name": "Fetch receives explicit true",
+      "passed": true
+    },
+    {
+      "name": "Build keeps all nine positional arguments",
+      "passed": true
+    },
+    {
+      "name": "New bank does not discard local work",
+      "passed": true
+    },
+    {
+      "name": "Previous bank edits survive navigation",
+      "passed": true
+    },
+    {
+      "name": "Pending USB changes are explicit",
+      "passed": true
+    },
+    {
+      "name": "Export sends every local bank",
+      "passed": true
+    },
+    {
+      "name": "Technical module group removed",
+      "passed": true
+    },
+    {
+      "name": "Manual stem import removed",
+      "passed": true
+    },
+    {
+      "name": "Quality details removed",
+      "passed": true
+    },
+    {
+      "name": "Standalone legacy button removed",
+      "passed": true
+    },
+    {
+      "name": "No separate dialog for older stems",
+      "passed": true
+    },
+    {
+      "name": "Waveform styles available",
+      "passed": true
+    },
+    {
+      "name": "Local waveform worker completes and enables preview",
+      "passed": true
+    },
+    {
+      "name": "A drive refresh opens no waveform dialog",
+      "passed": true
+    },
+    {
+      "name": "A drive refresh converts no waveform",
+      "passed": true
+    },
+    {
+      "name": "No horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "Minimum hit targets",
+      "passed": true
+    },
+    {
+      "name": "All visible form controls labeled",
+      "passed": true
+    },
+    {
+      "name": "All displayed keys resolved",
+      "passed": true
+    },
+    {
+      "name": "No uncaught browser errors",
+      "passed": true
     }
   ],
-  "status": "failed",
-  "error": "Traceback (most recent call last):\n  File \"/Users/fbrille/_Dev/rx3/rx3-toolbox/app/ui/web/design-audit/verify_ui.py\", line 190, in verify\n    wait('document.querySelector(\"#module-tutorial-samples canvas\").dataset.step!=='+json.dumps(frozen))\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/fbrille/_Dev/rx3/rx3-toolbox/app/ui/web/design-audit/verify_ui.py\", line 125, in wait\n    raise AssertionError('Timed out: '+expression)\nAssertionError: Timed out: document.querySelector(\"#module-tutorial-samples canvas\").dataset.step!==\"0\"\n",
+  "contrast": [
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "body",
+      "ratio": 15.457,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "canvas",
+      "ratio": 16.83,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "sidebar",
+      "ratio": 14.274,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "raised",
+      "ratio": 16.83,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "text",
+      "background": "accent-soft",
+      "ratio": 14.519,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "body",
+      "ratio": 6.092,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "canvas",
+      "ratio": 6.633,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "sidebar",
+      "ratio": 5.626,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "raised",
+      "ratio": 6.633,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "muted",
+      "background": "accent-soft",
+      "ratio": 5.722,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "on-accent",
+      "background": "accent",
+      "ratio": 5.985,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "good",
+      "background": "good-soft",
+      "ratio": 6.141,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "warning",
+      "background": "warning-soft",
+      "ratio": 5.986,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "danger",
+      "background": "danger-soft",
+      "ratio": 5.933,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "foreground": "on-danger",
+      "background": "danger-fill",
+      "ratio": 6.574,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "body",
+      "ratio": 15.626,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "canvas",
+      "ratio": 12.8,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "sidebar",
+      "ratio": 14.23,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "raised",
+      "ratio": 11.074,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "text",
+      "background": "accent-soft",
+      "ratio": 10.59,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "body",
+      "ratio": 8.619,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "canvas",
+      "ratio": 7.06,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "sidebar",
+      "ratio": 7.849,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "raised",
+      "ratio": 6.108,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "muted",
+      "background": "accent-soft",
+      "ratio": 5.841,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "on-accent",
+      "background": "accent",
+      "ratio": 5.487,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "good",
+      "background": "good-soft",
+      "ratio": 7.516,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "warning",
+      "background": "warning-soft",
+      "ratio": 7.839,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "danger",
+      "background": "danger-soft",
+      "ratio": 7.658,
+      "passed": true
+    },
+    {
+      "theme": "dark",
+      "foreground": "on-danger",
+      "background": "danger-fill",
+      "ratio": 7.135,
+      "passed": true
+    }
+  ],
+  "browserErrors": [],
   "calls": [
     {
       "operation": "localization_catalogs",
@@ -231,7 +3667,8 @@
       "operation": "stems_qualities",
       "args": [
         [
-          "vocals"
+          "vocals",
+          "drums"
         ]
       ]
     },
@@ -265,7 +3702,8 @@
       "operation": "stems_qualities",
       "args": [
         [
-          "vocals"
+          "vocals",
+          "drums"
         ]
       ]
     },
@@ -282,7 +3720,3029 @@
     {
       "operation": "stems_cache",
       "args": []
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "samples",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "samples"
+        ],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "samples"
+        ],
+        "stems",
+        true
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_library_status",
+      "args": []
+    },
+    {
+      "operation": "samples_draft_store",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad0.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad0.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "stems_library",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "stems_preview_open",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        "1",
+        false
+      ]
+    },
+    {
+      "operation": "stems_preview_chunk",
+      "args": [
+        "fixture",
+        0
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "stems_preview_close",
+      "args": [
+        "fixture"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "samples",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "samples"
+        ],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "samples"
+        ],
+        "stems",
+        true
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "pick_files",
+      "args": [
+        "audio",
+        ""
+      ]
+    },
+    {
+      "operation": "samples_analyse",
+      "args": [
+        [
+          "/UI-fixture/audio.wav"
+        ]
+      ]
+    },
+    {
+      "operation": "samples_draft_asset",
+      "args": [
+        "/UI-fixture/audio.wav"
+      ]
+    },
+    {
+      "operation": "samples_draft_store",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad0.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "samples_push",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad0.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "pick_file",
+      "args": [
+        "image",
+        ""
+      ]
+    },
+    {
+      "operation": "logo_open",
+      "args": [
+        "/UI-fixture/image.svg"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "samples",
+          "stems"
+        ],
+        "logo",
+        true
+      ]
+    },
+    {
+      "operation": "logo_render",
+      "args": [
+        "/UI-fixture/image.svg",
+        "classic",
+        {
+          "invertLight": true,
+          "mode": "contain",
+          "zoom": 1,
+          "offsetX": 0,
+          "offsetY": 0
+        }
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "en"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "en"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "fr"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "localization_language",
+      "args": [
+        "en"
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "stems_cache",
+      "args": []
+    },
+    {
+      "operation": "stems_forecast",
+      "args": [
+        "1",
+        [
+          "vocals",
+          "drums"
+        ],
+        true
+      ]
+    },
+    {
+      "operation": "stems_tracks",
+      "args": [
+        "1"
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "keyshift_preview",
+      "args": [
+        1,
+        "harmonic",
+        0
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "logo",
+          "samples",
+          "stems"
+        ],
+        "beatjump-32bars",
+        true
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "samples",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "samples"
+        ],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift",
+          "samples"
+        ],
+        "stems",
+        true
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_remove",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_key_forget",
+      "args": []
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [],
+        "keyshift",
+        true
+      ]
+    },
+    {
+      "operation": "mod_key_fetch",
+      "args": [
+        true
+      ]
+    },
+    {
+      "operation": "mod_key_hint",
+      "args": []
+    },
+    {
+      "operation": "mod_selection",
+      "args": [
+        "1.19",
+        [
+          "core",
+          "keyshift"
+        ],
+        "logo",
+        true
+      ]
+    },
+    {
+      "operation": "mod_build",
+      "args": [
+        "1.19",
+        [
+          "keyshift",
+          "logo"
+        ],
+        "/UI-fixture/retained-key",
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "path": "/UI-fixture/image.svg",
+          "canvas": "classic",
+          "mode": "contain",
+          "zoom": 1,
+          "offsetX": 0,
+          "offsetY": 0,
+          "invertLight": true
+        },
+        1,
+        "harmonic",
+        0,
+        13
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "drive_report",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_draft_store",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Edited sample",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "samples_draft_store",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Edited sample",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            },
+            {
+              "id": "1794085923312-0.5012137928554199",
+              "value": {
+                "name": "Bank-1",
+                "volume": 50,
+                "shiftSilence": false,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF2828",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF7800",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FFDC00",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#28DC28",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#00C8DC",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#2850FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#B428FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF28A0",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": false,
+                "settingsOk": true
+              },
+              "saved": null
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "1794085923312-0.5012137928554199"
+        }
+      ]
+    },
+    {
+      "operation": "samples_draft_store",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Edited sample",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            },
+            {
+              "id": "1794085923312-0.5012137928554199",
+              "value": {
+                "name": "Bank-1",
+                "volume": 50,
+                "shiftSilence": false,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF2828",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF7800",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FFDC00",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#28DC28",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#00C8DC",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#2850FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#B428FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF28A0",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": false,
+                "settingsOk": true
+              },
+              "saved": null
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "samples_push",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long",
+        {
+          "version": 1,
+          "entries": [
+            {
+              "id": "bank-0",
+              "value": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Edited sample",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              },
+              "saved": {
+                "name": "Demo",
+                "volume": 50,
+                "shiftSilence": true,
+                "pads": [
+                  {
+                    "source": "/UI-fixture/audio.wav",
+                    "audioPath": null,
+                    "sourceName": "UI sample.wav",
+                    "keep": false,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 1",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad1.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 2",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad2.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 3",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad3.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 4",
+                    "mode": 3,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad4.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#87A5FF",
+                    "name": "Sample 5",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad5.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#E4A767",
+                    "name": "Sample 6",
+                    "mode": 1,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad6.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#9BD8C1",
+                    "name": "Sample 7",
+                    "mode": 2,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": "/UI-fixture/pad7.wav",
+                    "sourceName": "",
+                    "keep": true,
+                    "present": true,
+                    "start": 0,
+                    "sourceSeconds": 2.5,
+                    "seconds": 2.5,
+                    "colour": "#C3ACE7",
+                    "name": "Sample 8",
+                    "mode": 3,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": true,
+                "settingsOk": true
+              }
+            },
+            {
+              "id": "1794085923312-0.5012137928554199",
+              "value": {
+                "name": "Bank-1",
+                "volume": 50,
+                "shiftSilence": false,
+                "pads": [
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF2828",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF7800",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FFDC00",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#28DC28",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#00C8DC",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#2850FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#B428FF",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  },
+                  {
+                    "source": null,
+                    "audioPath": null,
+                    "sourceName": "",
+                    "keep": false,
+                    "present": false,
+                    "seconds": 0,
+                    "start": 0,
+                    "sourceSeconds": 0,
+                    "colour": "#FF28A0",
+                    "name": "",
+                    "mode": 0,
+                    "gain": 100
+                  }
+                ],
+                "onDrive": false,
+                "settingsOk": true
+              },
+              "saved": null
+            }
+          ],
+          "active": "bank-0",
+          "savedActive": "bank-0",
+          "deleted": [],
+          "selected": "bank-0"
+        }
+      ]
+    },
+    {
+      "operation": "job_status",
+      "args": []
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
+    },
+    {
+      "operation": "samples_draft_load",
+      "args": [
+        "/UI-fixture/USB - Bibliotheque de demonstration - Destination avec un nom long"
+      ]
     }
   ],
-  "browserErrors": []
+  "status": "complete"
 }

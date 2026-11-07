@@ -11,5 +11,5 @@ static int start(const struct rx3_services *services)
 }
 const struct rx3_module rx3_now_playing_module = {
     RX3_MODULE_API_VERSION, sizeof(struct rx3_module), "now-playing",
-    now_playing_feature_configured, start, now_playing_feature_remove, 0, 0, 0, 0, 0
+    now_playing_feature_configured, start, now_playing_feature_remove, 0, 0, 0, 0, 0, 0
 };

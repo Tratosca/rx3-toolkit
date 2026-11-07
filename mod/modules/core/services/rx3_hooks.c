@@ -21,7 +21,7 @@ static struct hook_record records[RX3_HOOK_LIMIT];
  *   onKey_Pad   : ldrh r3,[r1,#8] ; stmdb sp!,{r4..r11,lr}
  */
 static void *install_raw_hook(struct hook_record *hook, unsigned long address,
-                          const uint8_t guard[8], void *replacement)
+                          const uint8_t guard[8], void *replacement, void **published)
 {
     if (memcmp((const void *)address, guard, 8))
         return 0;
@@ -50,7 +50,11 @@ static void *install_raw_hook(struct hook_record *hook, unsigned long address,
     }
 
     uint32_t patch[2] = {0xe51ff004, (uint32_t)(unsigned long)replacement};
+    /* The replacement calls through its original pointer, so publish the
+       trampoline before the first thread can reach the detour. */
+    if (published) __atomic_store_n(published, (void *)trampoline, __ATOMIC_SEQ_CST);
     if (write_code(address, patch, sizeof(patch))) {
+        if (published) __atomic_store_n(published, (void *)0, __ATOMIC_SEQ_CST);
         munmap(trampoline, 4096);
         return 0;
     }
@@ -67,7 +71,7 @@ static void *install_raw_hook(struct hook_record *hook, unsigned long address,
    preserves r3 without depending on the shared object's mapped address. */
 static void *install_raw_pc_ldr_hook(struct hook_record *hook,
                                  unsigned long address,
-                                 const uint8_t guard[8], void *replacement)
+                                 const uint8_t guard[8], void *replacement, void **published)
 {
     if (memcmp((const void *)address, guard, 8))
         return 0;
@@ -95,7 +99,9 @@ static void *install_raw_pc_ldr_hook(struct hook_record *hook,
     }
 
     uint32_t patch[2] = {0xe51ff004u, (uint32_t)(unsigned long)replacement};
+    if (published) __atomic_store_n(published, (void *)trampoline, __ATOMIC_SEQ_CST);
     if (write_code(address, patch, sizeof(patch))) {
+        if (published) __atomic_store_n(published, (void *)0, __ATOMIC_SEQ_CST);
         munmap(trampoline, 4096);
         return 0;
     }
@@ -112,7 +118,8 @@ static void *install_raw_pc_ldr_hook(struct hook_record *hook,
  * trampoline has been released. No implicit hook chaining is allowed.
  */
 static void *install_owned_hook(struct installed_hook *handle, unsigned long address,
-                                const uint8_t guard[8], void *replacement, int pc_ldr)
+                                const uint8_t guard[8], void *replacement, void **published,
+                                int pc_ldr)
 {
     if (!handle || handle->record || !address || !guard || !replacement) return 0;
     struct hook_record *slot = 0;
@@ -123,22 +130,34 @@ static void *install_owned_hook(struct installed_hook *handle, unsigned long add
             (other > address && other - address < 8u)) return 0;
     }
     if (!slot) return 0;
-    void *original = pc_ldr ? install_raw_pc_ldr_hook(slot, address, guard, replacement) :
-                             install_raw_hook(slot, address, guard, replacement);
+    void *original = pc_ldr ? install_raw_pc_ldr_hook(slot, address, guard, replacement, published) :
+                             install_raw_hook(slot, address, guard, replacement, published);
     if (!original) return 0;
     slot->owner = handle;
     handle->record = slot;
     return original;
 }
+/* `published` is where the replacement finds its original: it receives the
+   trampoline before the detour is written, and is cleared again on failure. */
 void *install_hook(struct installed_hook *handle, unsigned long address,
-                    const uint8_t guard[8], void *replacement)
+                    const uint8_t guard[8], void *replacement, void **published)
 {
-    return install_owned_hook(handle, address, guard, replacement, 0);
+    return install_owned_hook(handle, address, guard, replacement, published, 0);
 }
 void *install_pc_ldr_hook(struct installed_hook *handle, unsigned long address,
-                           const uint8_t guard[8], void *replacement)
+                           const uint8_t guard[8], void *replacement, void **published)
 {
-    return install_owned_hook(handle, address, guard, replacement, 1);
+    return install_owned_hook(handle, address, guard, replacement, published, 1);
+}
+/* The eight bytes a prologue check should compare: the stock bytes while one
+   of our detours sits on this address, the live code otherwise. A function
+   another feature detoured is still the function its caller verified. */
+const uint8_t *hook_original_code(unsigned long address)
+{
+    for (unsigned int i = 0; i < RX3_HOOK_LIMIT; i++)
+        if (records[i].owner && !records[i].detached && records[i].address == address)
+            return records[i].original;
+    return (const uint8_t *)address;
 }
 int hook_is_installed(const struct installed_hook *handle)
 {

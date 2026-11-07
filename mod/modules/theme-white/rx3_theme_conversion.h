@@ -11,8 +11,8 @@ static unsigned long theme_memory_kb;
 static uint64_t theme_memory_next_us;
 static struct {
     const uint16_t *source;
-    unsigned int image, count, cursor, opaque, vivid, classifying;
-    int light, artwork;
+    unsigned int image, count, cursor, opaque, vivid, plate, width, height, classifying;
+    int light, artwork, clear_icon_backdrop, plated;
 } theme_job;
 
 /* Watcher only: no renderer opens /proc or allocates the image arena. The
@@ -45,6 +45,12 @@ static void theme_prepare_conversion(void)
    core has replaced never reach the conversion: native_image() refuses them. */
 static void theme_remap_image(unsigned int image)
 {
+    /* Native BROWSE category-on artwork carries white ink over blue. */
+    if (image == 0x83cu || image == 0x859u || image == 0x806u ||
+        image == 0x80cu || image == 0x823u || image == 0x84au ||
+        image == 0x829u || image == 0x820u || image == 0x81au ||
+        image == 0x7eeu || image == 0x7fbu ||
+        image == 0x96du) return;
     if ((!theme_light_active() && !theme_global_dark) ||
         !framework->images->variants_ready() || image >= STOCK_IMAGE_COUNT) return;
     unsigned int bit = 1u << (image & 7u);
@@ -97,7 +103,15 @@ static int theme_begin_conversion(unsigned int image)
     memset(&theme_job, 0, sizeof(theme_job));
     theme_job.source = source;theme_job.image = image;
     theme_job.count = native.width * native.height;
+    theme_job.width = native.width;
+    theme_job.height = native.height;
     theme_job.light = theme_light_active() != 0;
+    /* Native list icons are keyed bitmaps, but some use an opaque neutral
+       square behind the symbol. Let the LIGHT row colour show through. */
+    theme_job.clear_icon_backdrop = theme_job.light &&
+        native.format == THEME_FORMAT_RGB565_KEYED &&
+        native.width <= 32u && native.height <= 32u &&
+        source[0] == 0x2945u;
     theme_job.classifying = theme_job.light;
     return 0;
 }
@@ -135,18 +149,25 @@ static int theme_run_conversions(void)
                 theme_unpack(pixel, &red, &green, &blue);
                 theme_job.opaque++;
                 if (theme_spread(red, green, blue) > THEME_VIVID_SPREAD) theme_job.vivid++;
+                theme_job.plate += (unsigned int)theme_plate_rgb(red, green, blue);
             }
             if (theme_job.cursor != theme_job.count) break;
             theme_job.artwork = theme_job.opaque &&
                 theme_job.opaque * THEME_ARTWORK_PERCENT <= theme_job.vivid * 100u;
+            theme_job.plated = theme_job.artwork &&
+                theme_is_plated(theme_job.width, theme_job.height,
+                                theme_job.opaque, theme_job.plate);
             theme_job.classifying = 0;theme_job.cursor = 0;
         }
         uint16_t *converted = (void *)(arena + theme_arena_used);
         while (remaining && theme_job.cursor < theme_job.count) {
             unsigned int i = theme_job.cursor++;remaining--;
-            converted[i] = theme_job.light ?
-                theme_pixel_light_for_image(theme_job.image, theme_job.source[i], theme_job.artwork) :
-                theme_pixel_dark(theme_job.source[i]);
+            uint16_t pixel = theme_job.source[i];
+            converted[i] = theme_job.clear_icon_backdrop && pixel == 0x2945u ?
+                COLOUR_KEY : theme_job.light ?
+                theme_pixel_light_for_image(theme_job.image, pixel, theme_job.artwork &&
+                    !(theme_job.plated && theme_plate_pixel(pixel))) :
+                theme_pixel_dark(pixel);
         }
         if (theme_job.cursor != theme_job.count) break;
         theme_arena_used += theme_job.count * 2u;

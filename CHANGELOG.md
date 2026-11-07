@@ -1,7 +1,92 @@
 <!-- SPDX-License-Identifier: MPL-2.0 -->
 # Changelog
 
+## 1.0.0-alpha.1
+
+First alpha of the 1.0 line. It has not been tested on hardware: bring a stock USB drive as a spare.
+
+### What is new
+
+- **Heard key**: with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. Key Sync, the KEY tab and the BROWSE colours follow it.
+- **Light theme**: the deck starts in LIGHT. SHIFT + SHORTCUT, or DISPLAY MODE in UTILITY, switches between DARK and LIGHT at any time.
+- **Sample pads**: tap SAMPLES on the touchscreen, tap it again to go back to STATUS. Each pad plays once, while held, in a loop, or as a latch (press again to stop). Each pad has its own level, SHIFT alone can silence them all, and up to four play at once.
+- **Stems**: the STEMS tab offers INST and VOCAL, or INST, VOCAL and DRUMS, with ON/OFF and LEVEL per deck. The waveform follows your stems, now on MP3 and M4A tracks too. Preparation fixes from LycheeAPPF's #51: tracks whose name Rekordbox cut after a space or a dot, tracks with an accent on Windows, and about one track in forty that failed while its waveforms were calculated.
+- **Third BROWSE column**: BPM, Key (Camelot), Artist or Duration beside the two stock columns. Tap a heading to sort the list, tap it again to reverse.
+- **Key Match**: BROWSE colours the tracks that work with the MASTER deck, with optional Energy Boost +2 (yellow), +7 (orange) and +4 (red, experimental).
+- **Key Sync**: the KEY row shows the shift that puts both decks in key and takes it in one press, within the limit you set (1 to 12 semitones, Same key or Key Match rules).
+- **Accent-insensitive search**: type Bebe and find the track however its title is accented (thanks to eDuSHMix).
+- **Asshole mode**: tap the eye at the start of a deck's title to hide or show it. Each deck has its own, and both titles come back at startup.
+- **Now Playing**: sends what each deck plays (title, BPM, tempo, on air) to the computer on the rear USB port, for a stream overlay or a set list. Built on Evan Purkhiser's #32 and jacksight's #20.
+- **Logo**: your artwork in place of the stock logo on the main screen, with an optional second image for LIGHT.
+- **UTILITY ends with an RX3 TOOLKIT section**: the Toolkit version, then each mod on the drive, ON or OFF (layout after Evan Purkhiser's #48).
+- Firmware 1.19 and 1.20.
+- Hold SHIFT on either deck while you plug in the USB drive to play stock for that session.
+- Beat Jump -32/+32 and Immediate Beat Jump have their own Beat Jump group in the Toolkit.
+
+### What is fixed
+
+- Some firmware 1.20 decks that the Toolkit turned away as an unsupported player (#47) are accepted.
+- Sample pads play: their levels, loop mode and SHIFT silence reach the deck. Before, every pad played at zero level and a loop stopped after one pass.
+- LIGHT is readable: BROWSE lists, both UTILITY pages and SOURCE show dark text on the light background, the selected blue row keeps white text (#44), and track titles, keys and the MASTER BPM no longer sit on black plates.
+- Removing the vocals no longer leaves a doubled voice on some MP3 files (#25). Stems already prepared for those files are made again on the next run.
+- With LIGHT and the third BROWSE column both chosen, the mod no longer refuses to start.
+- A drive with Logo chosen but no artwork keeps the stock logo and starts every other mod.
+- UTILITY shows SAMPLES as OFF when the drive carries no sample bank.
+- Now Playing sends the title the deck shows, and only when something changes plus once every two seconds.
+- After the mod restarts the player, the USB drive appears in SOURCE again without unplugging it.
+- The mod can no longer catch the player half way through starting (from Evan Purkhiser's #35).
+- Beat Jump -32/+32 now says beats in the Toolkit, not bars.
+- Stem preparation installs again on Intel Macs (#21).
+
+### Known limits
+
+- Not yet tested on hardware: everything above was checked in an emulator only.
+- #41, no sound on PLAY after the mod restarts the player (reported on firmware 1.20), is not reproduced and still open. With logging on, the session log now records the deck's audio state to help track it down.
+- LIGHT leftovers: after a switch, a thin strip at the far left and right edges of the deck strips can keep the old colour until you open another screen; in UTILITY, a row name stays pale while you change its value; the first DARK to LIGHT switch of a session shows dark boxes for a moment, until the screen has been converted.
+- Intel Macs: stem preparation was only tested under Rosetta, not on a real Intel Mac (#21).
+
+The full list of changes since 0.5.2 is in the Unreleased section below.
+
 ## Unreleased
+
+- UTILITY lists SAMPLES as OFF when the drive carries no sample bank, instead of ON while the pads do nothing. Not yet run on hardware.
+
+- A drive built without the Toolkit's settings files (command-line builds) now starts KEY SYNC in harmonic mode and KEY MATCH with no added suggestion, the same defaults as the Toolkit. Not yet run on hardware.
+
+- Samples: the pads now play. The bank's pad levels, loop mode and SHIFT silence never reached the deck, so every pad played at zero level and a loop stopped after one pass. Checked in the emulator with both decks stopped (pad sound, loop past the end of the sample, SHIFT silence); not yet run on hardware.
+
+- Now Playing: the title is the one the deck shows (it was always empty), and a datagram goes out when something changes plus once every two seconds, instead of about fifty identical ones per second ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Checked in the emulator; not yet run on hardware.
+
+- A drive built with Logo chosen but no artwork now keeps the stock logo and starts every other mod, instead of falling back to the stock player. Not yet run on hardware.
+
+- UTILITY ends with an RX3 TOOLKIT section: the toolkit VERSION, then one line per mod on the drive, showing ON or OFF and the revision it was built from (layout after Evan Purkhiser's [#48](https://github.com/Tratosca/rx3-toolkit/pull/48)). DISPLAY MODE stays available with the light theme. Not yet run on hardware.
+
+- Show a four-second native boot summary when the Toolkit is active, with its build version and enabled mod count in the selected screen language. The native top strip clears when the notice expires. Verified on cold boot and autoexec relaunch in the emulator; not yet run on hardware.
+
+- Light theme: with the module chosen, the deck now starts in LIGHT; SHIFT + SHORTCUT or DISPLAY MODE in Utility switches between DARK and LIGHT at any time, and a switch made while the deck is still starting is no longer undone by the next one. Known: after switching from DARK to LIGHT, the two time counters at the top of the main screen can keep a dark box until you open another screen. Checked in the emulator; not yet run on hardware.
+
+- Fix: with the light theme and the third BROWSE column both chosen, the mod no longer refuses to start and falls back to the stock player. Checked in the emulator through the real installation; not yet run on hardware.
+- Light theme: coloured numbers and marks that sat on small black plates now sit on the light background: the orange BPM of the MASTER deck, the arcs around the playing deck number, the loop length and the coloured list icons. Checked in the emulator; not yet run on hardware.
+- Light theme: on the main screen, the track title in each deck strip and the track key in the left column are now dark on the light background. In BROWSE, the KEY, RATING, MATCHING and HISTORY tiles of the left column no longer stay black the first time the screen opens. After switching from LIGHT to DARK, an empty deck no longer keeps a light box behind "Not Loaded.". A switch made on the main screen now redraws it the way leaving SHORTCUT does, so the background around the decks and the edge of the waveform follow the new mode; a thin strip at the far left and right edges can keep the old colour until you open another screen. Checked in the emulator; not yet run on hardware.
+- Light theme: BROWSE lists and both UTILITY pages now show dark text on the light background, and the selected blue row keeps its white text ([#44](https://github.com/Tratosca/rx3-toolkit/issues/44)). The SOURCE screen is readable too, and the grey squares behind the list icons are gone. In every BROWSE category the chosen category in the left column and the list cursor read correctly too. While you change a UTILITY value, the value now reads white on blue; the row's name stays pale until you confirm. Checked in the emulator; not yet run on hardware.
+
+- With logging on, the session log now says whether the deck's audio output is running after the mod restarts the player, and lists the audio state when it is not. This is the first step on decks that load tracks but stay silent on PLAY after the restart ([#41](https://github.com/Tratosca/rx3-toolkit/issues/41)). Not yet run on hardware.
+
+- Add optional **Heard key** ([#28](https://github.com/Tratosca/rx3-toolkit/issues/28)): with MASTER TEMPO off, the deck shows the key you actually hear as the TEMPO fader moves (5A at +5.95% shows 12A), with a "~" when the tempo sits between two keys. KEY shifts add up, and Key Sync, the KEY tab and the KEY MATCH colours in BROWSE follow the heard key. Checked in the emulator (loads, screen unchanged at 0%); the tempo fader response is not yet run on hardware.
+
+- Heard key now follows the deck on a still main screen: moving TEMPO, switching MASTER TEMPO or pressing KEY updates the deck's key line, the Key Sync button and the BROWSE key colours within a second, without opening another screen. Checked in the emulator; not yet run on hardware.
+
+- Removing the vocals no longer leaves a doubled voice on MP3 files whose encoder info the separator and the deck read differently ([#25](https://github.com/Tratosca/rx3-toolkit/issues/25)): the separator now hears the track exactly as the deck plays it. Stems already prepared for those files are made again on the next run; every other stem is kept. Checked on the reported file (25 ms early before, aligned after); not yet run on hardware.
+
+- The mod now hands each hook its way back to the player before the hook goes live, so a player thread can never reach a half-installed hook (from Evan Purkhiser's [#35](https://github.com/Tratosca/rx3-toolkit/pull/35)); it also loads only inside the player itself, and a build refuses a hook that would silently fail to load. Checked in the emulator; not yet run on hardware.
+
+- The waveform now follows your stems on MP3 and M4A tracks too. Rekordbox and the app measure these files a few columns apart, and a single column was enough for the deck to keep the normal waveform. Up to eight columns are accepted now; a larger gap still keeps the normal waveform. Checked on an RX3 running 1.20 in Blue, RGB and 3Band (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
+
+- A track whose name Rekordbox cut just after a space or a dot now gets its stem package under the name the deck asks for. The app used to trim that character, so it reported the track as ready while the deck found no stems. A package prepared before this fix needs preparing again. Checked on an RX3 running 1.20 (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
+
+- A track whose length ends exactly on a millisecond boundary no longer fails while its waveforms are calculated. That was about one track in forty (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
+
+- Tracks with an accent in the title, artist or file name can be prepared on Windows. The finished stem package was saved in the wrong encoding, so these tracks failed at the very last step, after separation had already run. Checked on an RX3 running 1.20 (from LycheeAPPF's [#51](https://github.com/Tratosca/rx3-toolkit/pull/51)).
 
 - The third BROWSE column reads less from the USB drive: only the value it shows (BPM, duration, artist or key), instead of the artist and key for every track. Emulator measurement: about 70% less work per track, identical display. First RX3 test with a 980-track USB drive: scrolling clearly faster.
 

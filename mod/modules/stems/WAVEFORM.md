@@ -8,7 +8,9 @@ The waveform reads the Stems module's selected and available roles. It waits for
 With v2 `.rx3stem` packages, detailed columns use embedded waveform amplitudes
 through the core's bounded copy service. Individual selections use their role's
 analysis; combinations sum/clamp role envelopes. Full mix restores the native
-waveform. An incompatible axis leaves the native waveform intact with a log.
+waveform. Up to eight columns of difference from Rekordbox's axis are tolerated,
+because a lossy source is measured a few columns apart by the two decoders; a
+larger gap leaves the native waveform intact with a log.
 Legacy stems retain the display filter, as does the Blue overview.
 
 Validated with a real exported track under QEMU (firmware 1.19), including

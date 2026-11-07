@@ -11,6 +11,21 @@ static int theme_enabled;
 static struct installed_hook theme_render_pass_hook;
 static void (*original_theme_render_pass)(void *manager);
 static int theme_render_pass_installed;
+static struct installed_hook theme_browse_rect_hook;
+static void (*original_theme_browse_rect)(void *render, void *rect);
+static int theme_browse_rect_installed;
+static unsigned char theme_browse_row_blue[12];
+static unsigned char theme_browse_right_row_blue[12];
+static unsigned int theme_browse_track_active;
+static unsigned int theme_browse_list_start = 379u;
+static unsigned int theme_browse_list_split = 857u;
+static unsigned char theme_source_row_blue[2];
+/* Utility paints exactly one blue cell: the chosen row's name, or its value
+   while the value is being changed. 0 until a cell has been seen. */
+static unsigned int theme_utility_blue_cell;
+static const uint8_t theme_browse_rect_guard[8] = {
+    0xb0, 0x31, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
+};
 static int theme_key_registered;
 
 /* Converted pixels live in one arena the module allocates once and keeps for
@@ -42,6 +57,95 @@ static unsigned int theme_fill_channel(unsigned int fill, unsigned int shift)
 }
 
 #include "rx3_theme_pixels.h"
+#include "rx3_theme_text.h"
+
+static unsigned int theme_text_remap(const struct rx3_text_draw *draw)
+{
+    unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
+    unsigned int selected_background = 0u;
+    if (view == 3u && draw->box[0] >= 108u && draw->box[0] < 1280u &&
+        draw->box[1] >= 60u &&
+        draw->box[1] < 60u + 12u * 50u) {
+        unsigned int row = (draw->box[1] - 60u) / 50u;
+        selected_background = draw->box[0] < 108u ?
+            ((draw->list_flags & 0x10u) && draw->selection_index == row) :
+            draw->box[0] < theme_browse_list_start ? 0u :
+            draw->box[0] < theme_browse_list_split ?
+            (theme_browse_track_active && theme_browse_row_blue[row]) :
+            (theme_browse_track_active && theme_browse_right_row_blue[row]);
+    }
+    if (view == 12u && draw->box[0] >= 100u && draw->box[0] < 735u &&
+        draw->box[1] >= 100u && draw->box[1] < 282u) {
+        unsigned int row = draw->box[1] < 190u ? 0u : 1u;
+        selected_background = theme_source_row_blue[row];
+    }
+    if (view == 7u && draw->box[1] >= 11u && draw->box[1] < 11u + 12u * 52u) {
+        unsigned int row = (draw->box[1] - 11u) / 52u;
+        unsigned int side = draw->box[0] < 734u ? 1u : 2u;
+        /* The cell can lag the cursor within one pass: rows drawn before the
+           new blue rectangle would still see the old one. Trust it only on
+           the cursor's row; elsewhere the name under the cursor is the cell. */
+        unsigned int cell = theme_utility_blue_cell;
+        selected_background = cell && (cell >> 2) == draw->selection_index ?
+            cell == ((row << 2) | side) :
+            side == 1u && draw->selection_index == row;
+    }
+    return theme_text_colour(theme_light_active(),
+                             theme_text_light_surface(view, draw->layer, draw->box[1]),
+                             draw->native_colour, selected_background);
+}
+static const struct rx3_text_policy theme_text_policy = {theme_text_remap};
+
+/* Native list and SOURCE row rectangles carry the live selection colour,
+   even when their text models do not change with focus. */
+static void theme_browse_rect(void *render, void *rect)
+{
+    unsigned int view = (unsigned int)((int (*)(void))0x001126d0u)();
+    if (rect && (view == 3u || view == 7u || view == 12u)) {
+        const uint8_t *model = rect;
+        uint16_t layer, box[4];
+        uint32_t colour;
+        memcpy(&layer, model + 0x10u, sizeof(layer));
+        memcpy(box, model + 0x18u, sizeof(box));
+        memcpy(&colour, model + 0x28u, sizeof(colour));
+        if (view == 7u && layer == 0x0001u && colour == 0xff1c1f00u &&
+            box[1] < 12u * 52u &&
+            ((box[0] == 8u && box[2] == 734u) || (box[0] == 735u && box[2] == 1280u)))
+            theme_utility_blue_cell = (((box[1] + 10u) / 52u) << 2) |
+                                      (box[0] == 8u ? 1u : 2u);
+        if (view == 3u && layer == 0x0801u && box[0] == 0u &&
+            box[1] == 50u && box[2] == 1280u && box[3] == 659u) {
+            theme_browse_track_active = 0u;
+            theme_browse_list_start = 379u;
+            theme_browse_list_split = 857u;
+            memset(theme_browse_row_blue, 0, sizeof(theme_browse_row_blue));
+            memset(theme_browse_right_row_blue, 0,
+                   sizeof(theme_browse_right_row_blue));
+        }
+        if (view == 3u && layer == 0x0801u &&
+            box[1] >= 50u && box[1] < 50u + 12u * 50u &&
+            box[3] == box[1] + 53u && (box[1] - 50u) % 50u == 0u) {
+            unsigned int row = (box[1] - 50u) / 50u;
+            if ((box[0] == 379u || box[0] == 108u) &&
+                box[2] == 857u) {
+                theme_browse_track_active = 1u;
+                theme_browse_list_start = box[0];
+                theme_browse_list_split = box[0] == 108u ? 735u : 857u;
+                theme_browse_row_blue[row] = colour == 0xff1c1f00u;
+            } else if (box[0] == 857u && box[2] == 1280u) {
+                theme_browse_track_active = 1u;
+                theme_browse_right_row_blue[row] = colour == 0xff1c1f00u;
+            }
+        }
+        if (view == 12u && layer == 0x0101u && box[0] == 0u &&
+            box[2] == 735u && box[3] == box[1] + 90u &&
+            (box[1] == 100u || box[1] == 192u)) {
+            unsigned int row = box[1] == 100u ? 0u : 1u;
+            theme_source_row_blue[row] = colour == 0xff1c1f00u;
+        }
+    }
+    original_theme_browse_rect(render, rect);
+}
 
 /* Whether this fill colour is chrome rather than a decision.
  *
@@ -103,6 +207,8 @@ static uint8_t theme_shortcut_swallowed;
  */
 static volatile int theme_toggle_pending;
 static unsigned int theme_refresh_pending;
+static unsigned int theme_home_repaint_pending;
+static int theme_last_text_view = -1;
 /* The light theme can start armed rather than active. The player paints its
    own first frame stock, and the display is taken over only once it has:
    switching during that first paint is what leaves half the chrome in one
@@ -140,6 +246,18 @@ static int theme_key(const struct rx3_key_event *event)
     return 0;
 }
 
+/* Make each deck strip repaint its message and backing in the new mode: the
+   next native counter update sees a caution ID it has not drawn. */
+static void theme_forget_counter_cautions(void)
+{
+    if (memcmp((const void *)THEME_COUNTER_CAUTION_CACHE,
+               theme_counter_caution_cache_guard, 8))
+        return;
+    volatile uint32_t *ids = (volatile uint32_t *)THEME_COUNTER_CAUTION_IDS;
+    ids[0] = 0xffffffffu;
+    ids[1] = 0xffffffffu;
+}
+
 /* Called at the render-pass boundary, before the native queue is consumed.
    Changing the table from a per-glyph callback mixes two themes in one pass.
    The key and Utility callbacks only publish requests. */
@@ -157,9 +275,23 @@ static void theme_run_pending_toggle(void)
     int request = __atomic_load_n(&theme_toggle_pending, __ATOMIC_SEQ_CST);
     if ((request == 1 || request == 2) &&
         __sync_bool_compare_and_swap(&theme_toggle_pending, request, 3)) {
+        /* A request taken while the start is still armed came from the DJ
+           (SHIFT + SHORTCUT or Utility): the armed start clears itself before
+           it publishes. Their choice wins, or the next switch to dark would
+           find the start still armed and go light again on its own. */
+        theme_light_armed = 0;
         int light = !theme_light_active();
         framework->images->select_variant(light);
+        framework->text->invalidate();
+        theme_forget_counter_cautions();
+        /* The main screen's ground is painted when the screen is entered and
+           never again. Enter it once more, as leaving SHORTCUT does, so the
+           ground and the waveform pane edge follow the new mode. */
+        if (((int (*)(void))0x001126d0u)() == 1 &&
+            !memcmp((const void *)THEME_SHOW_SCREEN, theme_show_screen_guard, 8))
+            ((int (*)(unsigned int))THEME_SHOW_SCREEN)(0u);
         theme_waveform_apply(light);
+        theme_home_repaint_pending = light != 0;
         if (request == 2) {
             theme_refresh_pending = 0;
             if (((int (*)(void))0x001126d0)() == 7)
@@ -211,23 +343,82 @@ static unsigned int theme_refresh_header(void)
         ((void *(*)(void *))vtable[THEME_CONTROL_CHILDREN_SLOT])(header));
 }
 
+static unsigned int theme_refresh_home_child(unsigned int target)
+{
+    if (((int (*)(void))0x001126d0u)() != 1) return 0;
+    void *component = ((void *(*)(void))THEME_COMPONENT_MANAGER)();
+    void *winscape = component ?
+        ((void *(*)(void *))THEME_ACTIVE_WINSCAPE)(component) : 0;
+    if (!winscape) return 0;
+    void *children = (uint8_t *)winscape + 0x24u;
+    void **vtable = *(void ***)children;
+    void *child = ((void *(*)(void *))vtable[THEME_LIST_FIRST_SLOT])(children);
+    for (unsigned int i = 0; child && i < 3u; i++) {
+        if (i == target) {
+            void *manager = ((void *(*)(void))GET_HMI_MANAGER)();
+            ((void (*)(void *, int, void *))REFRESH_GLYPH)(manager, -1, child);
+            return 1;
+        }
+        child = ((void *(*)(void *))vtable[THEME_LIST_NEXT_SLOT])(children);
+    }
+    return 0;
+}
+
+static void theme_refresh_text_for_view(void)
+{
+    int view = ((int (*)(void))0x001126d0u)();
+    if (theme_light_active() && view != theme_last_text_view &&
+        (view == 3 || view == 7 || view == 12))
+        framework->text->invalidate();
+    theme_last_text_view = view;
+}
+
+static unsigned int theme_browse_refresh_due;
+static int theme_requests_pending(void);
 static void hooked_theme_render_pass(void *manager)
 {
     if (theme_render_active) { original_theme_render_pass(manager); return; }
     theme_render_active = 1;
     int previous_theme = theme_light_active();
     theme_run_pending_toggle();
-    int repaint = theme_run_conversions() || previous_theme != theme_light_active();
+    theme_refresh_text_for_view();
+    int converted = theme_run_conversions();
+    int repaint = converted || previous_theme != theme_light_active();
+    /* Rail tiles drawn before their conversion was published keep the stock
+       pixels: the dirty-window pass does not reach them. Once nothing is left
+       to convert, ask BROWSE for one native refresh. */
+    if (converted && ((int (*)(void))0x001126d0u)() == 3) theme_browse_refresh_due = 1u;
+    if (theme_browse_refresh_due && !theme_requests_pending()) {
+        theme_browse_refresh_due = 0u;
+        theme_refresh_pending = 1u;
+    }
     if (repaint) ((int (*)(void))THEME_DIRTY_WINDOWS)();
     original_theme_render_pass(manager);
     /* A winscape entry consumes the root queue. Draw the independent header
        groups afterwards, in a second native pass on the same UI thread. */
-    if (repaint && theme_refresh_header())
+    if (theme_light_active() &&
+        ((int (*)(void))0x001126d0u)() == 1 &&
+        (theme_home_repaint_pending || repaint)) {
+        theme_home_repaint_pending = 0;
+        if (theme_refresh_home_child(1u))
+            original_theme_render_pass(manager);
+        unsigned int queued = theme_refresh_header();
+        queued += theme_refresh_home_child(2u);
+        if (queued) original_theme_render_pass(manager);
+    } else if (repaint && theme_refresh_header()) {
         original_theme_render_pass(manager);
+    }
     theme_render_active = 0;
 }
 
 #include "rx3_theme_conversion.h"
+static int theme_requests_pending(void)
+{
+    if (theme_job.source) return 1;
+    for (unsigned int i = 0; i < sizeof(theme_requested); i++)
+        if (theme_requested[i]) return 1;
+    return 0;
+}
 
 /* The pane's palette as the firmware ships it. Two entries hold whichever mode
  * is current, so both values are accepted for those and exactly one for the
@@ -310,13 +501,16 @@ static void theme_waveform_apply(int light)
 static void theme_read_mode(const char *theme)
 {
     theme_global_dark = theme[0] == 'd';
-    theme_light_armed = theme[0] == 'w';
+    /* l and w take the same armed toggle at a render boundary; only w waits
+       for the player's first paint. l used to log and never switch. */
+    theme_light_armed = theme[0] == 'w' || theme[0] == 'l';
     if (theme_global_dark) {
         log_line("global dark theme active (sentinel: " THEME_DARK_SENTINEL ")");
-    } else if (theme_light_armed) {
+    } else if (theme[0] == 'w') {
         theme_start_light_not_before_us = monotonic_enough_us() + 1000000u;
         log_line("display mode: light, held back until the player has painted once");
     } else if (theme[0] == 'l') {
+        theme_start_light_not_before_us = 0u;
         log_line("display mode: light from the first frame");
     } else {
         log_line("display mode: dark to begin with, switch it in Utility");
@@ -329,17 +523,27 @@ static int theme_feature_install(void)
 {
     if (!theme_enabled)
         return 0;
-    if (memcmp((const void *)THEME_DIRTY_WINDOWS, theme_dirty_windows_guard, 8)) {
+    if (memcmp((const void *)THEME_DIRTY_WINDOWS, theme_dirty_windows_guard, 8) ||
+        memcmp((const void *)THEME_COMPONENT_MANAGER, theme_component_manager_guard, 8) ||
+        memcmp((const void *)THEME_ACTIVE_WINSCAPE, theme_active_winscape_guard, 8)) {
         log_line("light theme: unexpected window invalidation prologue");
         return 0;
     }
     original_theme_render_pass = (void (*)(void *))install_hook(
         &theme_render_pass_hook, THEME_RENDER_PASS, theme_render_pass_guard,
-        hooked_theme_render_pass);
+        hooked_theme_render_pass, (void **)&original_theme_render_pass);
     if (!original_theme_render_pass)
         return 0;
     theme_render_pass_installed = 1;
+    original_theme_browse_rect = (void (*)(void *, void *))install_hook(
+        &theme_browse_rect_hook, 0x001d2decu, theme_browse_rect_guard,
+        (void *)theme_browse_rect, (void **)&original_theme_browse_rect);
+    if (!original_theme_browse_rect)
+        return 0;
+    theme_browse_rect_installed = 1;
     if (!framework->images->claim_variants(&theme_enabled, &theme_policy))
+        return 0;
+    if (!framework->text || !framework->text->claim(&theme_enabled, &theme_text_policy))
         return 0;
     /* The fill substitution is the theme; the key only turns it on. So a key
        that cannot be watched leaves a working feature with no switch, which is
@@ -355,14 +559,20 @@ static int theme_feature_install(void)
 
 static void theme_feature_remove(void)
 {
+    if (theme_browse_rect_installed && uninstall_hook(&theme_browse_rect_hook)) {
+        theme_browse_rect_installed = 0;
+        original_theme_browse_rect = 0;
+    }
     if (theme_render_pass_installed && uninstall_hook(&theme_render_pass_hook)) {
         theme_render_pass_installed = 0;
         original_theme_render_pass = 0;
     }
     utility_remove_theme_row();
     theme_refresh_pending = 0;
+    theme_home_repaint_pending = 0;
     int was_light = theme_light_active();
     framework->images->release_variants(&theme_enabled);
+    if (framework->text) framework->text->release(&theme_enabled);
     if (was_light)
         theme_waveform_apply(0);
     framework->input->unregister_owner(&theme_enabled);

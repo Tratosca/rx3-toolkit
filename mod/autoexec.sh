@@ -45,6 +45,7 @@ RESTART_REQUESTED_BY=""
 RUNNING_HOOK=""
 LOADED_MODULES=""
 DISABLED_MODULES=""
+INACTIVE_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -540,6 +541,71 @@ announce_media()
     fi
 }
 
+# The playhead only moves from the audio device callback, so a relaunched rbp
+# can browse and load tracks yet never play them. rbp does not report a device
+# it failed to open; the kernel's PCM state does. A playback stream counts as
+# running only when its hardware pointer moves between two reads.
+running_playback_pcm()
+{
+    # The master is device 0 of the card rbp opens by name. Any other playback
+    # stream running (headphones, booth) says nothing about what the room hears.
+    _rx3_streams=""
+    for _rx3_card in "$PROC_ROOT"/asound/card*; do
+        [ "$(cat "$_rx3_card/id" 2>/dev/null)" = "cs4344audiorev8" ] &&
+            _rx3_streams="$_rx3_streams $_rx3_card/pcm0p/sub*/status"
+    done
+    [ -n "$_rx3_streams" ] ||
+        _rx3_streams="$PROC_ROOT/asound/card*/pcm*p/sub*/status"
+    for _rx3_status in $_rx3_streams; do
+        [ -r "$_rx3_status" ] || continue
+        grep -q '^state: RUNNING' "$_rx3_status" 2>/dev/null || continue
+        _rx3_before=$(sed -n 's/^hw_ptr *: *//p' "$_rx3_status")
+        usleep 100000
+        _rx3_after=$(sed -n 's/^hw_ptr *: *//p' "$_rx3_status")
+        if [ -n "$_rx3_after" ] && [ "$_rx3_after" != "$_rx3_before" ]; then
+            AUDIO_PCM=${_rx3_status#"$PROC_ROOT"/asound/}
+            return 0
+        fi
+    done
+    return 1
+}
+
+check_audio_device()
+{
+    [ "$LOGGING" = "1" ] || return 0
+    # Without the kernel's PCM status files there is nothing to judge by, and a
+    # missing file is not a stalled deck.
+    set -- "$PROC_ROOT"/asound/card*/pcm*p/sub*/status
+    [ -r "$1" ] || {
+        say "audio check skipped: no PCM status under $PROC_ROOT/asound"
+        return 0
+    }
+    audio_wait=0
+    until running_playback_pcm; do
+        rbp_alive "$NEW" || {
+            say "audio check skipped: rbp pid $NEW exited"
+            return 0
+        }
+        if [ "$audio_wait" -ge 100 ]; then
+            say "FAILED: rbp pid $NEW has no running audio output after 20 s; PLAY will not move the playhead"
+            for audio_status in "$PROC_ROOT"/asound/card*/pcm*p/sub*/status; do
+                [ -r "$audio_status" ] || continue
+                say "  ${audio_status#"$PROC_ROOT"/asound/}: $(head -1 "$audio_status")"
+            done
+            for audio_fd in "$PROC_ROOT/$NEW/fd"/*; do
+                audio_target=$(readlink "$audio_fd" 2>/dev/null) || continue
+                case "$audio_target" in
+                    /dev/snd/*) say "  rbp holds $audio_target" ;;
+                esac
+            done
+            return 1
+        fi
+        usleep 200000
+        audio_wait=$((audio_wait + 1))
+    done
+    say "audio output running: $AUDIO_PCM after $((audio_wait * 200)) ms"
+}
+
 append_diagnostics()
 {
     for diagnostic_file in $RBP_DIAGNOSTIC_FILES; do
@@ -652,6 +718,7 @@ fi
 say "OK: rbp active, pid=$NEW"
 echo patched > /tmp/rx3-patch.state
 discard_runtime_stage
+check_audio_device
 
 run_hooks "$AFTER_LAUNCH_HOOKS" || say "WARNING: an after-launch hook failed"
 run_hooks "$POST_LAUNCH_HOOKS" || say "WARNING: a post-launch hook failed"

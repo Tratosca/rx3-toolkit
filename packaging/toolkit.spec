@@ -4,6 +4,7 @@
 import json
 import os
 import pathlib
+import subprocess
 import sys
 
 
@@ -22,12 +23,33 @@ resources = [
     (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
     (str(repository / "mod/autoexec.sh"), "resources/mod"),
     (str(repository / "mod/categories.json"), "resources/mod"),
+    (str(repository / "mod/compatibility.sh"), "resources/mod"),
     (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
+    (str(repository / "mod/lib/safe-mode.sh"), "resources/mod/lib"),
     (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
-for compatibility in (repository / "mod").glob("*/compatibility.sh"):
-    destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
-    resources.append((str(compatibility), destination))
+# The frozen application has no Git directory. Stamp the checkout identity into
+# its runtime resources at packaging time, including the tag distance on a
+# development build. A release tag produces the release number itself.
+version = subprocess.run(
+    ["git", "-C", str(repository), "describe", "--tags", "--always", "--dirty"],
+    capture_output=True, text=True, check=True,
+).stdout.strip().removeprefix("v")
+version_file = repository / "build/toolkit-version"
+version_file.parent.mkdir(parents=True, exist_ok=True)
+version_file.write_text(version + "\n", encoding="ascii")
+resources.append((str(version_file), "resources/mod"))
+# Utility shows each module's last commit; the frozen app reads it from here.
+revisions = {}
+for manifest in sorted((repository / "mod/modules").glob("*/manifest.json")):
+    revisions[json.loads(manifest.read_text(encoding="utf-8"))["id"]] = subprocess.run(
+        ["git", "-C", str(repository), "log", "-1", "--format=%h", "--",
+         manifest.parent.relative_to(repository).as_posix()],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+revisions_file = repository / "build/module-revisions.json"
+revisions_file.write_text(json.dumps(revisions, sort_keys=True) + "\n", encoding="ascii")
+resources.append((str(revisions_file), "resources/mod"))
 for manifest in (repository / "mod/modules").glob("**/manifest.json"):
     destination = f"resources/{manifest.parent.relative_to(repository).as_posix()}"
     resources.append((str(manifest), destination))

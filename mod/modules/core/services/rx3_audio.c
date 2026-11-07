@@ -68,7 +68,7 @@ static int claim(struct stage *stage, const void *owner, void *client, unsigned 
 {
     if (!owner || !client || stage->owner) return 0;
     if (!stage->original) {
-        stage->original = install_hook(&stage->hook, address, guard, replacement);
+        stage->original = install_hook(&stage->hook, address, guard, replacement, (void **)&stage->original);
         if (!stage->original) return 0;
     }
     stage->owner = owner;

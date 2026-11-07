@@ -1,0 +1,31 @@
+{
+  "id": "effective-key",
+  "name": {
+    "en": "Heard key",
+    "fr": "Tonalité réelle"
+  },
+  "description": {
+    "en": "With MASTER TEMPO off, the deck shows the key you actually hear as the tempo fader moves.",
+    "fr": "Avec MASTER TEMPO désactivé, la platine affiche la tonalité réellement entendue selon la position du fader TEMPO."
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 35,
+  "category": "harmonic-mixing",
+  "runtime_directory": "effective-key",
+  "namespace": "effective_key",
+  "requires": [
+    "keyshift"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ]
+}

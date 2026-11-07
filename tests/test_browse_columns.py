@@ -15,8 +15,9 @@ class BrowseColumnsTests(unittest.TestCase):
     def test_added_and_preserved_fields_share_one_metadata_request(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}
 static unsigned requests,streams,position,freed;
@@ -63,8 +64,9 @@ int main(void) {
     def test_row_extension_survives_native_utf16_strings_and_capacity(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}
 int main(void) {
@@ -95,8 +97,9 @@ int main(void) {
     def test_preserved_column_keeps_filter_header_and_native_green(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}
 int main(void){
@@ -129,8 +132,9 @@ static void paint(void *render,void *model){
     assert(half(m+0x18)==1126 && half(m+0x1c)==1258);
     assert(m[0x38]==3 && word(m+0x28)==0);
 }
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)g;assert((a==ROW_HOOK||a==0x20805cu||a==0x207dd0u||a==0x11d9b0u||a==0x11d83cu||a==0x2596ccu||a==0x104edcu||a==0x171780u||a==0x153530u||a==0x2995c8u||a==0x2955d8u||a==0x29992cu)&&r);h->record=(void *)1;installed++;return a==ROW_HOOK?(void *)1:(void *)native_load;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)g;assert((a==ROW_HOOK||a==0x20805cu||a==0x207dd0u||a==0x11d9b0u||a==0x11d83cu||a==0x2596ccu||a==0x104edcu||a==0x171780u||a==0x153530u||a==0x2995c8u||a==0x2955d8u||a==0x29992cu)&&r);h->record=(void *)1;installed++;return a==ROW_HOOK?(void *)1:(void *)native_load;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;detached++;return 1;}
 int release_hook(struct installed_hook *h){h->record=0;released++;return 1;}
 static unsigned category(unsigned a,unsigned b,unsigned c){(void)a;(void)b;return c;}
@@ -170,8 +174,9 @@ static int firmware_guard(const void *a,const void *b,size_t n){(void)a;(void)b;
 #include "core/services/rx3_browse.c"
 #undef memcmp
 static unsigned detached,released;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)g;(void)r;return a==0x11d83cu?0:(void *)1;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)g;(void)r;return a==0x11d83cu?0:(void *)1;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;detached++;return 1;}
 int release_hook(struct installed_hook *h){h->record=0;released++;return 1;}
 static unsigned category(unsigned a,unsigned b,unsigned c){(void)a;(void)b;return c;}
@@ -197,8 +202,9 @@ static int firmware_guard(const void *a,const void *b,size_t n){(void)a;(void)b;
 #include "core/services/rx3_browse.c"
 #undef memcmp
 static unsigned detached,released,fail_at;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)g;(void)r;if(a==fail_at)return 0;h->record=(void *)1;return (void *)1;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)g;(void)r;if(a==fail_at)return 0;h->record=(void *)1;return (void *)1;}
 int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
 int detach_hook(struct installed_hook *h){(void)h;detached++;return 1;}
 int release_hook(struct installed_hook *h){h->record=0;released++;return 1;}
 static unsigned category(unsigned a,unsigned b,unsigned c){(void)a;(void)b;return c;}
@@ -224,7 +230,7 @@ int main(void){
     def test_sort_gestures_and_native_request_handoff(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
 int hook_is_installed(const struct installed_hook *h){(void)h;return 0;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}
@@ -280,7 +286,7 @@ int main(void){
     def test_native_scroll_resets_at_end_and_reuses_native_timers(self):
         self.run_units(r'''
 #include "core/services/rx3_browse.c"
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){(void)h;(void)a;(void)g;(void)r;return 0;}
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
 int hook_is_installed(const struct installed_hook *h){(void)h;return 0;}
 int detach_hook(struct installed_hook *h){(void)h;return 1;}
 int release_hook(struct installed_hook *h){(void)h;return 1;}

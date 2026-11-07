@@ -8,13 +8,14 @@
 #include "rx3_dsp.h"
 #include "rx3_panel_api.h"
 #include "rx3_image_api.h"
+#include "rx3_text_api.h"
 #include "rx3_browse_api.h"
 #include "rx3_title_api.h"
 #include "rx3_input_api.h"
 #include "rx3_audio_api.h"
 #include "rx3_memory_api.h"
 #include "rx3_loader_api.h"
-#define RX3_MODULE_API_VERSION 18u
+#define RX3_MODULE_API_VERSION 21u
 /* Static composition contract, not a promise of a stable dynamic ABI.
  * All descriptors have process lifetime. Startup is serial and explicit.
  * A failed start is followed by stop, including partial installation.
@@ -28,8 +29,10 @@ struct rx3_text_observation {
     unsigned int length;
 };
 struct rx3_services {
+    /* The last argument receives the original entry point before the
+       detour is live; pass the variable the replacement calls through. */
     void *(*install_hook)(struct installed_hook *, unsigned long,
-                          const uint8_t[8], void *);
+                          const uint8_t[8], void *, void **);
     int (*uninstall_hook)(struct installed_hook *);
     void (*log_line)(const char *);
     struct rx3_mix_state (*mix_state)(unsigned int deck);
@@ -66,6 +69,7 @@ struct rx3_services {
                             unsigned int format, uint8_t *out, unsigned int count));
     void (*withdraw_waveform)(unsigned int (*)(unsigned int deck, unsigned int mask,
                               unsigned int format, uint8_t *out, unsigned int count));    const struct rx3_loader_service *loader;
+    const struct rx3_text_service *text;
 };
 struct rx3_module {
     unsigned int version;
@@ -83,5 +87,8 @@ struct rx3_module {
     void (*report)(void);
     /* Invalidate old metadata before the native load can publish new text. */
     void (*track_will_load)(unsigned int deck, void *reader, const void *track_info);
+    /* Watcher thread, every 50 ms, even when rbp draws nothing. Return
+       promptly: no allocation, I/O or waiting. */
+    void (*tick)(void);
 };
 #endif

@@ -53,7 +53,7 @@ static int search_latin_feature_install(void)
     if (!search_latin_enabled)
         return 0;
     original_search_shape = (search_shape_fn)framework->install_hook(
-        &search_shape_hook, SEARCH_SHAPE, search_shape_guard, hooked_search_shape);
+        &search_shape_hook, SEARCH_SHAPE, search_shape_guard, hooked_search_shape, (void **)&original_search_shape);
     if (!original_search_shape)
         return 0;
     framework->log_line("browse search: accents no longer hide a track");

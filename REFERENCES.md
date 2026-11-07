@@ -121,7 +121,7 @@ The sections below are the stable overview. Exact procedures, binary layouts, me
 | Display and interaction | [Pad visual design](#doc-pad-visual-design), [Key Sync follow-up](#doc-key-sync-follow-up), [title visibility](#doc-title-visibility), [BROWSE scrolling](#doc-browse-scroll-performance). The [DJ UX audit](#doc-ux-audit-dj) is a dated audit with proposals; check current UI before treating a proposal as pending. |
 | Validation and incidents | [0.6.0 acceptance campaign](docs/acceptance/0.6.0/ACCEPTANCE.md#doc-acceptance-0-6-0-readme) and its cases, [hardware feedback](#doc-hardware-feedback-20260929), [emulator feedback](#doc-emulator-feedback-20260929), [startup incident](#doc-rx3-startup-incident) |
 
-The [changelog](CHANGELOG.md) is chronological history, not an authority for the current state. [AUDIT.md](AUDIT.md) and [CLEANUP.md](CLEANUP.md) record earlier repository decisions. Local evidence and vendor binaries live outside Git under `local/`; the private `local/INDEX.md` describes that workspace when present. Do not copy private keys, firmware or commercial audio into public documentation.
+The [changelog](CHANGELOG.md) is chronological history, not an authority for the current state. Local evidence and vendor binaries live outside Git under `local/`; the private `local/INDEX.md` describes that workspace when present. Do not copy private keys, firmware or commercial audio into public documentation.
 
 ## Cross-cutting contracts
 
@@ -405,15 +405,17 @@ Lettering is artwork. `build_labels.py` renders one image per character on each 
 
 `EMERGENCY LOOP` is not special. It is one entry in a table of on-screen notices the player raises for itself, alongside `PC FULL`, `OVERCURRENT`, `DATABASE UNFOUND`, `QUANTIZE LIMITED` and dozens more. The mechanism is `ui::CautionManager`, and the binary is not stripped, so all of it is readable.
 
-The entry point takes the text, which is what makes it usable from here:
+The entry point has a text parameter:
 
     ui::Caution::set(bool show, uif::UiObject::Channel deck, unsigned short const *text) const
 
-The player builds 72 `ui::Caution` objects in one static initialiser, each 32 bytes, and keeps a pointer to each in a table. A caution carries a service code as its first field, encoded as the code reads: `A008` is `0xa008`, `B051` is `0xb051`. Its placement is fixed at construction, in four shapes -- `CautionOnTop`, `CautionOnInfo`, `CautionOnBrowse`, and the plain base -- and the info-bar ones carry a life in milliseconds, 500 to 3000.
+That signature is misleading on firmware 1.19. Decompiled `ui::Caution::set` at `0x0032b374` forwards the text only to `BrowseUiIf::SetCautionID_StatusforBrowseMode` for its special status caution. The native status and Browse painters (`0x00195084`, `0x00194640`) select text by ID through `NS_GetString`, not from that argument. On this renderer, the initial `uif::MsgManager::refMainMsgManager` route reaches a `__cxa_throw` in `0x0000fba8`. Calling `set` is unsafe here. `ui::Caution::getText` at `0x002bb794` can read the object's stored pointer at `+0x1c`, but changing that pointer would not make the ID-based painter use it.
 
-**Twenty of the seventy-two are constructed and then never referenced anywhere else in the binary**, so the player never raises them. Counting the literal pools alone is not enough to establish that: four more are reached through `movw`/`movt` pairs, and `B046` and `B059` look unused until those are counted too. The mod borrows `B051`, an info-bar notice with a three second life and no other reader.
+The player builds 72 `ui::Caution` objects in one static initialiser, each 32 bytes, and keeps a pointer to each in a table. A caution carries a service code as its first field, encoded as the code reads: `A008` is `0xa008`, `B051` is `0xb051`. Its placement is fixed at construction, in four shapes -- `CautionOnTop`, `CautionOnInfo`, `CautionOnBrowse`, and the plain base -- and the info-bar ones carry a life in milliseconds, 500 to 3000. The `B003` object associated with `EMERGENCY LOOP` is constructed as a base caution with info placement in `ui::CautionObj::_GLOBAL__sub_I_unsetCautions` at `0x00018e6c`.
 
-Borrowing rather than building is deliberate. Constructing a caution means modelling a C++ object with bitfields and multiple inheritance, and a wrong field is a frozen player. That is not hypothetical here: a build predating this repository had caution workers of its own, and the only record of them is the line that disabled them, in `tools/rx3_runtime/patch_r38_ui.py`, kept in the tag `snapshot/before-cleanup` -- "invoking that path froze rbp". The cause was never written down.
+**Twenty of the seventy-two are constructed and then never referenced anywhere else in the binary**, so the player never raises them. Counting the literal pools alone is not enough to establish that: four more are reached through `movw`/`movt` pairs, and `B046` and `B059` look unused until those are counted too. An earlier implementation borrowed `B051`, an info-bar notice with a three second life and no other reader.
+
+The earlier B051 borrowing was deliberate. Constructing a caution means modelling a C++ object with bitfields and multiple inheritance, and a wrong field is a frozen player. That is not hypothetical here: a build predating this repository had caution workers of its own, and the only record of them is the line that disabled them, in `tools/rx3_runtime/patch_r38_ui.py`, kept in the tag `snapshot/before-cleanup` -- "invoking that path froze rbp". The cause was never written down. The current boot notice uses the renderer-owned native top strip instead of this caution path.
 
 ### The player's language
 
@@ -2810,7 +2812,7 @@ guarantee of restored page permissions or atomic live patching. The core retains
 original callbacks on cleanup failure. Search Latin and Now Playing detach
 their hooks and drain admitted native callbacks before releasing trampolines.
 
-`track_will_load` runs on the native loading thread before the original load, allowing metadata invalidation before new text can be observed. `track_did_load` runs after the original load and the existing providers' load callbacks. Mix observations may run on the waveform thread. A provider must return promptly without allocation, I/O or waiting, and its code must remain resident after withdrawal. Logging and hook installation are not audio-thread services. Workers remain owned and joined by their modules.
+`track_will_load` runs on the native loading thread before the original load, allowing metadata invalidation before new text can be observed. `track_did_load` runs after the original load and the existing providers' load callbacks. `tick` runs on the core watcher thread every 50 ms, whether or not rbp draws anything, for state that must follow the deck on a still screen. Mix observations may run on the waveform thread. A provider must return promptly without allocation, I/O or waiting, and its code must remain resident after withdrawal. Logging and hook installation are not audio-thread services. Workers remain owned and joined by their modules.
 
 <a id="doc-runtime-framework--ownership-map"></a>
 ##### Ownership map
@@ -2828,7 +2830,7 @@ their hooks and drain admitted native callbacks before releasing trampolines.
 | Search Latin | Transliteration | Hooks, logging |
 | Stems | Files and formats, payloads, per-deck mix, pad and light policy, panel | Input (pads, SLIP LOOP lights, blink clock), deck stream stage, providers, panels, memory, loader, track notifications |
 | Stemwave | Waveform rendering | Hooks, mix observations, waveform copies, track notifications |
-| Theme | Chrome and conversion policy, SHIFT + SHORTCUT, Utility row, waveform palette, pixel arena, watcher | Image variants and fill adapter, key handler, guarded writes, memory |
+| Theme | Chrome, text and conversion policy, SHIFT + SHORTCUT, Utility row, waveform palette, pixel arena, watcher | Image variants and fill adapter, text rendering, key handler, guarded writes, memory |
 | Beat Jump variants, Decoder Sleep, Telnet, Logging variants | Shell lifecycle and guarded patches | None in process |
 
 <a id="doc-runtime-framework--alternatives"></a>
@@ -3103,6 +3105,35 @@ adapter consults while the light table is shown, never while the core paints
 its own panels. Theme reads records through `native_image` and publishes
 converted pixels with `publish_variant`; it never writes a table.
 
+**Text (API version 20).** `services->text` accepts one process-lifetime
+`rx3_text_policy`. Its `colour(const rx3_text_draw *)` callback receives the
+native glyph colour, its resolved window colour, window format, borrowed
+palette, layer and rectangle, and the native visible-list selection index and
+focus flags.
+It returns the native colour for this draw only. The core copies a changed
+glyph before calling rbp, so the player's model and other modules' text stay
+intact. Observation and pending UI work precede the policy; BROWSE's split
+glyphs and generated captions pass through it as well. `invalidate()` queues
+the active native glyph tree for redraw at a render-pass boundary. Claim and
+release run during serial module lifecycle; the colour callback and
+invalidation run on the render thread and must not allocate, perform I/O or
+wait. They never run on the audio callback.
+
+On 1.19 (`cf309238491e73cdbdc1f08a09f7a3177e079068`),
+`ui_ListBrowse_SetText` at `0x00299b9c` and `ui_Utility_SetText` at
+`0x002952e8` call `ui_com_SetListDispText` at `0x001940fc`. That routine
+assigns glyph colour at offset `0x28` from `ALL_COLOR_LIST_TEXT` at
+`0x00514be8`. `NS_PALRender_DrawText` at `0x001d23e4` resolves the window
+format and passes that colour to `DS_GR_SetWindowColor` at `0x001a0680`
+before `DS_GR_DrawWString`. For paletted windows the setter resolves the low
+byte through the window palette. The theme policy remaps only neutral list
+style zero, outside the native selected visible row. It leaves semantic
+colours and other screens untouched. This service and the theme's text policy
+have emulator and host-test evidence; they have not yet run on hardware. The
+native selection index remains zero while focus is on the BROWSE sidebar.
+The list's `0x10` focus flag controls whether that row keeps its white ink;
+without focus, it takes the same dark ink as the other light rows.
+
 **Memory.** `services->memory` is one ledger for stems, sample banks and the
 theme arena. A module reserves before it allocates, settles once the pages are
 resident, and releases when it frees them. A reservation is granted when the
@@ -3148,8 +3179,10 @@ startup setting or resource consumed only at startup requires a planned restart
 when the media guard permits one. Unknown firmware, patch words or process state
 must stop before writes.
 
-The first local branch merges PR #34 with the current core layout. It preserves
-the same-boot removal of the former `librx3_stems.so` preload. A second commit
+The first local branch merges PR #34 with the current core layout. It kept the
+same-boot removal of the former `librx3_stems.so` preload; PR #43 later dropped
+it, so a deck hot-swapped from a v0.4.0 drive keeps that preload until it is
+powered off. A second commit
 avoids replacing unchanged core/logo images and avoids recreating stems/sample
 links when they already point at the selected directory. Those changes do not
 establish the full contract below.

@@ -19,8 +19,6 @@ CORE_GLYPHS=/root/pdj/rx3-glyph-atlas-dark.rgb565
 register_pid_ready_file "$CORE_READY"
 register_diagnostic_file "$CORE_LOG"
 register_runtime_preload "$CORE_LIB"
-# The pre-split name, so a rollback also unloads an older runtime.
-register_runtime_preload /root/pdj/librx3_stems.so
 
 # NS_GetImageInfoByID: movw r3,#0x15cc -> movw r3,#0x16a5. This guarded
 # pre-launch word admits the private IDs in the secondary table without
@@ -46,25 +44,6 @@ core_optional_asset()
 
 core_normalize_preload()
 {
-    # Retire the pre-split library on a same-boot upgrade. Keep the first core
-    # position so independently packaged preloads retain their precedence.
-    pending=$RBP_PRELOAD
-    cleaned=""
-    while [ -n "$pending" ]; do
-        case "$pending" in
-            *:*) entry=${pending%%:*}; pending=${pending#*:} ;;
-            *)   entry=$pending; pending="" ;;
-        esac
-        [ -n "$entry" ] || continue
-        # The pre-split name, so an older runtime is superseded cleanly.
-        [ "$entry" = "/root/pdj/librx3_stems.so" ] && continue
-        if [ -n "$cleaned" ]; then
-            cleaned="$cleaned:$entry"
-        else
-            cleaned=$entry
-        fi
-    done
-    RBP_PRELOAD=$cleaned
     ensure_preload_entry "$CORE_LIB"
 }
 

@@ -33,6 +33,7 @@
     "rx3_theme_decl.h",
     "rx3_theme_feature.h",
     "rx3_theme_pixels.h",
+    "rx3_theme_text.h",
     "rx3_theme_conversion.h",
     "rx3_theme_utility.h"
   ]

@@ -17,6 +17,76 @@ MODULES = ROOT / 'mod/modules'
 class AuditRegressions(unittest.TestCase):
     run_units = harness.FrameworkTests.run_units
 
+    def test_original_is_published_before_the_detour_goes_live(self):
+        # The replacement calls through its original pointer; a thread reaching
+        # the detour before that pointer is set would jump to zero.
+        patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
+        writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
+        self.run_units(r'''
+#include "core/services/rx3_hooks.h"
+#include "core/firmware/rx3_patch.h"
+static uint32_t arena[1024];
+static void *original,*seen_at_patch;
+static unsigned fail_code;
+void *mmap(void *a,size_t n,int p,int f,int d,off_t o) {
+ (void)a;(void)n;(void)p;(void)f;(void)d;(void)o;return arena;
+}
+int munmap(void *p,size_t n){(void)p;(void)n;return 0;}
+int mprotect(void *p,size_t n,int f){
+ (void)n;(void)f;
+ if(p==(void *)arena)return 0;            /* the trampoline page */
+ if(!seen_at_patch)seen_at_patch=original; /* first touch of the player's code */
+ return fail_code?-1:0;
+}
+void clear_instruction_cache(unsigned long a,unsigned long b){assert(b>a);}
+''' + writer + r'''
+int main(void){
+ for(unsigned pc=0;pc<2;pc++) {
+  uint32_t code[4]={0xe59f3000,0xe92d4010,0x12345678,0};uint8_t guard[8];memcpy(guard,code,8);
+  struct installed_hook hook={0};original=seen_at_patch=0;fail_code=0;
+  void *returned=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234,&original):
+                    install_hook(&hook,(unsigned long)code,guard,(void *)1234,&original);
+  assert(returned && original==returned && seen_at_patch==returned);
+  assert(uninstall_hook(&hook));
+  struct installed_hook failed={0};original=seen_at_patch=0;fail_code=1;
+  returned=pc?install_pc_ldr_hook(&failed,(unsigned long)code,guard,(void *)1234,&original):
+              install_hook(&failed,(unsigned long)code,guard,(void *)1234,&original);
+  assert(!returned && !original && !memcmp(code,guard,8));
+ }
+ return 0;
+}
+''', ['core/services/rx3_hooks.c'], ['-Dmmap=audit_map', '-Dmunmap=audit_unmap', '-Dmprotect=audit_protect'])
+
+    def test_prologue_check_sees_stock_bytes_under_our_own_detour(self):
+        # The light theme detours the native rectangle painter; the browse
+        # columns check that same prologue before they start. Seeing the detour
+        # instead of the stock bytes refused the columns and the whole runtime.
+        patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
+        writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
+        self.run_units(r'''
+#include "core/services/rx3_hooks.h"
+#include "core/firmware/rx3_patch.h"
+static uint32_t arena[1024];
+void *mmap(void *a,size_t n,int p,int f,int d,off_t o) {
+ (void)a;(void)n;(void)p;(void)f;(void)d;(void)o;return arena;
+}
+int munmap(void *p,size_t n){(void)p;(void)n;return 0;}
+int mprotect(void *p,size_t n,int f){(void)p;(void)n;(void)f;return 0;}
+void clear_instruction_cache(unsigned long a,unsigned long b){assert(b>a);}
+''' + writer + r'''
+int main(void){
+ uint32_t code[4]={0xe1d131b0,0xe92d4ff0,0,0};uint8_t stock[8];memcpy(stock,code,8);
+ void *original=0;struct installed_hook hook={0};
+ assert(hook_original_code((unsigned long)code)==(const uint8_t *)code);
+ assert(install_hook(&hook,(unsigned long)code,stock,(void *)1234,&original));
+ assert(memcmp(code,stock,8));                                  /* detour live */
+ assert(!memcmp(hook_original_code((unsigned long)code),stock,8)); /* check passes */
+ assert(uninstall_hook(&hook));
+ assert(hook_original_code((unsigned long)code)==(const uint8_t *)code);
+ return 0;
+}
+''', ['core/services/rx3_hooks.c'], ['-Dmmap=audit_map', '-Dmunmap=audit_unmap', '-Dmprotect=audit_protect'])
+
     def test_patch_failure_restores_bytes_before_trampoline_release(self):
         patch = (MODULES / 'core/firmware/rx3_patch.c').read_text()
         writer = 'int write_code(' + patch.split('int write_code(', 1)[1]
@@ -41,14 +111,14 @@ int main(void){
   uint32_t code[4]={0xe59f3000,0xe92d4010,0x12345678,0};
   uint8_t guard[8];memcpy(guard,code,8);struct installed_hook hook={0};
   protects=freed=0;fail_at=failure;fail_twice=failure==3;
-  void *original=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234):
-                    install_hook(&hook,(unsigned long)code,guard,(void *)1234);
+  void *original=pc?install_pc_ldr_hook(&hook,(unsigned long)code,guard,(void *)1234,0):
+                    install_hook(&hook,(unsigned long)code,guard,(void *)1234,0);
   assert(!original && !hook_is_installed(&hook));
   assert(!memcmp(code,guard,8) && freed==1);
  }
  uint32_t code[4]={1,2,3,4};uint8_t guard[8];memcpy(guard,code,8);
  struct installed_hook hook={0};protects=freed=fail_at=fail_twice=0;
- assert(install_hook(&hook,(unsigned long)code,guard,(void *)1234));
+ assert(install_hook(&hook,(unsigned long)code,guard,(void *)1234,0));
  fail_at=protects+2; /* RX restoration on detach */
  assert(!detach_hook(&hook) && hook_is_installed(&hook) && !freed);
  assert(code[0]==0xe51ff004 && code[1]==1234);
@@ -79,6 +149,7 @@ static int *failed;
 static int uninstall_hook(int *hook){return hook!=failed;}
 static void park_native_performance_touches(int x){(void)x;}
 static void rx3_modules_stop(void){}
+static void rx3_utility_remove(void){}
 static void log_line(const char *text){(void)text;}
 ''' + function(core, 'uninstall_performance_hooks') + '\nstatic void reject(void){\n' + rejection + '\n}\n' +
         'int main(void){\n' + setup + '\nfailed=&load_hook;reject();\n' + verify + '\n' + setup +
@@ -251,6 +322,87 @@ int main(void){
  assert(released==1 && !original_search_shape && !search_callbacks);return 0;
 }
 ''', [], ['-pthread'])
+
+    def test_samples_settings_reach_the_pads(self):
+        """A bank's loop mode, pad trims and SHIFT silence used to stay at zero:
+        only colours and volume were published, so every pad played at gain 0."""
+        publish = function(MODULES / 'samples/rx3_samples_feature.h', 'samples_publish_config')
+        self.run_units(r'''
+#include <assert.h>
+#define SAMPLES_PAD_COUNT 8u
+struct samples_config { unsigned int volume, colour[SAMPLES_PAD_COUNT], mode[SAMPLES_PAD_COUNT],
+                        gain[SAMPLES_PAD_COUNT], shift_silence; };
+static struct samples_config samples_config;
+static unsigned int samples_volume, samples_volume_touched;
+''' + publish + r'''
+int main(void){
+ struct samples_config wanted = {0};
+ for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++) {
+  wanted.colour[pad] = pad + 1u; wanted.mode[pad] = pad & 3u; wanted.gain[pad] = 100u - pad; }
+ wanted.volume = 75u; wanted.shift_silence = 1u;
+ samples_publish_config(&wanted);
+ for (unsigned int pad = 0; pad < SAMPLES_PAD_COUNT; pad++)
+  assert(samples_config.gain[pad] == 100u - pad && samples_config.mode[pad] == (pad & 3u));
+ assert(samples_config.shift_silence == 1u && samples_volume == 75u);
+ return 0;
+}
+''', [])
+
+    def test_now_playing_sends_a_change_only_when_a_deck_changed(self):
+        source = MODULES / 'now-playing/rx3_now_playing_feature.h'
+        parts = ''.join(function(source, name) + '\n' for name in (
+            'now_playing_put', 'now_playing_literal', 'now_playing_unsigned',
+            'now_playing_signed', 'now_playing_title', 'now_playing_read_deck'))
+        text = source.read_text()
+        # Its string literals hold braces, so cut at the closing brace in column 0.
+        start = text.index('static int now_playing_send(')
+        send = text[start:text.index('\n}\n', start) + 3]
+        self.run_units(r'''
+#include <assert.h>
+#define NOW_PLAYING_TITLE_UNITS 128u
+#define NOW_PLAYING_DATAGRAM_MAX 2048u
+#define NOW_PLAYING_AF_INET 2
+#define NOW_PLAYING_PORT 50123u
+#define NOW_PLAYING_BROADCAST 0u
+#define NOW_PLAYING_DONTWAIT 0
+typedef int (*now_playing_deck_int_fn)(unsigned int);
+typedef int (*now_playing_on_air_fn)(unsigned int, int);
+static int bpm_value = 12800;
+static int stub_int(unsigned int deck) { (void)deck; return bpm_value; }
+static int stub_air(unsigned int deck, int x) { (void)x; return deck == 0; }
+#define NOW_PLAYING_PLAY_BPM   ((unsigned long)stub_int)
+#define NOW_PLAYING_PLAY_TEMPO ((unsigned long)stub_int)
+#define NOW_PLAYING_PLAY_MODE  ((unsigned long)stub_int)
+#define NOW_PLAYING_ON_AIR     ((unsigned long)stub_air)
+struct now_playing_address { uint16_t family, port; uint32_t address; uint8_t zero[8]; };
+struct now_playing_deck { volatile unsigned int revision; uint8_t loaded; uint32_t track_id;
+                          uint16_t title[NOW_PLAYING_TITLE_UNITS]; };
+struct now_playing_text { char bytes[NOW_PLAYING_DATAGRAM_MAX]; unsigned int length; };
+static struct now_playing_deck now_playing_decks[2];
+static unsigned int now_playing_sequence;
+static struct now_playing_text now_playing_last_decks;
+static int now_playing_screen_title;
+static void now_playing_read_title(unsigned int index, uint16_t *title) { (void)index; (void)title; }
+static int now_playing_socket;
+static const uint16_t now_playing_no_title[1] = {0};
+static unsigned int sent;
+static char last[NOW_PLAYING_DATAGRAM_MAX];
+static long sendto(int fd, const void *data, size_t n, int flags, const void *to, unsigned int size)
+{ (void)fd; (void)flags; (void)to; (void)size; memcpy(last, data, n); last[n] = 0; sent++; return (long)n; }
+''' + parts + send + r'''
+int main(void){
+ now_playing_decks[0].loaded = 1; now_playing_decks[0].track_id = 2;
+ now_playing_decks[0].title[0] = 'D'; now_playing_decks[0].title[1] = 'O';
+ now_playing_send("start", 0); assert(sent == 1 && strstr(last, "\"sequence\":0"));
+ /* The player's status updates repeat; nothing a listener sees moved. */
+ for (int i = 0; i < 50; i++) now_playing_send("change", 1);
+ assert(sent == 1);
+ bpm_value = 12900; now_playing_send("change", 1);
+ assert(sent == 2 && strstr(last, "\"sequence\":1") && strstr(last, "\"bpmX100\":12900"));
+ now_playing_send("heartbeat", 0); assert(sent == 3 && strstr(last, "\"title\":\"DO\""));
+ return 0;
+}
+''', [])
 
     def test_now_playing_retains_live_hooks_and_drains_before_release(self):
         remove = function(MODULES / 'now-playing/rx3_now_playing_feature.h', 'now_playing_feature_remove')

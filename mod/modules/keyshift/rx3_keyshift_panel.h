@@ -14,12 +14,19 @@ static int keyshift_base_key(unsigned deck)
 {
     return deck<2?__atomic_load_n(&keyshift_track_key[deck],__ATOMIC_SEQ_CST):-1;
 }
+static int keyshift_tempo_semitones(unsigned deck);
+/* The analysed key as heard before KEY: moved by the tempo fader when MASTER
+ * TEMPO is off (rx3_keyshift_effective.h), the analysed key otherwise. */
+static int keyshift_heard_base(unsigned deck)
+{
+    return rx3_camelot_shifted(keyshift_base_key(deck),keyshift_tempo_semitones(deck));
+}
 
 /* Where a deck sits on the wheel right now, shift included. */
 static int keyshift_current_key(unsigned int deck)
 {
     if (deck >= 2u) return -1;
-    return rx3_camelot_shifted(keyshift_base_key(deck),
+    return rx3_camelot_shifted(keyshift_heard_base(deck),
                                rx3_keyshift_semitones(deck));
 }
 
@@ -41,7 +48,7 @@ static int keyshift_match_delta(unsigned int deck)
 {
     struct rx3_harmonic_reference ref=keyshift_reference(deck);
     if(!keyshift_sync_enabled || deck>1)return 0;
-    return rx3_harmonic_delta(keyshift_base_key(deck),rx3_keyshift_semitones(deck),
+    return rx3_harmonic_delta(keyshift_heard_base(deck),rx3_keyshift_semitones(deck),
         ref.key,ref.native_keys,keyshift_match_rules,keyshift_sync_range,keyshift_sync_harmonic);
 }
 
@@ -81,7 +88,7 @@ static const uint16_t *keyshift_caption(unsigned int deck, unsigned int widget,
         *end=0;
         return sync_labels[deck];
     }
-    keyshift_format_labels(keyshift_labels[deck], keyshift_base_key(deck),
+    keyshift_format_labels(keyshift_labels[deck], keyshift_heard_base(deck),
                            rx3_keyshift_semitones(deck));
     return keyshift_labels[deck][part];
 }
@@ -94,12 +101,12 @@ static uint16_t keyshift_part_colour(unsigned int deck, unsigned int widget,
     if (widget == 1u) {
         int delta=keyshift_match_delta(deck);
         return delta ? rx3_camelot_colour(
-            rx3_camelot_shifted(keyshift_base_key(deck),rx3_keyshift_semitones(deck)+delta)) : 0u;
+            rx3_camelot_shifted(keyshift_heard_base(deck),rx3_keyshift_semitones(deck)+delta)) : 0u;
     }
     int shift = rx3_keyshift_semitones(deck);
     if ((part == 0u && shift <= -12) || (part == 2u && shift >= 12)) return 0u;
     int delta = part == 0u ? -1 : part == 2u ? 1 : 0;
-    return rx3_camelot_colour(rx3_camelot_shifted(keyshift_base_key(deck),shift+delta));
+    return rx3_camelot_colour(rx3_camelot_shifted(keyshift_heard_base(deck),shift+delta));
 }
 
 static unsigned int keyshift_refresh_pending;
@@ -108,7 +115,7 @@ static void keyshift_publish_key(unsigned deck,int key)
     if(deck>1)return;
     __atomic_store_n(&keyshift_track_key[deck],key,__ATOMIC_SEQ_CST);
     if(framework->browse && framework->browse->deck_key)
-        framework->browse->deck_key(deck,key,rx3_keyshift_semitones(deck));
+        framework->browse->deck_key(deck,keyshift_heard_base(deck),rx3_keyshift_semitones(deck));
     __atomic_store_n(&keyshift_refresh_pending,1u,__ATOMIC_SEQ_CST);
 }
 static int keyshift_needs_refresh(void)

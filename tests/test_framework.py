@@ -22,7 +22,8 @@ class FrameworkTests(unittest.TestCase):
         if 'core/runtime/rx3_modules.c' in units:
             # The service table names every shared service.
             for unit in ('core/services/rx3_input.c', 'core/services/rx3_audio.c',
-                         'core/services/rx3_memory.c', 'core/services/rx3_loader.c'):
+                         'core/services/rx3_memory.c', 'core/services/rx3_loader.c',
+                         'core/services/rx3_text.c'):
                 if unit not in units:
                     units = [*units, unit]
         compiler = shutil.which('clang') or shutil.which('cc')
@@ -57,8 +58,8 @@ extern int unsetenv(const char *);
             stubs = directory / 'weak_services.c'
             stubs.write_text(r'''
 struct installed_hook;
-__attribute__((weak)) void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
-__attribute__((weak)) void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r) { (void)h; (void)a; (void)g; (void)r; return 0; }
+__attribute__((weak)) void *install_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r,void **o) {(void)o; (void)h; (void)a; (void)g; (void)r; return 0; }
+__attribute__((weak)) void *install_pc_ldr_hook(struct installed_hook *h, unsigned long a, const uint8_t g[8], void *r,void **o) {(void)o; (void)h; (void)a; (void)g; (void)r; return 0; }
 __attribute__((weak)) int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
 __attribute__((weak)) int detach_hook(struct installed_hook *h) { (void)h; return 1; }
 __attribute__((weak)) int release_hook(struct installed_hook *h) { (void)h; return 1; }
@@ -119,7 +120,7 @@ int main(void) {
 extern const struct rx3_module rx3_keyshift_module;
 static const struct rx3_pad_row *row;
 static unsigned installs, detached, released, reject, reject_row;
-static void *hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
+static void *hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o) {(void)o;
     (void)h; (void)g; assert(a==0x000a0e54 && r); installs++;
     return reject ? 0 : (void *)1;
 }
@@ -193,7 +194,7 @@ static const struct rx3_module module={.version=RX3_MODULE_API_VERSION,
     .audio_started=audio,.text_observed=text,.report=report,.track_will_load=will_load};
 const struct rx3_module *const rx3_bundle[]={&module};
 const unsigned int rx3_bundle_count=1;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r){
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;
     (void)h;(void)a;(void)g;(void)r;return 0;
 }
 int uninstall_hook(struct installed_hook *h){(void)h;return 1;}
@@ -249,11 +250,11 @@ static int start_a(const struct rx3_services *s) { assert(s->log_line); started[
 static int start_b(const struct rx3_services *s) { assert(s->install_hook); started[1]++; return !fail; }
 static void stop_a(void) { stopped[0]=++sequence; }
 static void stop_b(void) { stopped[1]=++sequence; }
-const struct rx3_module rx3_search_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"a",configured,start_a,stop_a,0,0,0,0,0};
-const struct rx3_module rx3_now_playing_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"b",configured,start_b,stop_b,0,0,0,0,0};
+const struct rx3_module rx3_search_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"a",configured,start_a,stop_a,0,0,0,0,0,0};
+const struct rx3_module rx3_now_playing_module={RX3_MODULE_API_VERSION,sizeof(struct rx3_module),"b",configured,start_b,stop_b,0,0,0,0,0,0};
 const struct rx3_module *const rx3_bundle[]={&rx3_search_module,&rx3_now_playing_module};
 const unsigned int rx3_bundle_count=2;
-void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o) {(void)o;
     (void)h;(void)a;(void)g;(void)r; return 0;
 }
 int uninstall_hook(struct installed_hook *h) { (void)h; return 1; }
@@ -282,7 +283,7 @@ static unsigned int calls, removed;
 static void original(uint16_t *text,void *context,int length) {
     (void)context; calls++; if(text && length) text[0]=0x00e9;
 }
-static void *install(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r) {
+static void *install(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o) {(void)o;
     assert(h && a==0x001644fc && g[0]==0x18); shape=r; return original;
 }
 static int remove_hook(struct installed_hook *h) { assert(h); removed++; return 1; }
@@ -321,31 +322,31 @@ int main(void) {
     uint32_t code[4]={1,2,3,4};
     uint8_t guard[8];memcpy(guard,code,8);
     struct installed_hook first={0}, second={0};
-    void *original=install_hook(&first,(unsigned long)code,guard,(void *)1234);
+    void *original=install_hook(&first,(unsigned long)code,guard,(void *)1234,0);
     assert(original && allocated==1 && hook_is_installed(&first));
-    assert(!install_hook(&first,(unsigned long)(code+2),guard,(void *)1234));
+    assert(!install_hook(&first,(unsigned long)(code+2),guard,(void *)1234,0));
     /* Even a guard matching the detour cannot stack a second owner. */
     uint8_t patched[8];memcpy(patched,code,8);
-    assert(!install_hook(&second,(unsigned long)code,patched,(void *)5678));
-    assert(!install_hook(&second,(unsigned long)(code+1),patched,(void *)5678));
+    assert(!install_hook(&second,(unsigned long)code,patched,(void *)5678,0));
+    assert(!install_hook(&second,(unsigned long)(code+1),patched,(void *)5678,0));
     assert(!release_hook(&first) && !freed);
     struct installed_hook copied=first;assert(!detach_hook(&copied) && !release_hook(&copied));
     fail_write=1; uninstall_hook(&first);
     assert(hook_is_installed(&first) && !freed);
     fail_write=0; assert(detach_hook(&first)); assert(!memcmp(code,guard,8));
     unsigned int before=writes;assert(detach_hook(&first) && writes==before);
-    assert(!install_hook(&second,(unsigned long)code,guard,(void *)5678));
+    assert(!install_hook(&second,(unsigned long)code,guard,(void *)5678,0));
     fail_release=1;assert(!release_hook(&first) && hook_is_installed(&first));
     fail_release=0;assert(release_hook(&first) && !hook_is_installed(&first) && freed==1);
-    assert(install_hook(&second,(unsigned long)code,guard,(void *)5678));
+    assert(install_hook(&second,(unsigned long)code,guard,(void *)5678,0));
     uninstall_hook(&second);uninstall_hook(&second);assert(freed==2);
     uint32_t literal_code[5]={0xe0803080,0xe59f2000,0,0x12345678,0};
     memcpy(guard,literal_code,8);
-    uint32_t *relocated=install_hook(&first,(unsigned long)literal_code,guard,(void *)1234);
+    uint32_t *relocated=install_hook(&first,(unsigned long)literal_code,guard,(void *)1234,0);
     assert(relocated && relocated[0]==0xe0803080 && relocated[1]==0xe59f2008);
     assert(relocated[5]==0x12345678 && relocated[3]==(uint32_t)(unsigned long)(literal_code+2));
     uninstall_hook(&first);assert(!memcmp(guard,literal_code,8));
-    uint8_t wrong[8]={0};assert(!install_hook(&first,(unsigned long)code,wrong,(void *)1234));
+    uint8_t wrong[8]={0};assert(!install_hook(&first,(unsigned long)code,wrong,(void *)1234,0));
     assert(!hook_is_installed(&first));
     return 0;
 }

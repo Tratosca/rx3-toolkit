@@ -524,7 +524,8 @@ def available_versions(root: pathlib.Path | None = None) -> list[str]:
 
 def validate_arm_hook(path: pathlib.Path) -> None:
     """Validate the architecture and EABI marker without a host `file` tool."""
-    header = path.read_bytes()[:52]
+    data = path.read_bytes()
+    header = data[:52]
     if len(header) < 52 or header[:4] != b"\x7fELF":
         raise ValueError(f"{path}: compiled hook is not an ELF file")
     if header[4:6] != b"\x01\x01":
@@ -533,6 +534,44 @@ def validate_arm_hook(path: pathlib.Path) -> None:
     flags = struct.unpack_from("<I", header, 36)[0]
     if machine != 40 or (flags & 0xFF000000) != 0x05000000:
         raise ValueError(f"{path}: hook must target ARM EABI5")
+
+    forbidden = {"bcmp", "__memcmp_chk"}
+    imported = _undefined_elf32_symbols(data)
+    rejected = sorted(imported & forbidden)
+    if rejected:
+        names = ", ".join(rejected)
+        raise ValueError(f"{path}: hook imports unavailable symbol(s): {names}")
+
+
+def _undefined_elf32_symbols(data: bytes) -> set[str]:
+    """Return undefined dynamic symbols from a little-endian ELF32 image."""
+    section_offset, = struct.unpack_from("<I", data, 0x20)
+    section_size, section_count = struct.unpack_from("<HH", data, 0x2E)
+
+    def section(index: int) -> tuple[int, int, int, int, int]:
+        base = section_offset + index * section_size
+        section_type, = struct.unpack_from("<I", data, base + 4)
+        offset, size, link = struct.unpack_from("<III", data, base + 0x10)
+        entry_size, = struct.unpack_from("<I", data, base + 0x24)
+        return section_type, offset, size, link, entry_size
+
+    names: set[str] = set()
+    for index in range(section_count):
+        section_type, offset, size, link, entry_size = section(index)
+        if section_type != 11 or not entry_size:  # SHT_DYNSYM
+            continue
+        _, strings_offset, _, _, _ = section(link)
+        for entry in range(size // entry_size):
+            base = offset + entry * entry_size
+            name_offset, _, _, _, _, defined = struct.unpack_from(
+                "<IIIBBH", data, base
+            )
+            if defined != 0 or not name_offset:  # SHN_UNDEF only
+                continue
+            start = strings_offset + name_offset
+            end = data.index(b"\0", start)
+            names.add(data[start:end].decode("ascii"))
+    return names
 
 
 def compile_arm_hook(source: pathlib.Path, output: pathlib.Path, compiler: str | None = None,
@@ -646,6 +685,39 @@ def _validate_supplied_files(
     return supplied
 
 
+def _utility_rows(root: pathlib.Path, selected) -> list[tuple[PatchDefinition, str, str]]:
+    """One Utility row per selected module: its name and the short commit that
+    last touched its directory. A checkout asks Git (a "+" marks local edits);
+    a packaged app reads the revisions stamped when it was frozen."""
+    stamped_file = root / "mod/module-revisions.json"
+    stamped = (json.loads(stamped_file.read_text(encoding="ascii"))
+               if not (root / ".git").exists() and stamped_file.is_file() else {})
+    rows = []
+    for patch in selected:
+        if patch.patch_id in ("core", "compatibility"):
+            continue  # VERSION already names the toolkit build itself
+        if (root / ".git").exists():
+            folder = str(patch.directory.resolve().relative_to(root.resolve()))
+            revision = subprocess.run(
+                ["git", "-C", str(root), "log", "-1", "--format=%h", "--", folder],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            if subprocess.run(
+                ["git", "-C", str(root), "status", "--porcelain", "--", folder],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip():
+                revision += "+"
+        else:
+            revision = stamped.get(patch.patch_id, "")
+        label = patch.name.upper()
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9 ().+-]{0,47}", label):
+            raise ValueError(f"module name cannot be shown in Utility: {patch.name}")
+        if not re.fullmatch(r"[0-9a-f]{7,12}\+?", revision):
+            revision = "UNKNOWN"
+        rows.append((patch, label, revision))
+    return rows
+
+
 def build_runtime(
     firmware: str,
     patch_ids: Iterable[str],
@@ -697,6 +769,22 @@ def build_runtime(
         modules = staging / "modules"
         modules.mkdir(parents=True)
         shutil.copy2(root / "mod/autoexec.sh", staging / "autoexec.sh")
+        # A checkout has an exact tag or a reproducible tag-distance identity.
+        # Release bundles without .git carry the version stamped by CI.
+        version_file = root / "mod/toolkit-version"
+        if (root / ".git").exists():
+            described = subprocess.run(
+                ["git", "-C", str(root), "describe", "--tags", "--always", "--dirty"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            toolkit_version = described.removeprefix("v")
+        else:
+            if not version_file.is_file():
+                raise ValueError("this Toolkit bundle has no stamped version")
+            toolkit_version = version_file.read_text(encoding="ascii").strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]{0,47}", toolkit_version):
+            raise ValueError("invalid toolkit version for the RX3 display")
+        (staging / "toolkit-version").write_text(toolkit_version + "\n", encoding="ascii")
         library = staging / "lib"
         library.mkdir()
         shutil.copy2(root / "mod/lib/module-api.sh", library / "module-api.sh")
@@ -735,6 +823,11 @@ def build_runtime(
         # the directory name and fails the module-name check on every line.
         (modules / "index").write_text(
             "".join(f"{item}\n" for item in module_index), encoding="ascii", newline="",
+        )
+        (modules / "utility").write_text(
+            "".join(f"{patch.patch_id}|{label}|{revision}\n"
+                    for patch, label, revision in _utility_rows(root, selected)),
+            encoding="ascii", newline="",
         )
         (staging / "autoexec.sh").chmod(0o755)
 

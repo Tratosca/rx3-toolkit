@@ -38,6 +38,20 @@ static const uint8_t now_playing_mixer_guard[8] = {
 #define NOW_PLAYING_PLAY_TEMPO    ((unsigned long)0x000fd2dc)
 #define NOW_PLAYING_ON_AIR        ((unsigned long)0x000fe34c)
 
+/* The load record carries no title (zeros where the database would put it,
+   checked in the emulator). The deck's title line on screen does:
+   ConvertPlayTitle2Gui 0x0027b0e8 copies it from this per-deck buffer, whose
+   address sits in its literal pool, beside the key line's. Line layout: u16
+   length at +0x20, UTF-16 text at +0x22. The guard is that literal pair. */
+#define NOW_PLAYING_TITLE_LITERALS ((unsigned long)0x0027b2f4)
+#define NOW_PLAYING_GUI_TITLE      0x0326ef78u
+#define NOW_PLAYING_GUI_STRIDE     0x238u
+#define NOW_PLAYING_GUI_LENGTH     0x20u
+#define NOW_PLAYING_GUI_TEXT       0x22u
+static const uint8_t now_playing_title_literals_guard[8] = {
+    0xf0, 0x8b, 0x26, 0x03, 0x78, 0xef, 0x26, 0x03
+};
+
 static const uint8_t now_playing_current_track_guard[8] = {
     0x3c, 0x31, 0x90, 0xe5, 0x04, 0x00, 0x93, 0xe5
 };

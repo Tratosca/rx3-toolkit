@@ -153,5 +153,17 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertNotIn(b"compatibility\r", plain)
 
 
+    def test_the_image_names_each_module_and_its_revision_for_utility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            key = directory / "aes256.key"
+            key.write_bytes(b"0123456789012345678901234567890\n")
+            result = build_runtime(
+                "1.19", ["keyshift"], key, directory, root=REPOSITORY
+            )
+            plain = load_firmware_codec().read_autoexec(result.output, key)
+            self.assertRegex(plain, rb"keyshift\|KEY SHIFT\|[0-9a-f]{7,12}\+?\n")
+            self.assertNotIn(b"|SHARED COMPONENTS|", plain)
+
 if __name__ == "__main__":
     unittest.main()

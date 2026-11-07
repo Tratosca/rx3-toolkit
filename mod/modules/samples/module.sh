@@ -43,6 +43,7 @@ samples_bank_generation()
 
 samples_disable()
 {
+    module_inactive samples
     module_export RX3_SAMPLES_DIR "" "Sample pads" || :
     module_export RX3_SAMPLES_GENERATION "" "Sample pads" || :
     if [ -L "$SAMPLES_LINK" ]; then

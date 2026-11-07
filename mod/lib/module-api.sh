@@ -437,6 +437,44 @@ reconcile_module_set()
     _rx3_selection="${LOADED_MODULES# }|${DISABLED_MODULES# }"
     RUNNING_HOOK=module-set
     module_export RX3_RUNTIME_MODULE_SET "$_rx3_selection" "Module set" || :
+    _rx3_count=0
+    for _rx3_loaded in $LOADED_MODULES; do
+        case "$_rx3_loaded" in
+            compatibility|core) ;;
+            *)
+                case " $DISABLED_MODULES " in
+                    *" $_rx3_loaded "*) ;;
+                    *) _rx3_count=$((_rx3_count + 1)) ;;
+                esac
+                ;;
+        esac
+    done
+    module_export RX3_ACTIVE_MODULES "$_rx3_count" "Module summary" || :
+    # Utility lists each loaded module as NAME|ON rev, rows joined by ";". The
+    # build wrote names and revisions; only the state is decided here.
+    _rx3_rows=
+    _rx3_utility="${RX3_ISO_ROOT:-/mnt/iso}/modules/utility"
+    [ -r "$_rx3_utility" ] && while IFS='|' read -r _rx3_id _rx3_label _rx3_revision; do
+        case " $LOADED_MODULES " in *" $_rx3_id "*) ;; *) continue ;; esac
+        case "$_rx3_label$_rx3_revision" in *[!A-Za-z0-9' ().+-']*) continue ;; esac
+        case " $DISABLED_MODULES $INACTIVE_MODULES " in
+            *" $_rx3_id "*) _rx3_state=OFF ;;
+            *) _rx3_state=ON ;;
+        esac
+        _rx3_rows="$_rx3_rows${_rx3_rows:+;}$_rx3_label|$_rx3_state $_rx3_revision"
+    done < "$_rx3_utility"
+    module_export RX3_UTILITY_ROWS "$_rx3_rows" "Utility rows" || :
+    # The version is only shown to the operator: an image without a valid one
+    # still loads, and the boot message leaves the number out.
+    _rx3_version=$(cat "${RX3_ISO_ROOT:-/mnt/iso}/toolkit-version" 2>/dev/null) ||
+        _rx3_version=
+    case "$_rx3_version" in
+        ""|*[!A-Za-z0-9.+-]*)
+            say "toolkit version missing or invalid in this image; boot message without it"
+            return 0
+            ;;
+    esac
+    module_export RX3_TOOLKIT_VERSION "$_rx3_version" "Toolkit version" || :
 }
 
 # Where a module's kill switch lives. One shape for every module, so an operator
@@ -459,6 +497,16 @@ module_switch_path() { printf '/tmp/rx3-%s.off' "$1"; }
 # all, so a switch meant to take out one module would take out every one of
 # them. That is the opposite of what it is for, and it is not hypothetical: it
 # shipped that way once and cost a session on hardware.
+# A module that loaded but has nothing to do on this drive (Samples without a
+# bank). Utility then lists it as OFF rather than ON.
+module_inactive()
+{
+    case " $INACTIVE_MODULES " in
+        *" $1 "*) ;;
+        *) INACTIVE_MODULES="$INACTIVE_MODULES $1" ;;
+    esac
+}
+
 module_disabled_by_switch()
 {
     _rx3_switch=$(module_switch_path "$1")

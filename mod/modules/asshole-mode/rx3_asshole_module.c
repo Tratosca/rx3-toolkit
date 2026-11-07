@@ -55,5 +55,5 @@ static void stop(void)
 }
 const struct rx3_module rx3_asshole_module={
     RX3_MODULE_API_VERSION,sizeof(struct rx3_module),owner,configured,start,stop,
-    0,0,0,0,0
+    0,0,0,0,0,0
 };

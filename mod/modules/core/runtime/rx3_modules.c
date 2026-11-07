@@ -13,7 +13,8 @@ extern const unsigned int rx3_bundle_count;
 static struct rx3_services services = {
     install_hook, uninstall_hook, log_line, rx3_mix_read, &rx3_notices, &rx3_dsp, &rx3_panels, rx3_wave_read, detach_hook, release_hook, &rx3_images, &rx3_browse, &rx3_titles,
     &rx3_input, &rx3_audio, rx3_log_number, &rx3_memory, 0,
-    rx3_mix_claim, rx3_mix_release, rx3_wave_claim, rx3_wave_release, &rx3_loader
+    rx3_mix_claim, rx3_mix_release, rx3_wave_claim, rx3_wave_release, &rx3_loader,
+    &rx3_text
 };
 void rx3_modules_bind_writer(int (*writer)(unsigned long, const void *, const void *, unsigned int))
 {
@@ -112,6 +113,13 @@ void rx3_modules_text_observed(const struct rx3_text_observation *text)
     for (unsigned int i=0; i<rx3_bundle_count; i++)
         if (active[i] && rx3_bundle[i]->text_observed)
             rx3_bundle[i]->text_observed(text);
+    leave_notification();
+}
+void rx3_modules_tick(void)
+{
+    if (!enter_notification()) return;
+    for (unsigned int i=0; i<rx3_bundle_count; i++)
+        if (active[i] && rx3_bundle[i]->tick) rx3_bundle[i]->tick();
     leave_notification();
 }
 void rx3_modules_report(void)

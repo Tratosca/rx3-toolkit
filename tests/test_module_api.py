@@ -28,6 +28,7 @@ RBP_DIAGNOSTIC_FILES=""
 RUNTIME_PRELOAD_ENTRIES=""
 LOADED_MODULES=""
 DISABLED_MODULES=""
+INACTIVE_MODULES=""
 CURRENT_MODULE=""
 CURRENT_NAMESPACE=""
 MODULE_LOAD_FAILED=0
@@ -49,6 +50,81 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def test_summary_exports_selected_module_count_and_image_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            version = Path(directory) / "toolkit-version"
+            version.write_text("0.5.2-90-gb730f95\n", encoding="ascii")
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin compatibility compatibility || exit 10\n'
+                'module_begin core core || exit 11\n'
+                'module_begin stems stems || exit 12\n'
+                'module_begin logging logging || exit 13\n'
+                'DISABLED_MODULES=" stems"\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                '[ "$RX3_ACTIVE_MODULES" = 1 ] || exit 15\n'
+                '[ "$RX3_TOOLKIT_VERSION" = 0.5.2-90-gb730f95 ] || exit 16\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_summary_exports_utility_rows_for_loaded_modules_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "modules").mkdir()
+            (Path(directory) / "modules/utility").write_text(
+                "stems|STEMS|8351ffc\n"
+                "logging|TROUBLESHOOTING REPORT|1d824ea+\n"
+                "keyshift|KEY SHIFT|3f2a9c1\n"
+                "telnet|BAD;ROW|1234567\n",
+                encoding="ascii",
+            )
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin core core || exit 10\n'
+                'module_begin stems stems || exit 11\n'
+                'module_begin logging logging || exit 12\n'
+                'module_begin telnet telnet || exit 13\n'
+                'DISABLED_MODULES=" stems"\n'
+                'module_inactive logging\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                'printf "%s" "$RX3_UTILITY_ROWS"\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # Switched off and loaded-but-idle both read OFF.
+            self.assertEqual(
+                result.stdout.splitlines()[-1],
+                "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|OFF 1d824ea+",
+            )
+
+    def test_logo_without_artwork_is_skipped_not_fatal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            core = Path(directory) / "librx3_core.so"
+            core.write_bytes(b"")
+            (Path(directory) / "modules/logo").mkdir(parents=True)
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                f'CORE_OBJECT={shlex.quote(str(core))}\n'
+                '. "${1%/lib/module-api.sh}/modules/logo/module.sh" || exit 10\n'
+                'logo_prepare || exit 11\n'
+                '[ "$LOGO_READY" = 0 ] || exit 12\n'
+                '[ -z "${RX3_LOGO:-}" ] || exit 13\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_image_without_a_version_still_loads_and_exports_the_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'module_begin core core || exit 10\n'
+                'module_begin logging logging || exit 11\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 12\n'
+                '[ "$RX3_ACTIVE_MODULES" = 1 ] || exit 13\n'
+                '[ -z "$RX3_TOOLKIT_VERSION" ] || exit 14\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_removed_or_switched_off_module_requests_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             switch = Path(directory) / "stems.off"
@@ -57,7 +133,10 @@ class ModuleApiTests(unittest.TestCase):
                 'module_begin core core || exit 10\n'
                 'module_begin stems stems || exit 11\n'
                 'running="core stems|"\n'
-                'rbp_environment_value() { printf %s "$running"; }\n'
+                # The running player already carries this summary.
+                'rbp_environment_value() { case $1 in\n'
+                '  RX3_RUNTIME_MODULE_SET) printf %s "$running" ;;\n'
+                '  RX3_ACTIVE_MODULES) printf 1 ;; esac; }\n'
                 'reconcile_module_set\n'
                 '[ "$NEED_RBP_RESTART" = 0 ] || exit 12\n'
                 f'module_switch_path() {{ printf %s {shlex.quote(str(switch))}; }}\n'
@@ -263,16 +342,16 @@ exit 0
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_core_preload_keeps_order_and_retires_legacy_library(self):
+    def test_core_preload_keeps_order_and_preserves_other_libraries(self):
         result = run_shell(
             r'''
 . "${1%/lib/module-api.sh}/modules/core/module.sh" || exit 9
 RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so"
 core_normalize_preload || exit 10
-[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 11
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so:/root/pdj/librx3_stems.so" ] || exit 11
 RBP_PRELOAD="/opt/vendor.so:/root/pdj/librx3_stems.so"
 core_normalize_preload || exit 12
-[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_core.so" ] || exit 13
+[ "$RBP_PRELOAD" = "/opt/vendor.so:/root/pdj/librx3_stems.so:/root/pdj/librx3_core.so" ] || exit 13
 RBP_PRELOAD=""
 core_normalize_preload || exit 14
 [ "$RBP_PRELOAD" = "/root/pdj/librx3_core.so" ] || exit 15
