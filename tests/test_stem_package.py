@@ -25,13 +25,20 @@ class PackageTests(unittest.TestCase):
             self.inputs[role] = p
         self.template = analysis.Template(b'PWV5',b'\0'*30,15,(), '11'*32)
 
-    def make(self, count=3):
+    def test_manifest_survives_names_outside_the_platform_encoding(self):
+        # Read back as UTF-8 whatever the machine's locale; cp1252 cannot even
+        # write the combining accent, and its e-acute is not valid UTF-8.
+        title = 'Beyonc\u00e9 INTRO PILE\u0301'
+        out = self.make(metadata={'title': title})
+        self.assertEqual(package.read(out)['manifest']['title'], title)
+
+    def make(self, count=3, metadata=None):
         inputs = dict(list(self.inputs.items())[:count])
         wave = self.root/'track.rx3wave'
         roles = dict((r,(bytes([0,4*(i+1)])*15,'22'*32)) for i,r in enumerate(list(waveform.ROLE_IDS)[:count+1]))
         waveform.write(wave,self.template,self.frames,'33'*32,roles)
         out=self.root/'track.rx3stem'
-        package.write(out,inputs,wave,{'title':'test'})
+        package.write(out,inputs,wave,metadata or {'title':'test'})
         return out
 
     def test_single_file_self_describes_each_selected_set_and_audition(self):
@@ -203,7 +210,24 @@ int main(int argc,char **argv) {
    assert(packed[15*stride]==99);
   }
   assert(stems_waveform(0,7,2,packed,15)==0);
-  assert(stems_waveform(0,7,2,packed,14)==0xffffffffu);
+  /* Rekordbox's axis for a lossy source lands a few columns from the decoder's:
+     the shared columns are copied, a missing tail stays silent. */
+  uint8_t wide[32];
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,11)==11);
+  for(unsigned i=0;i<11;i++) assert(wide[i]==7);
+  assert(wide[11]==99);
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,23)==23);
+  for(unsigned i=0;i<15;i++) assert(wide[i]==7);
+  for(unsigned i=15;i<23;i++) assert(wide[i]==0);
+  assert(wide[23]==99);
+  /* A larger gap is another recording, and the native waveform stays. */
+  memset(wide,99,sizeof(wide));
+  assert(stems_waveform(0,7,0,wide,6)==0xffffffffu);
+  assert(stems_waveform(0,7,0,wide,24)==0xffffffffu);
+  assert(stems_waveform(0,7,0,wide,0)==0xffffffffu);
+  for(unsigned i=0;i<sizeof(wide);i++) assert(wide[i]==99);
   munmap(next[0].block,next[0].block_size);close(fd);return 0;
  }
  uint8_t amplitudes[46];memset(amplitudes,99,sizeof(amplitudes));
