@@ -23,7 +23,9 @@ resources = [
     (str(repository / "THIRD_PARTY_NOTICES.md"), "."),
     (str(repository / "mod/autoexec.sh"), "resources/mod"),
     (str(repository / "mod/categories.json"), "resources/mod"),
+    (str(repository / "mod/compatibility.sh"), "resources/mod"),
     (str(repository / "mod/lib/module-api.sh"), "resources/mod/lib"),
+    (str(repository / "mod/lib/safe-mode.sh"), "resources/mod/lib"),
     (str(repository / "app/firmware/firmware_image.py"), "resources/app/firmware"),
 ]
 # The frozen application has no Git directory. Stamp the checkout identity into
@@ -48,9 +50,6 @@ for manifest in sorted((repository / "mod/modules").glob("*/manifest.json")):
 revisions_file = repository / "build/module-revisions.json"
 revisions_file.write_text(json.dumps(revisions, sort_keys=True) + "\n", encoding="ascii")
 resources.append((str(revisions_file), "resources/mod"))
-for compatibility in (repository / "mod").glob("*/compatibility.sh"):
-    destination = f"resources/{compatibility.parent.relative_to(repository).as_posix()}"
-    resources.append((str(compatibility), destination))
 for manifest in (repository / "mod/modules").glob("**/manifest.json"):
     destination = f"resources/{manifest.parent.relative_to(repository).as_posix()}"
     resources.append((str(manifest), destination))

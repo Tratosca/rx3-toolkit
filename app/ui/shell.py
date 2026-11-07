@@ -86,6 +86,21 @@ def self_test() -> None:
         if not (resources() / name).is_file():
             raise SystemExit(f"the interface did not ship: {resources() / name}")
 
+    # Every file a drive build reads, so a bundle that cannot build fails here
+    # rather than when a DJ presses Install.
+    from app.runtime import build
+    root = build.repository_root()
+    needed = [root / name for name in (
+        "mod/autoexec.sh", "mod/compatibility.sh",
+        "mod/lib/module-api.sh", "mod/lib/safe-mode.sh")]
+    for firmware in build.available_versions(root):
+        for patch in build.discover_patches(root, firmware):
+            needed += [patch.directory / item.source for item in patch.files]
+            needed += [patch.directory / name for name in patch.build_files]
+    missing = sorted({str(path) for path in needed if not path.is_file()})
+    if missing:
+        raise SystemExit("the build files did not ship: " + ", ".join(missing[:5]))
+
     from app.localization import catalogs
     catalogs()  # Refuse a bundle missing its translation resources.
     from app.firmware import key_source
