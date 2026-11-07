@@ -94,6 +94,21 @@ class ModuleApiTests(unittest.TestCase):
                 "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|ON 1d824ea+",
             )
 
+    def test_logo_without_artwork_is_skipped_not_fatal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            core = Path(directory) / "librx3_core.so"
+            core.write_bytes(b"")
+            (Path(directory) / "modules/logo").mkdir(parents=True)
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                f'CORE_OBJECT={shlex.quote(str(core))}\n'
+                '. "${1%/lib/module-api.sh}/modules/logo/module.sh" || exit 10\n'
+                'logo_prepare || exit 11\n'
+                '[ "$LOGO_READY" = 0 ] || exit 12\n'
+                '[ -z "${RX3_LOGO:-}" ] || exit 13\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_image_without_a_version_still_loads_and_exports_the_count(self):
         with tempfile.TemporaryDirectory() as directory:
             result = run_shell(
