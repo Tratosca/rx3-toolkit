@@ -400,6 +400,7 @@ static unsigned int performance_refresh_reported;
 #include "ui/rx3_pad_atlas.h"
 #include "firmware/rx3_message.h"
 #include "firmware/rx3_utility.h"
+static const struct rx3_settings_service rx3_settings_service = { rx3_utility_setting };
 
 static int load_tab_pixels(void)
 {
@@ -569,6 +570,10 @@ static void install_tab_assets(const char *route)
     log_line(route);
 }
 
+/* Set when no performance hook was installed: the watcher then only picks up
+   Utility choices, and touches nothing the performance path owns. */
+static unsigned int watch_utility_only;
+
 static void *watch_patch_state(void *unused)
 {
     (void)unused;
@@ -576,6 +581,8 @@ static void *watch_patch_state(void *unused)
     unsigned int last_browse_pages=0;
     while (__atomic_load_n(&state_thread_running, __ATOMIC_SEQ_CST)) {
         usleep(50000u);
+        rx3_utility_poll(monotonic_enough_us());
+        if (watch_utility_only) continue;
         if (ticks % 10u == 0u) (void)rx3_message_allowed();
         if (!tab_assets_ready &&
             (!tab_install_not_before_us ||
@@ -1785,6 +1792,7 @@ __attribute__((constructor)) static void initialize(void)
     rx3_message_refresh=refresh_message_header;
     rx3_modules_bind_writer(rx3_write_guarded);
     rx3_utility_install();
+    rx3_modules_bind_settings(&rx3_settings_service);
 
     /* Each feature is a module of its own and announces itself through the
        environment its module.sh exports. Modules start first: they register
@@ -1795,6 +1803,12 @@ __attribute__((constructor)) static void initialize(void)
     if (!rx3_panel_count() && !rx3_image_contributions() && !rx3_browse_count() &&
         !rx3_titles_enabled()) {
         if (started) {
+            watch_utility_only = 1u;
+            state_thread_running = 1;
+            if (!pthread_create(&state_thread, 0, watch_patch_state, 0))
+                state_thread_started = 1;
+            else
+                log_line("warning: Utility watcher could not start");
             publish_ready();
             log_line("RX3 performance hook active");
         } else rx3_utility_remove();

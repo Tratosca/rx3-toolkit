@@ -3,6 +3,8 @@
 
 The deck starts in LIGHT. Use SHIFT + SHORTCUT or DISPLAY MODE in Utility to switch between DARK and LIGHT at any time.
 
+To start in another mode, add `theme-white.mode = dark` (or `switch`: dark, switchable; `wait`: light once the player has painted once) to the drive's `RX3_RUNTIME/settings.cfg`. The older one-word `RX3_RUNTIME/display` file still works when that line is absent.
+
 The source port includes solid fills, image conversion, the waveform palette, the Utility row and the optional light logo. Images are queued as they are drawn. While DARK is active, the module prepares the LIGHT versions of those images; a switch waits for pending conversions when the memory reserve allows it. Shared bitmaps reuse the same converted pixels. A bounded memory arena leaves further images stock when it fills.
 
 Optional light tab artwork is used only when all four images load. Otherwise the original dark tabs remain in the light interface.

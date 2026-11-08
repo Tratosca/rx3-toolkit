@@ -107,7 +107,13 @@ static void stop(void)
     framework->release_hook(&set_hook);framework->release_hook(&show_hook);
     framework->images->unregister_owner(&owner);
 }
+/* The ENERGY BOOST rules the DJ changes in Utility apply from the next tick. */
+static void tick(void)
+{
+    const char *value=framework->settings ? framework->settings->value("key-match.rules") : 0;
+    if(value) rules=rx3_match_rules(value);
+}
 const struct rx3_module rx3_key_match_module={
     .version=RX3_MODULE_API_VERSION,.size=sizeof(struct rx3_module),.name="key-match",
-    .configured=configured,.start=start,.stop=stop
+    .configured=configured,.start=start,.stop=stop,.tick=tick
 };

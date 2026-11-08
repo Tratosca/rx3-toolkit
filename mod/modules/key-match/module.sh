@@ -6,10 +6,7 @@ key_match_prepare()
     [ -r "$CORE_OBJECT" ] || return 1
     module_disabled_by_switch key-match && return 0
     # Same default as the Toolkit: no added suggestion.
-    key_match_rules=0
-    if [ -r /mnt/iso/modules/key-match/rules.txt ]; then
-        read -r key_match_rules < /mnt/iso/modules/key-match/rules.txt
-    fi
+    key_match_rules=$(module_setting key-match.rules 0)
     case "$key_match_rules" in
         [0-9]|1[0-5]) ;; *) key_match_rules=0 ;;
     esac

@@ -8,6 +8,8 @@ from app.localization import LocalizedError
 from app.ui.bridge import Bridge
 from app.runtime import build
 from tests import test_framework
+from tests.test_module_api import settings_reader, write_settings
+import tempfile
 
 class BrowseColumnsTests(unittest.TestCase):
     run_units = test_framework.FrameworkTests.run_units
@@ -49,17 +51,17 @@ int main(void) {
 ''', [], flags=('-Wno-unused-function',))
 
     def test_setting_is_data_and_reaches_the_packaged_module(self):
-        self.assertEqual(browse_columns.files(), {'column.txt': b'13\n'})
+        self.assertEqual(browse_columns.settings(), {'browse-columns.column': '13'})
         for value in (None, True, 0, 14, '15', '$(id)'):
-            with self.assertRaises(LocalizedError): browse_columns.files(value)
+            with self.assertRaises(LocalizedError): browse_columns.settings(value)
         result=SimpleNamespace(output='autoexec.bin',size=1,sha256='x',patches=('browse-columns',))
         bridge=Bridge()
-        with patch('app.ui.bridge.build_module.build_runtime',return_value=result) as writer, patch.object(bridge,'_settle'):
-            bridge._build('1.19',['browse-columns'],pathlib.Path('key'),pathlib.Path('.'),None,build.Cancellation(),1,'identical',3,15)
-        supplied=writer.call_args.kwargs['supplied_files']
-        self.assertEqual(supplied,{'browse-columns':{'column.txt':b'15\n'}})
-        selected=build.resolve_patches(build.discover_patches(None,'1.19'),['browse-columns'])
-        self.assertEqual(build._validate_supplied_files(supplied,selected),supplied)
+        with tempfile.TemporaryDirectory() as drive:
+            with patch('app.ui.bridge.build_module.build_runtime',return_value=result) as writer, patch.object(bridge,'_settle'):
+                bridge._build('1.19',['browse-columns'],pathlib.Path('key'),pathlib.Path(drive),None,build.Cancellation(),1,'identical',3,15)
+            self.assertEqual(writer.call_args.kwargs['supplied_files'],{})
+            self.assertEqual((pathlib.Path(drive)/'RX3_RUNTIME'/'settings.cfg').read_text(),
+                             'version = 1\nbrowse-columns.column = 15\n')
 
     def test_row_extension_survives_native_utf16_strings_and_capacity(self):
         self.run_units(r'''
@@ -354,16 +356,14 @@ int main(void){
         import tempfile
         script=pathlib.Path('mod/modules/browse-columns/module.sh').read_text()
         with tempfile.TemporaryDirectory() as temp:
-            config=pathlib.Path(temp)/'column.txt'
             core=pathlib.Path(temp)/'core';core.write_bytes(b'x')
-            script=script.replace('/mnt/iso/modules/browse-columns/column.txt',str(config))
-            prefix=f'CORE_OBJECT="{core}"\n'+'''module_begin(){ :; }
+            prefix=f'CORE_OBJECT="{core}"\nUSB="{temp}"\n'+settings_reader()+'''module_begin(){ :; }
 register_prepare_hook(){ :; }
 module_disabled_by_switch(){ return 1; }
 module_export(){ printf '%s=%s\\n' "$1" "$2"; }
 '''
             for raw,expected in ((None,13),('15\n',15),('7\n',7),('11\n',11),('14\n',13),('$(touch injected)\n',13)):
-                if raw is not None: config.write_text(raw)
+                write_settings(temp,'browse-columns.column',raw)
                 result=subprocess.run(['sh'],input=prefix+script+'\nbrowse_columns_prepare\n',text=True,capture_output=True,check=True,cwd=temp)
                 self.assertIn(f'RX3_BROWSE_FIELD={expected}\n',result.stdout)
                 self.assertFalse((pathlib.Path(temp)/'injected').exists())

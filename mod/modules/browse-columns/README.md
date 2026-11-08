@@ -21,8 +21,12 @@ and pauses again. The added third field stays visible; it does not gain a
 separate scrolling surface.
 
 Choose **BPM** (default), **Key (Camelot)**, **Artist**, or **Duration** in the
-Toolkit module settings. The build writes inert `column.txt` data; `module.sh`
+Toolkit module settings. The build writes `browse-columns.column` (7, 11, 13 or
+15) to the drive's `RX3_RUNTIME/settings.cfg`; `module.sh` reads it as data,
 validates the field and exports `RX3_BROWSE_FIELD`. No settings code is executed.
+On the deck, UTILITY > RX3 TOOLKIT > THIRD COLUMN changes it too; the new
+column shows once the drive is plugged in again (the line reads AFTER REPLUG
+until then).
 
 ## USB settings
 

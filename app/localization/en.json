@@ -377,6 +377,7 @@
   "error.keySyncMode": "Choose Match the MASTER key or Nearest compatible key.",
   "error.keyMatchRules": "Invalid Enhanced Key Match settings. Select the transitions again in Modules.",
   "error.browseColumn": "Choose a third column from the available fields.",
+  "error.settingsFile": "The settings file {path} is not in a format this version can update. Rename or delete it, then build again.",
   "ui.navigation": "Toolkit sections",
   "ui.connecting": "Opening the app…",
   "ui.unavailable": "The app could not finish loading. Click Try again.",

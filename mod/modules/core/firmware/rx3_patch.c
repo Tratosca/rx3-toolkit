@@ -11,6 +11,15 @@ void clear_instruction_cache(unsigned long first, unsigned long last)
     __asm__ volatile("svc 0" : "+r"(r0) : "r"(r1), "r"(r2), "r"(r7) : "memory");
 }
 
+int rx3_rename(const char *from, const char *to)
+{
+    register long r0 __asm__("r0") = (long)from;
+    register long r1 __asm__("r1") = (long)to;
+    register long r7 __asm__("r7") = 38; /* __NR_rename, ARM EABI */
+    __asm__ volatile("svc 0" : "+r"(r0) : "r"(r1), "r"(r7) : "memory");
+    return r0 < 0 ? -1 : 0;
+}
+
 int write_code(unsigned long address, const void *bytes, size_t length)
 {
     /* Every caller writes a four-byte literal or an eight-byte detour. Keep

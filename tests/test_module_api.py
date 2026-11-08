@@ -39,6 +39,24 @@ RUNNING_HOOK=""
 '''
 
 
+def settings_reader() -> str:
+    """module_setting from module-api.sh, for module scripts tested alone."""
+    import re
+    text = MODULE_API.read_text(encoding="utf-8")
+    return re.search(r"^module_setting\(\)\n\{.*?^\}\n", text, re.S | re.M).group(0)
+
+
+def write_settings(usb, key, raw) -> None:
+    """A drive whose settings file sets `key` to `raw`, or none when raw is None."""
+    path = Path(usb) / "RX3_RUNTIME" / "settings.cfg"
+    if raw is None:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(f"version = 1\n{key} = {raw.strip()}\n", encoding="utf-8")
+
+
 def run_shell(body: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["sh", "-s", "--", str(MODULE_API)],
@@ -50,6 +68,34 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def setting(self, content, key, fallback="d"):
+        """What module_setting prints for `key` on a drive holding `content`."""
+        with tempfile.TemporaryDirectory() as usb:
+            if content is not None:
+                runtime = Path(usb) / "RX3_RUNTIME"
+                runtime.mkdir()
+                data = content if isinstance(content, bytes) else content.encode()
+                (runtime / "settings.cfg").write_bytes(data)
+            result = run_shell(f"USB={shlex.quote(usb)}\n"
+                               f"module_setting {shlex.quote(key)} {shlex.quote(fallback)}\n")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout
+
+    def test_settings_file_is_read_as_data_with_its_rules(self):
+        self.assertEqual(self.setting(None, "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.b = 4\n", "a.b"), "4")
+        self.assertEqual(self.setting("version = 1\r\n  a.b=4  \r\n", "a.b"), "4")
+        self.assertEqual(self.setting("version = 1\na.b = 4\na.b = 7\n", "a.b"), "7")
+        self.assertEqual(self.setting("version = 1\n# a.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.bc = 4\n", "a.b"), "d")
+        # Not a settings file: no version, another version, or too large.
+        self.assertEqual(self.setting("a.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 2\na.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.b = 4\n" + "#" * 65536, "a.b"), "d")
+        # A value is text for the module to validate, never shell code.
+        self.assertEqual(self.setting("version = 1\na.b = $(touch injected) x\n", "a.b"),
+                         "$(touch injected) x")
+
     def test_summary_exports_selected_module_count_and_image_version(self):
         with tempfile.TemporaryDirectory() as directory:
             version = Path(directory) / "toolkit-version"
@@ -96,6 +142,162 @@ class ModuleApiTests(unittest.TestCase):
                 result.stdout.splitlines()[-1],
                 "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|OFF 1d824ea+",
             )
+
+    def test_utility_rows_carry_switches_and_declared_options(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "modules").mkdir()
+            (Path(directory) / "modules/utility").write_text(
+                "key-sync|KEY SYNC|abc1234|1\n"
+                "logo|LOGO|0123456|0\n"
+                "samples|SAMPLES|1111111|1\n"
+                "browse-columns|THIRD BROWSE COLUMN|2222222|1\n",
+                encoding="ascii",
+            )
+            (Path(directory) / "modules/settings").write_text(
+                "key-sync|range|SYNC RANGE|1|RX3_KEY_SYNC_RANGE|1=1 SEMITONE,2=2 SEMITONES\n"
+                "key-sync|mode|SYNC MODE|1|PATH|harmonic=NEAREST MATCH\n"
+                "key-sync|gone|GONE|1|RX3_NOT_EXPORTED|1=ONE,2=TWO\n"
+                "key-sync|odd|ODD|2|RX3_KEY_SYNC_RANGE|1=ONE,2=TWO\n"
+                "browse-columns|column|THIRD COLUMN|0|RX3_BROWSE_FIELD|13=BPM,7=ARTIST\n",
+                encoding="ascii",
+            )
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'for m in core key-sync logo samples browse-columns; do module_begin $m x || exit 10; done\n'
+                'DISABLED_MODULES=" browse-columns"\n'
+                'module_inactive samples\n'
+                'export RX3_KEY_SYNC_RANGE=2 RX3_BROWSE_FIELD=13\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                'printf "%s" "$RX3_UTILITY_ROWS"\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # An option follows its module only while the module runs; a name
+            # outside RX3_, an unset value or an odd field drops the option.
+            self.assertEqual(result.stdout.splitlines()[-1].split(";"), [
+                "KEY SYNC|abc1234|key-sync.enabled|0|on|on=ON,off=OFF",
+                "  SYNC RANGE||key-sync.range|1|2|1=1 SEMITONE,2=2 SEMITONES",
+                "LOGO|ON 0123456",
+                "SAMPLES|OFF 1111111",
+                "THIRD BROWSE COLUMN|2222222|browse-columns.enabled|0|off|on=ON,off=OFF",
+            ])
+
+    def test_the_drive_can_switch_a_module_off(self):
+        for value, disabled in (("off", True), ("on", False), ("OFF", False)):
+            with tempfile.TemporaryDirectory() as usb:
+                write_settings(usb, "stems.enabled", value)
+                result = run_shell(
+                    f"USB={shlex.quote(usb)}\n"
+                    "module_switch_path() { printf '%s/none' \"$USB\"; }\n"
+                    "module_disabled_by_switch stems; echo \"rc=$? [$DISABLED_MODULES]\"\n"
+                )
+                self.assertEqual(result.stdout.strip(),
+                                 "rc=0 [ stems]" if disabled else "rc=1 []", value)
+
+    def merge(self, existing, pending):
+        """settings.cfg after the deck merges `pending` into `existing` bytes."""
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "settings.cfg"
+            if existing is not None:
+                target.write_bytes(existing)
+            (Path(directory) / "pending").write_bytes(pending)
+            result = run_shell(f"settings_merge {shlex.quote(directory)}/pending "
+                               f"{shlex.quote(str(target))}; echo \"rc=$?\"\n")
+            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()),
+                             sorted({"pending"} | ({"settings.cfg"} if target.exists() else set())))
+            return result.stdout.strip(), target.read_bytes() if target.exists() else None
+
+    def test_utility_changes_merge_into_the_settings_file(self):
+        rc, data = self.merge(
+            b"# mine\r\nversion = 1\r\ntheme-white.mode = dark\r\nkey-sync.range = 2\r\n"
+            b"guard.stems = off\r\nkey-sync.range = 5\r\n",
+            b"key-sync.range = 7\nnot a setting\nKEY.x = 1\nstems.enabled = off\nx.y = a b\n")
+        self.assertEqual(rc, "rc=0")
+        self.assertEqual(data, b"# mine\nversion = 1\ntheme-white.mode = dark\n"
+                               b"key-sync.range = 7\nguard.stems = off\nstems.enabled = off\n")
+        self.assertEqual(self.merge(None, b"key-sync.mode = identical\n"),
+                         ("rc=0", b"version = 1\nkey-sync.mode = identical\n"))
+        # Nothing to merge leaves even a missing file missing.
+        self.assertEqual(self.merge(None, b""), ("rc=0", None))
+        # A file the deck would not read is never rewritten.
+        for content in (b"key-sync.range = 2\n", b"version = 2\n", b"",
+                        b"version = 1\n" + b"#" * 65536):
+            self.assertEqual(self.merge(content, b"key-sync.range = 3\n"), ("rc=1", content))
+
+    def test_the_writer_saves_pending_changes_until_a_newer_one_takes_over(self):
+        with tempfile.TemporaryDirectory() as directory:
+            usb = Path(directory) / "usb"
+            (usb / "RX3_RUNTIME").mkdir(parents=True)
+            pending, token = Path(directory) / "pending", Path(directory) / "token"
+            script = (
+                f"USB={shlex.quote(str(usb))}\n"
+                f"SETTINGS_PENDING={shlex.quote(str(pending))}\n"
+                f"SESSION_WATCHER={shlex.quote(str(token))}\n"
+                "start_session_watcher '' || exit 10\n"
+                "until [ -s \"$SESSION_WATCHER\" ]; do :; done\n"
+                "printf 'key-sync.range = 4\\n' > \"$SETTINGS_PENDING\"\n"
+                "for i in 1 2 3 4 5 6 7 8 9 10; do\n"
+                "  [ -e \"$USB/RX3_RUNTIME/settings.cfg\" ] && [ ! -e \"$SETTINGS_PENDING\" ] && break\n"
+                "  sleep 0.5\n"
+                "done\n"
+                "cat \"$USB/RX3_RUNTIME/settings.cfg\"\n"
+                "echo other > \"$SESSION_WATCHER\"; sleep 1.5\n"
+                "printf 'key-sync.range = 9\\n' > \"$SETTINGS_PENDING\"; sleep 1.5\n"
+                "cat \"$USB/RX3_RUNTIME/settings.cfg\"; ls \"$SETTINGS_PENDING\"\n"
+            )
+            result = run_shell(script)
+            self.assertEqual(result.stdout.splitlines(),
+                             ["version = 1", "key-sync.range = 4",
+                              "version = 1", "key-sync.range = 4", str(pending)],
+                             result.stderr)
+
+    CRASH_HARNESS = (
+        'P=$(mktemp -d); PROC_ROOT=$P; echo "100.00 1.00" > $P/uptime\n'
+        'RUNTIME_PRELOAD_ENTRIES=" /root/pdj/librx3_core.so"\n'
+        'RBP_PRELOAD=/root/pdj/librx3_core.so; RBP_RESTORE_OUTPUT=/dev/null; NEW=10\n'
+        'say() { echo "say: $*"; }\n'
+        'rbp_alive() { [ -e "$P/alive.$1" ]; }\n'
+        'launch_rbp() { NEW=$((NEW + 1)); : > "$P/alive.$NEW"; echo "launch $NEW ${RBP_PRELOAD:-none}"; }\n'
+        'announce_media() { echo "announce $NEW"; }\n'
+        'at() { echo "$1.00 1.00" > $P/uptime; }\n'
+    )
+
+    def test_a_dead_player_is_relaunched_then_relaunched_without_the_mods(self):
+        result = run_shell(self.CRASH_HARNESS + (
+            '_rx3_rbp=10; _rx3_crashed_at=; _rx3_without_mods=0\n'
+            'rbp_relaunch_after_crash; echo "watching ${_rx3_rbp:-none}"\n'
+            'at 800; rbp_relaunch_after_crash\n'      # long after: as it was
+            'at 900; rbp_relaunch_after_crash\n'      # again soon: no mods
+            'at 950; rbp_relaunch_after_crash; echo "watching ${_rx3_rbp:-none}"\n'
+        ))
+        lines = [line for line in result.stdout.splitlines() if not line.startswith("say: ")]
+        self.assertEqual(lines, [
+            "launch 11 /root/pdj/librx3_core.so", "announce 11", "watching 11",
+            "launch 12 /root/pdj/librx3_core.so", "announce 12",
+            "launch 13 none", "announce 13",
+            "watching none",
+        ], result.stderr)
+        self.assertIn("say: STOP: rbp pid 13 died again without the mods; not relaunched",
+                      result.stdout)
+
+    def test_the_watcher_leaves_the_player_alone_while_an_insertion_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            usb = Path(directory) / "usb"
+            (usb / "RX3_RUNTIME").mkdir(parents=True)
+            result = run_shell(self.CRASH_HARNESS + (
+                f"USB={shlex.quote(str(usb))}\n"
+                f"LOCK={shlex.quote(directory)}/lock; mkdir $LOCK\n"
+                f"SESSION_WATCHER={shlex.quote(directory)}/token\n"
+                f"SETTINGS_PENDING={shlex.quote(directory)}/pending\n"
+                f"OUT={shlex.quote(directory)}/out\n"
+                'echo me > $SESSION_WATCHER\n'
+                'session_watcher me 10 > $OUT 2>&1 &\n'
+                'sleep 2.5; echo "locked: $(grep -c ^launch $OUT)"\n'
+                'rmdir $LOCK; sleep 2.5; echo "unlocked: $(grep -c ^launch $OUT)"\n'
+                'echo other > $SESSION_WATCHER; wait\n'
+            ))
+            self.assertEqual(result.stdout.splitlines(), ["locked: 0", "unlocked: 1"],
+                             result.stderr)
 
     def test_logo_without_artwork_is_skipped_not_fatal(self):
         with tempfile.TemporaryDirectory() as directory:

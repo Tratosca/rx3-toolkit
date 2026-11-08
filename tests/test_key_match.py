@@ -10,21 +10,24 @@ from app.localization import LocalizedError
 from app.ui.bridge import Bridge
 from app.runtime import build
 from tests import test_framework
+from tests.test_module_api import settings_reader, write_settings
 
 class KeyMatchTests(unittest.TestCase):
     run_units = test_framework.FrameworkTests.run_units
 
     def test_rules_and_build_configuration(self):
-        self.assertEqual(key_match.files(), {'rules.txt': b'0\n'})
+        self.assertEqual(key_match.settings(), {'key-match.rules': '0'})
         for saved in range(16):
-            self.assertEqual(key_match.files(saved), {'rules.txt': f'{saved & 14}\n'.encode()})
+            self.assertEqual(key_match.settings(saved), {'key-match.rules': str(saved & 14)})
         for bad in (True, None, -1, 16, '3', '$(id)'):
-            with self.assertRaises(LocalizedError): key_match.files(bad)
+            with self.assertRaises(LocalizedError): key_match.settings(bad)
         result=SimpleNamespace(output='autoexec.bin',size=1,sha256='x',patches=('key-match',))
         bridge=Bridge()
-        with patch('app.ui.bridge.build_module.build_runtime',return_value=result) as writer, patch.object(bridge,'_settle'):
-            bridge._build('1.19',['key-sync'],pathlib.Path('key'),pathlib.Path('.'),None,build.Cancellation(),1,'identical',15)
-        self.assertEqual(writer.call_args.kwargs['supplied_files'],{'key-match':{'rules.txt':b'14\n'}, 'key-sync': {'sync-range.txt': b'1\n', 'sync-mode.txt': b'identical\n'}})
+        with tempfile.TemporaryDirectory() as drive:
+            with patch('app.ui.bridge.build_module.build_runtime',return_value=result) as writer, patch.object(bridge,'_settle'):
+                bridge._build('1.19',['key-sync'],pathlib.Path('key'),pathlib.Path(drive),None,build.Cancellation(),1,'identical',15)
+            self.assertEqual(writer.call_args.kwargs['supplied_files'],{})
+            self.assertIn('key-match.rules = 14\n',(pathlib.Path(drive)/'RX3_RUNTIME'/'settings.cfg').read_text())
 
     def test_harmonic_modules_have_independent_selection_and_sync_dependencies(self):
         definitions = build.discover_patches(None, '1.19')
@@ -73,11 +76,9 @@ int main(void) {
         script = pathlib.Path('mod/modules/key-match/module.sh').read_text()
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)
-            config = root / 'rules.txt'
             core = root / 'core'
             core.write_bytes(b'x')
-            script = script.replace('/mnt/iso/modules/key-match/rules.txt', str(config))
-            prefix = f'CORE_OBJECT="{core}"\n' + '''module_begin(){ :; }
+            prefix = f'CORE_OBJECT="{core}"\nUSB="{temp}"\n' + settings_reader() + '''module_begin(){ :; }
 register_prepare_hook(){ :; }
 module_disabled_by_switch(){ return 1; }
 module_export(){ printf '%s=%s\\n' "$1" "$2"; }
@@ -85,8 +86,7 @@ module_export(){ printf '%s=%s\\n' "$1" "$2"; }
             cases = [(None, 0), *[(str(n), n & 14) for n in range(16)],
                      ('16', 0), ('$(touch injected)', 0)]
             for raw, expected in cases:
-                if raw is not None:
-                    config.write_text(raw + '\n')
+                write_settings(temp, 'key-match.rules', raw)
                 result = subprocess.run(['sh'], input=prefix + script + '\nkey_match_prepare\n',
                                         text=True, capture_output=True, check=True, cwd=temp)
                 self.assertIn(f'RX3_KEY_MATCH_RULES={expected}\n', result.stdout)

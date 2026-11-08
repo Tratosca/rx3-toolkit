@@ -71,6 +71,16 @@ class ArmHook:
     sources: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class ModuleSetting:
+    """One option a DJ can change in Utility: a closed list of choices."""
+    key: str
+    label: str
+    environment: str
+    live: bool
+    choices: tuple[tuple[str, str], ...]
+
+
 # Where a module sits in the app's module list, in the order the list shows
 # them. It says what a DJ uses the module for and nothing about how it is built:
 # the load order is `order`, not this.
@@ -96,6 +106,7 @@ class PatchDefinition:
     category: str | None = None
     category_ui: dict | None = None
     advanced: bool = False
+    settings: tuple[ModuleSetting, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -286,6 +297,7 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
             category=category,
             category_ui=category_ui,
             advanced=data.get("advanced", False),
+            settings=_module_settings(manifest_path, data.get("settings", [])),
         )
         if patch.default and not patch.selectable:
             raise ValueError(f"{patch.patch_id}: an internal module cannot be default")
@@ -294,6 +306,45 @@ def discover_patches(root: pathlib.Path | None = None, firmware: str | None = No
     patches = sorted(patches, key=lambda patch: (patch.order, patch.name.lower()))
     _validate_module_graph(patches)
     return patches
+
+
+# Utility text is printable ASCII drawn by the firmware, and the deck's shell
+# splits these fields on "|", ";", "," and "=": none of them may appear inside.
+_UTILITY_LABEL = r"[A-Z0-9().+-][A-Z0-9 ().+-]{0,22}"
+
+
+def _module_settings(manifest_path: pathlib.Path, value: object) -> tuple[ModuleSetting, ...]:
+    if not isinstance(value, list):
+        raise ValueError(f"{manifest_path}: settings must be a list")
+    settings = []
+    for item in value:
+        try:
+            key, label, environment = item["key"], item["label"], item["environment"]
+            live, choices = item["live"], item["choices"]
+        except (TypeError, KeyError) as error:
+            raise ValueError(f"{manifest_path}: incomplete setting {item!r}") from error
+        if not (isinstance(key, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,23}", key)) or key == "enabled":
+            raise ValueError(f"{manifest_path}: unsafe setting key {key!r}")
+        if not (isinstance(label, str) and re.fullmatch(_UTILITY_LABEL, label)):
+            raise ValueError(f"{manifest_path}: setting {key} label cannot be shown in Utility")
+        if not (isinstance(environment, str) and re.fullmatch(r"RX3_[A-Z0-9_]{1,40}", environment)):
+            raise ValueError(f"{manifest_path}: setting {key} needs an RX3_ environment name")
+        if type(live) is not bool or not isinstance(choices, list) or not 2 <= len(choices) <= 12:
+            raise ValueError(f"{manifest_path}: setting {key} needs live and 2 to 12 choices")
+        pairs = []
+        for choice in choices:
+            if not (isinstance(choice, list) and len(choice) == 2
+                    and all(isinstance(part, str) for part in choice)
+                    and re.fullmatch(r"[A-Za-z0-9.+-]{1,15}", choice[0])
+                    and re.fullmatch(_UTILITY_LABEL, choice[1])):
+                raise ValueError(f"{manifest_path}: setting {key} has an unsafe choice {choice!r}")
+            pairs.append((choice[0], choice[1]))
+        if len({word for word, _ in pairs}) != len(pairs):
+            raise ValueError(f"{manifest_path}: setting {key} repeats a choice")
+        settings.append(ModuleSetting(key, label, environment, live, tuple(pairs)))
+    if len({setting.key for setting in settings}) != len(settings):
+        raise ValueError(f"{manifest_path}: duplicate setting key")
+    return tuple(settings)
 
 
 def _module_ids(manifest_path: pathlib.Path, value: object, field: str) -> tuple[str, ...]:
@@ -824,9 +875,18 @@ def build_runtime(
         (modules / "index").write_text(
             "".join(f"{item}\n" for item in module_index), encoding="ascii", newline="",
         )
+        # A module can be switched off from Utility only if its module.sh asks
+        # module_disabled_by_switch; the others keep a read-only row.
         (modules / "utility").write_text(
-            "".join(f"{patch.patch_id}|{label}|{revision}\n"
+            "".join(f"{patch.patch_id}|{label}|{revision}|"
+                    f"{int('module_disabled_by_switch' in (patch.directory / 'module.sh').read_text(encoding='utf-8'))}\n"
                     for patch, label, revision in _utility_rows(root, selected)),
+            encoding="ascii", newline="",
+        )
+        (modules / "settings").write_text(
+            "".join(f"{patch.patch_id}|{setting.key}|{setting.label}|{int(setting.live)}|"
+                    f"{setting.environment}|{','.join(f'{word}={text}' for word, text in setting.choices)}\n"
+                    for patch in selected for setting in patch.settings),
             encoding="ascii", newline="",
         )
         (staging / "autoexec.sh").chmod(0o755)

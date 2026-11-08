@@ -101,6 +101,7 @@
     "services/rx3_memory.c",
     "api/rx3_memory_api.h",
     "api/rx3_loader_api.h",
+    "api/rx3_settings_api.h",
     "services/rx3_loader.h",
     "services/rx3_loader.c"
   ],

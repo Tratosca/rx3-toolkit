@@ -377,6 +377,7 @@
   "error.keySyncMode": "Choisissez « Même tonalité que le MASTER » ou « Tonalité compatible la plus proche ».",
   "error.keyMatchRules": "Réglages de Key Match amélioré non valides. Sélectionnez de nouveau les transitions dans Modules.",
   "error.browseColumn": "Choisissez une troisième colonne parmi les champs proposés.",
+  "error.settingsFile": "Le fichier de réglages {path} n’est pas dans un format que cette version sait mettre à jour. Renommez-le ou supprimez-le, puis relancez la création.",
   "ui.navigation": "Rubriques du Toolkit",
   "ui.connecting": "Ouverture de l’application…",
   "ui.unavailable": "L’application n’a pas pu terminer le chargement. Cliquez sur Réessayer.",

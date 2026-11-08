@@ -10,5 +10,5 @@ def rules(value=DEFAULT_RULES):
     # Retire diagonals without changing the remaining saved bit assignments.
     return value & 14
 
-def files(value=DEFAULT_RULES):
-    return {"rules.txt": f"{rules(value)}\n".encode("ascii")}
+def settings(value=DEFAULT_RULES):
+    return {"key-match.rules": str(rules(value))}

@@ -4,7 +4,7 @@ Module sélectionnable dans la catégorie Harmonic mixing du Toolkit. Sa carte K
 
 ## Paramètres du Toolkit
 
-Les cases sont indépendantes, enregistrées localement et exportées dans `modules/key-match/rules.txt`. Le bit 1 de l'ancienne option Diagonales est ignoré, sans changer les autres choix enregistrés. Les valeurs de 0 à 15 sont acceptées en entrée et normalisées avec le masque 14, jamais exécutées.
+Les cases sont indépendantes, enregistrées localement et écrites sur la clé dans `RX3_RUNTIME/settings.cfg` (`key-match.rules`). Le bit 1 de l'ancienne option Diagonales est ignoré, sans changer les autres choix enregistrés. Les valeurs de 0 à 15 sont acceptées en entrée et normalisées avec le masque 14, jamais exécutées. Sur la platine, la ligne ENERGY BOOST de UTILITY > RX3 TOOLKIT change ces règles immédiatement et les enregistre dans ce fichier.
 
 | Bit | Relation depuis le morceau de référence | Exemple | Couleur | Par défaut |
 | --- | --- | --- | --- | --- |
