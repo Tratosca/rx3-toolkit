@@ -13,7 +13,9 @@ THEME = r'''
 #include "theme-white/rx3_theme_pixels.h"
 #undef STOCK_IMAGE_COUNT
 #define STOCK_IMAGE_COUNT 3u
-static int theme_enabled=1,light_selected;
+static int theme_enabled=1,light_selected,theme_global_dark;
+static unsigned int theme_toggle_pending;
+static unsigned long theme_memory_kb;
 static struct {uint8_t records[132];uint16_t pixels[32768];} fixture;
 static uint8_t light[132],storage[THEME_ARENA_BYTES];
 static uint8_t *theme_arena;
@@ -78,6 +80,24 @@ static uint32_t image_offset(unsigned id){uint32_t v;memcpy(&v,light+id*44+32,4)
 
 class BoundedRuntimeTests(unittest.TestCase):
     run_units = harness.FrameworkTests.run_units
+
+    def test_dark_screen_prewarms_light_images_before_toggle(self):
+        self.run_units(THEME + r'''
+int main(void){
+ record(0,0,16384);
+ for(unsigned i=0;i<16384;i++)fixture.pixels[i]=0x2945u;
+ light_selected=0;theme_global_dark=0;theme_toggle_pending=1;
+ available=THEME_ARENA_FLOOR_KB+1024;theme_prepare_conversion();
+ theme_remap_image(0);
+ work=0;assert(theme_run_conversions());
+ assert(theme_id_done[0]&1u);
+ assert(work>THEME_PIXEL_BUDGET && work<=THEME_PIXEL_BUDGET*8u);
+ assert(!light_selected);
+ const uint16_t *result=(const void *)storage;
+ assert(result[0]==theme_pixel_light_for_image(0,fixture.pixels[0],0));
+ return 0;
+}
+''', [], ['-Wno-unused-function', '-Wno-unused-variable'])
 
     def test_theme_budget_retry_publication_and_pixel_equivalence(self):
         self.run_units(THEME + r'''

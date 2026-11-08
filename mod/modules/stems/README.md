@@ -7,14 +7,13 @@ The Toolkit exports one self-describing `.rx3stem` package per track, with
 all prepared PCM roles, an internal manifest and optional embedded waveforms.
 See [the package format](../../../REFERENCES.md#doc-stem-package).
 
-Preparation offers two modes: VOCAL + INST (one stored PCM role, three
-waveform combinations) and VOCAL + DRUMS + INST (two stored PCM roles,
-seven combinations). The mode is chosen before quality. For three-part
-preparation, all presets select a vocal-and-drums Demucs model, including on
-CPU: Quality prefers htdemucs_ft with four shifts, Normal uses htdemucs with
-two shifts, and Very fast uses htdemucs with one shift. Custom models are
-validated for the selected roles. Import accepts both modes independently
-of the automatic model's capabilities.
+Preparation always makes VOCAL + DRUMS + INST (two stored PCM roles, seven
+waveform combinations). Every preset selects a vocal-and-drums Demucs model,
+including on CPU: Quality prefers htdemucs_ft with four shifts, Normal uses
+htdemucs with two shifts, and Very fast uses htdemucs with one shift. Custom
+models must provide vocals and drums. A package prepared earlier with the
+vocal only gets its drums on the next run, keeping its vocal. Manual import
+still accepts a vocal alone, or a vocal and drums.
 
 A private audio-separator worker keeps one model loaded for the preparation
 job. Cache hits do not start it. Failures discard the worker; cancellation

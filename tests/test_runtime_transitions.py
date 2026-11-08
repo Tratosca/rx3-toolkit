@@ -1145,6 +1145,7 @@ static unsigned performance_refresh_pending, performance_refresh_reported, overl
 static uint64_t performance_refresh_until_us, performance_refresh_next_us;
 static int render_probe_enabled, drawing, pending, light_state, switches, passes, invalidations, window_dirty, header_pending, header_visible;
 static unsigned theme_render_active, theme_home_repaint_pending;
+static int theme_global_dark;
 static int theme_light_active(void) { return light_state; }
 static int test_view(void) { return 3; }
 static int converted_next, requests_left;
@@ -1166,6 +1167,7 @@ static void theme_run_pending_toggle(void) {
     if(pending) { light_state=!light_state; pending=0; switches++; }
 }
 static void theme_refresh_text_for_view(void) {}
+static void theme_refresh_utility_name(void *manager) { (void)manager; }
 ''' + function(core, "run_pending_ui") + r'''
 static void native_render(void *manager) {
     assert(manager==(void *)123);

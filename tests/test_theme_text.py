@@ -44,6 +44,15 @@ int main(void) {
     assert(!theme_text_light_surface(1u, 0x201u, 65u));
     assert(theme_text_light_surface(1u, 0x1101u, 98u));
     assert(!theme_text_light_surface(1u, 0x1701u, 23u));
+    /* UTILITY redraws only the name newly uncovered by the blue edit cell. */
+    for (unsigned row = 0; row < 12u; row++) {
+        unsigned name = (row << 2) | 1u;
+        unsigned value = (row << 2) | 2u;
+        assert(theme_utility_name_row(name, value) == row + 1u);
+        assert(theme_utility_name_row(value, value) == 0u);
+        assert(theme_utility_name_row(value, name) == 0u);
+    }
+    assert(theme_utility_name_row(1u, (12u << 2) | 2u) == 0u);
     return 0;
 }
 '''

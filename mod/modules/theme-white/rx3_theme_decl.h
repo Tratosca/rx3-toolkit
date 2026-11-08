@@ -102,6 +102,25 @@ static const uint8_t theme_active_winscape_guard[8] = {
     0x20, 0x00, 0x90, 0xe5, 0x1e, 0xff, 0x2f, 0xe1
 };
 
+/* ui_com_draw_RefreshObject queues a single native control for repaint.
+   ui_Utility_SetText (0x002952e8) uses this row-name ID table; its first
+   twelve entries are the names currently visible in UTILITY. */
+#define THEME_REFRESH_OBJECT ((unsigned long)0x0018e1a0)
+static const uint8_t theme_refresh_object_guard[8] = {
+    0x70, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+#define THEME_UTILITY_NAME_IDS ((unsigned long)0x004c97e8)
+static const uint8_t theme_utility_name_ids_guard[8] = {
+    0x8c, 0x00, 0x87, 0x00, 0x82, 0x00, 0x7d, 0x00
+};
+/* ui_Utility_SetText passes this control root to GetObjectByID, rather than
+   searching the active winscape root. */
+#define THEME_UTILITY_ROOT_LITERAL ((unsigned long)0x00295524)
+static const uint8_t theme_utility_root_literal_guard[8] = {
+    0x10, 0x46, 0x68, 0x02, 0xb8, 0x97, 0x4c, 0x00
+};
+#define THEME_UTILITY_ROOT_PTR ((unsigned long)0x02684610)
+
 /* Magenta. The player writes every other value to the framebuffer and skips
  * this one, so it is transparency and never a colour. Converting it would
  * punch a hole in whatever image it belongs to.

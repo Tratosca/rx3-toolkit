@@ -38,4 +38,12 @@ static unsigned int theme_text_colour(unsigned int light, unsigned int light_sur
         return THEME_TEXT_DARK;
     return native_colour;
 }
+/* A UTILITY edit moves its blue fill from the name to the value without
+   redrawing the name. Return the visible name row to queue, one-based so zero
+   means no new repaint. */
+static unsigned int theme_utility_name_row(unsigned int previous, unsigned int cell)
+{
+    unsigned int row = cell >> 2;
+    return cell != previous && (cell & 3u) == 2u && row < 12u ? row + 1u : 0u;
+}
 #endif
