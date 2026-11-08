@@ -18,8 +18,18 @@ static const uint8_t stream_guard[8] = {0xf8,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1}
 #define MIC_TALKOVER ((unsigned long)0x0009c750)
 static const uint8_t master_guard[8] = {0x03,0xc0,0xd0,0xe5,0x04,0x40,0x2d,0xe5};
 
+/* mixerengine::BeatEffectManager, called on the bus BEAT FX is assigned to:
+   copyMusicData (the Roll pre-capture, const input) then operateBeatEffect
+   (in place; its bool is the native effect position test, passed through). */
+#define BEAT_FX_OPERATE ((unsigned long)0x0008a52c)
+static const uint8_t beat_fx_operate_guard[8] = {0xf8,0x45,0x2d,0xe9,0x01,0x60,0xa0,0xe1};
+#define BEAT_FX_CAPTURE ((unsigned long)0x0008af50)
+static const uint8_t beat_fx_capture_guard[8] = {0x70,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
+
 typedef unsigned long (*stream_fn)(void *, unsigned long, struct rx3_stereo *, unsigned long);
 typedef void (*talkover_fn)(void *, void *, struct rx3_stereo *, int);
+typedef void (*operate_fn)(void *, struct rx3_stereo *, int, int);
+typedef void (*capture_fn)(void *, const struct rx3_stereo *, int);
 
 struct stage {
     struct installed_hook hook;
@@ -28,7 +38,9 @@ struct stage {
     void *client;
     unsigned int active;
 };
-static struct stage deck_stage, master_stage;
+static struct stage deck_stage, master_stage, beat_fx_stage, capture_stage;
+/* Audio thread only: the pre-capture runs once per block on one bus. */
+static struct rx3_stereo capture_copy[RX3_BEAT_FX_CAPTURE_FRAMES];
 static void *volatile deck_readers[2];
 
 static void drain(struct stage *stage)
@@ -61,6 +73,29 @@ static void master_hooked(void *self, void *state, struct rx3_stereo *output, in
     if (client && output && frames > 0) client(output, (unsigned int)frames);
     ((talkover_fn)master_stage.original)(self, state, output, frames);
     __atomic_sub_fetch(&master_stage.active, 1u, __ATOMIC_SEQ_CST);
+}
+
+static void beat_fx_hooked(void *manager, struct rx3_stereo *block, int frames, int position)
+{
+    __atomic_add_fetch(&beat_fx_stage.active, 1u, __ATOMIC_SEQ_CST);
+    const struct rx3_beat_fx_client *client = __atomic_load_n(&beat_fx_stage.client, __ATOMIC_SEQ_CST);
+    if (client && block && frames > 0) client->send(block, (unsigned int)frames);
+    ((operate_fn)beat_fx_stage.original)(manager, block, frames, position);
+    if (client && block && frames > 0) client->ret(block, (unsigned int)frames);
+    __atomic_sub_fetch(&beat_fx_stage.active, 1u, __ATOMIC_SEQ_CST);
+}
+
+static void capture_hooked(void *manager, const struct rx3_stereo *block, int frames)
+{
+    __atomic_add_fetch(&capture_stage.active, 1u, __ATOMIC_SEQ_CST);
+    const struct rx3_beat_fx_client *client = __atomic_load_n(&capture_stage.client, __ATOMIC_SEQ_CST);
+    if (client && block && frames > 0 && (unsigned int)frames <= RX3_BEAT_FX_CAPTURE_FRAMES) {
+        memcpy(capture_copy, block, (unsigned int)frames * sizeof(capture_copy[0]));
+        client->capture(capture_copy, (unsigned int)frames);
+        block = capture_copy;
+    }
+    ((capture_fn)capture_stage.original)(manager, block, frames);
+    __atomic_sub_fetch(&capture_stage.active, 1u, __ATOMIC_SEQ_CST);
 }
 
 static int claim(struct stage *stage, const void *owner, void *client, unsigned long address,
@@ -106,6 +141,23 @@ static int claim_master(const void *owner, rx3_master_fn client)
                  (void *)master_hooked);
 }
 static void release_master(const void *owner) { release(&master_stage, owner); }
+/* One owner for both hooks: the capture and the effect must see the same
+   client, or Roll would replay a band the effect no longer receives. */
+static int claim_beat_fx(const void *owner, const struct rx3_beat_fx_client *client)
+{
+    if (!client || !client->capture || !client->send || !client->ret) return 0;
+    if (!claim(&capture_stage, owner, (void *)client, BEAT_FX_CAPTURE, beat_fx_capture_guard,
+               (void *)capture_hooked)) return 0;
+    if (claim(&beat_fx_stage, owner, (void *)client, BEAT_FX_OPERATE, beat_fx_operate_guard,
+              (void *)beat_fx_hooked)) return 1;
+    release(&capture_stage, owner);
+    return 0;
+}
+static void release_beat_fx(const void *owner)
+{
+    release(&beat_fx_stage, owner);
+    release(&capture_stage, owner);
+}
 
 /* PcmReader::load runs on the native loading thread. The old reader stops
    naming a deck before the load; the new one only after it. */
@@ -126,9 +178,10 @@ int rx3_audio_deck_for_reader(const void *reader)
 }
 unsigned int rx3_audio_count(void)
 {
-    return (deck_stage.owner != 0) + (master_stage.owner != 0);
+    return (deck_stage.owner != 0) + (master_stage.owner != 0) + (beat_fx_stage.owner != 0);
 }
 
 const struct rx3_audio_service rx3_audio = {
-    claim_deck_stream, release_deck_stream, claim_master, release_master
+    claim_deck_stream, release_deck_stream, claim_master, release_master,
+    claim_beat_fx, release_beat_fx
 };

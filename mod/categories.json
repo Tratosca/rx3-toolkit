@@ -40,6 +40,15 @@
     }
   },
   {
+    "id": "effects",
+    "order": 45,
+    "collapsed": false,
+    "name": {
+      "en": "Effects",
+      "fr": "Effets"
+    }
+  },
+  {
     "id": "screen",
     "order": 50,
     "collapsed": false,

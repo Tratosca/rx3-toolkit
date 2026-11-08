@@ -32,6 +32,10 @@ typedef int (*rx3_pad_handler)(const struct rx3_pad_event *);
 struct rx3_key_event { unsigned int key, operation, channel; };
 typedef int (*rx3_key_handler)(const struct rx3_key_event *);
 #define RX3_KEY_SHIFT 0x4103u
+/* COLOR FX buttons, sent once per mixer channel (1 and 2) for each press. */
+#define RX3_KEY_COLOR_FX_SPACE    0x50a1u
+#define RX3_KEY_COLOR_FX_DUB_ECHO 0x50a2u
+#define RX3_KEY_COLOR_FX_SWEEP    0x50a3u
 
 /* Pad lights, declared rather than driven. When the player refreshes its pad
  * lights, the core asks the owner of that refresh what each control should
@@ -43,6 +47,7 @@ typedef int (*rx3_key_handler)(const struct rx3_key_event *);
 #define RX3_LIGHT_ON     1u  /* the colour at full brightness */
 #define RX3_LIGHT_DIM    2u  /* the colour at its idle brightness */
 #define RX3_LIGHT_BLINK  3u  /* the colour, on the shared blink clock */
+#define RX3_LIGHT_OFF    4u  /* dark; COLOR FX buttons only */
 #define RX3_LIGHT_SHIFT  8u
 struct rx3_light { unsigned int state; uint32_t rgb; /* 0xRRGGBB */ };
 typedef void (*rx3_light_fn)(unsigned int deck, unsigned int control, struct rx3_light *);
@@ -52,6 +57,17 @@ typedef void (*rx3_light_fn)(unsigned int deck, unsigned int control, struct rx3
  * does not name one. */
 #define RX3_LIGHTS_SLIP_LOOP 0u
 #define RX3_LIGHTS_PADS      1u
+/* The mixer's refresh, unit-wide (deck RX3_NO_DECK): the six COLOR FX
+ * buttons, single-colour (rgb ignored, DIM is their low brightness), in
+ * panel order. */
+#define RX3_LIGHTS_MIXER     2u
+#define RX3_LIGHT_COLOR_FX_SPACE    0u
+#define RX3_LIGHT_COLOR_FX_DUB_ECHO 1u
+#define RX3_LIGHT_COLOR_FX_SWEEP    2u
+#define RX3_LIGHT_COLOR_FX_NOISE    3u
+#define RX3_LIGHT_COLOR_FX_CRUSH    4u
+#define RX3_LIGHT_COLOR_FX_FILTER   5u
+#define RX3_LIGHT_COLOR_FX_COUNT    6u
 
 struct rx3_input_service {
     int (*register_pad)(const void *owner, unsigned int priority, rx3_pad_handler);

@@ -58,6 +58,8 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- **BEAT FX frequency bands**, as on Pioneer DJM mixers: SPACE, DUB ECHO and SWEEP become LOW, MID and HIGH. A lit button sends its band through BEAT FX; a dark one keeps that band dry, outside the effect, and Roll replays only the lit bands. All three lit is the stock effect. The bands use the deck's own isolator crossover (about 284 Hz and 4.6 kHz). These three buttons lose their own COLOR FX. Optional module, off by default. Checked in the emulator on firmware 1.19 with ECHO on MASTER; not yet run on hardware.
+
 - **The deck comes back on its own after a crash**: if the player stops while the mod drive is in, it restarts within a few seconds and shows your drive again; load your tracks again. If it stops a second time within ten minutes, it restarts without the mods. Checked in the emulator on firmware 1.19; not yet run on hardware.
 
 - **Change your mods from the deck**: in UTILITY > RX3 TOOLKIT, press the browse encoder on a line to turn a mod ON or OFF or to change its options (KEY SYNC range and mode, Energy Boost rules, third BROWSE column). KEY SYNC and Energy Boost change at once; the rest reads AFTER REPLUG until you plug the drive in again. Your choices are saved in `RX3_RUNTIME/settings.cfg` on the drive. Checked in the emulator on firmware 1.19; not yet run on hardware.

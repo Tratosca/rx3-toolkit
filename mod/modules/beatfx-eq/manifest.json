@@ -1,0 +1,34 @@
+{
+  "id": "beatfx-eq",
+  "name": {
+    "en": "BEAT FX frequency bands",
+    "fr": "Bandes de fréquences du BEAT FX"
+  },
+  "description": {
+    "en": "Choose which bands go through BEAT FX, as on Pioneer DJM mixers: SPACE is LOW, DUB ECHO is MID, SWEEP is HIGH. A lit button sends its band to the effect; a dark one keeps it dry. These three COLOR FX lose their own effect.",
+    "fr": "Choisissez les bandes qui passent dans le BEAT FX, comme sur les tables de mixage Pioneer DJM : SPACE pour LOW, DUB ECHO pour MID, SWEEP pour HIGH. Un bouton allumé envoie sa bande dans l’effet ; éteint, la bande reste sans effet. Ces trois COLOR FX perdent leur propre effet."
+  },
+  "firmwares": [
+    "1.19",
+    "1.20"
+  ],
+  "default": false,
+  "order": 45,
+  "category": "effects",
+  "runtime_directory": "beatfx-eq",
+  "namespace": "beatfx_eq",
+  "requires": [
+    "core"
+  ],
+  "conflicts": [],
+  "files": [
+    {
+      "source": "module.sh",
+      "target": "module.sh",
+      "executable": false
+    }
+  ],
+  "build_files": [
+    "rx3_beatfx_eq_module.c"
+  ]
+}
