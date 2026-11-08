@@ -429,8 +429,9 @@ static int load_tab_pixels(void)
 }
 
 /* The light variant: a rebased copy of the finished table whose tab and pad
-   glyph records point at the light artwork. Optional light tabs fall back to
-   the dark ones: generic conversion cannot keep their selected-state contrast.
+   glyph records point at the light artwork. Light tabs are the dark artwork
+   converted with the theme's chrome rule, so they match the native STATUS /
+   BEAT FX row; a missing one falls back to the dark tab.
    The allocation stays resident for the life of the process. */
 static uint8_t *build_light_table(uint8_t *dark_table)
 {

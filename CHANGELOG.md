@@ -58,6 +58,8 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- Light theme: the KEY, STEMS and SAMPLES tabs now look exactly like STATUS and BEAT FX beside them (same grey border, grey text, and a mid-grey selected tab), instead of a darker style of their own. Checked in the emulator; not yet run on hardware.
+
 - Light theme: when you first switch from DARK to LIGHT, HOME waits for its images to be ready, so the controls and time counters no longer flash on dark boxes. Checked in the emulator with empty decks; not yet run on hardware.
 
 - Light theme: in UTILITY, the row name turns dark as soon as you start changing its value; the value stays white on blue. Checked in the emulator; not yet run on hardware.

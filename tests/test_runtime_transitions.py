@@ -1093,6 +1093,31 @@ int main(void) {
 }
 ''')
 
+    def test_light_tabs_are_the_dark_tabs_as_the_theme_converts_them(self):
+        # Otherwise KEY / STEMS / SAMPLES no longer look like STATUS / BEAT FX in LIGHT.
+        pairs = [(str(light).replace("-light.rgb565", ".rgb565"), str(light))
+                 for light in sorted(MODULES.glob("*/assets/*-light.rgb565"))
+                 if light.name != "glyph-atlas-light.rgb565"]
+        self.assertGreaterEqual(len(pairs), 11)
+        files = ",".join('{"%s","%s"}' % pair for pair in pairs)
+        self.run_c(r'''
+#include <stdio.h>
+#include "theme-white/rx3_theme_decl.h"
+#include "theme-white/rx3_theme_pixels.h"
+static const char *pairs[][2] = {''' + files + r'''};
+int main(void) {
+    static uint16_t dark[9000], light[9000];
+    for (unsigned p = 0; p < sizeof(pairs) / sizeof(pairs[0]); p++) {
+        FILE *d = fopen(pairs[p][0], "rb"), *l = fopen(pairs[p][1], "rb");
+        assert(d && l && fread(dark, 2, 9000, d) == 9000 && fread(light, 2, 9000, l) == 9000);
+        for (unsigned i = 0; i < 9000; i++)
+            assert(light[i] == theme_pixel_light_for_image(0u, dark[i], 0));
+        fclose(d); fclose(l);
+    }
+    return 0;
+}
+''')
+
     def test_theme_pixels_and_utility_choice_are_bounded(self):
         utility = MODULES / "theme-white/rx3_theme_utility.h"
         self.run_c(r'''
