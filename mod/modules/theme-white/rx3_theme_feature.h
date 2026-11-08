@@ -271,6 +271,52 @@ static void theme_forget_counter_cautions(void)
 /* Called at the render-pass boundary, before the native queue is consumed.
    Changing the table from a per-glyph callback mixes two themes in one pass.
    The key and Utility callbacks only publish requests. */
+/* The margins beside and under the deck strips (x 0-9, 630-649, 1270-1279
+   at y 709-788) belong to tall narrow HOME windows that the screen reload
+   recreates on reused surfaces. The player repaints their top part only, so
+   the bottom keeps the previous mode's pixels. Fill that part with the stock
+   black; the fill adapter turns it into the light panel colour in LIGHT. */
+static unsigned int theme_margin_repaint_passes;
+
+static void theme_repaint_margins(void)
+{
+    if (memcmp((const void *)THEME_HW_FILL_RECT, theme_hw_fill_rect_guard, 8) ||
+        *(const volatile uint32_t *)THEME_LAYER0_LITERAL != THEME_LAYER0) return;
+    unsigned long window = *(volatile uint32_t *)(THEME_LAYER0 + THEME_LAYER_WINDOWS);
+    for (unsigned int n = 0; window && n < THEME_WINDOW_WALK_LIMIT; n++) {
+        int y = *(volatile int *)(window + THEME_WINDOW_Y);
+        unsigned int width = *(volatile uint16_t *)(window + THEME_WINDOW_WIDTH);
+        unsigned int height = *(volatile uint16_t *)(window + THEME_WINDOW_HEIGHT);
+        /* The left and middle margins end at y 789, the right one at 790. */
+        if (width && width <= THEME_MARGIN_MAX_WIDTH && y < THEME_MARGIN_TOP &&
+            y + (int)height >= THEME_MARGIN_BOTTOM) {
+            volatile uint32_t *colour = (volatile uint32_t *)(window + THEME_WINDOW_COLOUR);
+            uint32_t saved = *colour;
+            *colour = 0u;
+            ((int (*)(unsigned long, int, int, unsigned int))THEME_HW_FILL_RECT)(
+                window, 0, THEME_MARGIN_TOP - y,
+                width | ((unsigned int)(THEME_MARGIN_BOTTOM - THEME_MARGIN_TOP) << 16));
+            *colour = saved;
+        }
+        window = *(volatile uint32_t *)(window + THEME_WINDOW_NEXT);
+    }
+}
+
+/* A few passes after a switch on HOME, once the reload has drawn and the
+   windows are the new ones. */
+static void theme_run_margin_repaint(void)
+{
+    if (!theme_margin_repaint_passes || --theme_margin_repaint_passes ||
+        ((int (*)(void))0x001126d0u)() != 1)
+        return;
+    /* Keyed windows show the screen surface where they are transparent,
+       such as the bottom row: clear it in the new mode first. */
+    if (!memcmp((const void *)THEME_CLEAR_SCREEN, theme_clear_screen_guard, 8))
+        ((int (*)(void))THEME_CLEAR_SCREEN)();
+    theme_repaint_margins();
+    ((int (*)(void))THEME_DIRTY_WINDOWS)();
+}
+
 static void theme_run_pending_toggle(void)
 {
     /* An armed start becomes an ordinary toggle request rather than a second
@@ -321,8 +367,13 @@ static void theme_run_pending_toggle(void)
            never again. Enter it once more, as leaving SHORTCUT does, so the
            ground and the waveform pane edge follow the new mode. */
         if (((int (*)(void))0x001126d0u)() == 1 &&
-            !memcmp((const void *)THEME_SHOW_SCREEN, theme_show_screen_guard, 8))
+            !memcmp((const void *)THEME_SHOW_SCREEN, theme_show_screen_guard, 8)) {
+            if (!memcmp((const void *)THEME_SIMPLE_COUNTER_CLEAR,
+                        theme_simple_counter_clear_guard, 8))
+                ((void (*)(void))THEME_SIMPLE_COUNTER_CLEAR)();
+            theme_margin_repaint_passes = THEME_MARGIN_REPAINT_PASSES;
             ((int (*)(unsigned int))THEME_SHOW_SCREEN)(0u);
+        }
         theme_waveform_apply(light);
         theme_home_repaint_pending = light != 0;
         if (request == 2) {
@@ -433,6 +484,7 @@ static void hooked_theme_render_pass(void *manager)
     theme_render_active = 1;
     int previous_theme = theme_light_active();
     theme_run_pending_toggle();
+    theme_run_margin_repaint();
     theme_refresh_text_for_view();
     int converted = theme_run_conversions();
     /* A DARK prewarm publishes only into the dormant LIGHT table. It changes
