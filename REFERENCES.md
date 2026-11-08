@@ -871,7 +871,7 @@ Physical data consolidation and a shell replacement are separate optional follow
 <a id="doc-adr-0002-live-settings-and-fault-containment"></a>
 ### ADR-0002: Live settings, interactive Utility rows and runtime fault containment
 
-**Status:** Proposed; step 0, layer 1 (settings file) and layer 2 (editable Utility rows) built and checked in the emulator; hardware measurements, hot-path cost and layers 3 and 4 pending
+**Status:** Accepted, reduced; layer 1 (settings file), layer 2 (editable Utility rows) and layer 4 (relaunch) built and checked in the emulator; layer 3 (containment inside `rbp`) dropped; hardware measurements pending
 **Date:** 2026-11-08
 **Deciders:** François Brille
 **Scope:** The C core (`librx3_core.so`), the module contract, `mod/autoexec.sh` and a new resident watcher, the desktop app's drive writer. Inspired by AZ-MODS for the XDJ-AZ (issue #50), whose source is GPL-3.0-only: only ideas and documented behaviour are reused, no code.
@@ -896,36 +896,31 @@ Every module runs inside `rbp`. A fault in module code kills the player, and wit
 <a id="doc-adr-0002-live-settings-and-fault-containment--decision"></a>
 ##### Decision
 
-One mechanism, a **gate per module** owned by the core, serves the menu, the settings and the fault containment. A gated module keeps its hooks installed (no live unpatching, see the hook service's "No hot unload") but every entry passes straight to the original firmware function. Four layers are built in this order (François, 2026-11-08: settings and menu first).
+Three layers are built, settings and menu first (François, 2026-11-08). The fourth, fault containment inside `rbp`, was dropped the same day to keep the design simple (François: keep it simple); the relaunch alone keeps a crash from ending the set.
 
 **1. Settings file on the USB drive.** One `key = value` text file on the drive, `RX3_RUNTIME/settings.cfg` (François, 2026-11-08: beside the display word, the sample banks and the logs), with a `version = 1` line, `#` comments, unknown keys kept, last duplicate wins, CR ignored, 64 KB at most. Keys are `<module>.<key>`. The drive is the source of truth and the options leave the image: a drive without the file runs with the defaults. Nothing is written to the deck's persistent storage, so "drive out, deck stock" still holds. Layer 1 is shell-side only (François, 2026-11-08): `module_setting` in `mod/lib/module-api.sh` reads the file as data at each insertion, the module validates the value, and the environment stays the transport to `rbp`. The desktop app writes the file before the image, changing only its own keys and keeping every other line; a file the deck would not read is left untouched and stops the build with a message. First keys: `key-sync.range`, `key-sync.mode`, `key-match.rules`, `browse-columns.column`, `theme-white.mode` (the older `RX3_RUNTIME/display` word still counts when that key is absent). Layer 2 adds what live changes need, as built on 2026-11-08 (see layer 2).
 
-**2. Interactive Utility rows.** The RX3 TOOLKIT rows become choice rows built like DISPLAY MODE (the same stock row words and guards); a commit is read from the row by the core's watcher thread, wherever the row sits. Each module that honours `module_disabled_by_switch` gets an ON/OFF row, followed while it runs by the options its manifest declares (`settings`: key, deck label in English, environment name, live, closed list of choices); the build turns the declarations into `modules/settings` and the shell into `RX3_UTILITY_ROWS`, within the existing 25-row limit and with no help text. Decided by François, 2026-11-08: ON/OFF writes `<module>.enabled = off` and applies at the next insertion until layer 3's gate makes it live; KEY SYNC range and mode and the KEY MATCH rules are live (served by `services->settings->value()`, read from each module's `tick()`), the third BROWSE column applies at the next insertion. A row waiting for the next insertion reads "AFTER REPLUG". The core leaves every key the DJ touched in `/tmp/rx3-settings.pending` two seconds after the last change; a small shell loop left by `core_after_launch` for the insertion (the seed of layer 4's watcher) merges it into `settings.cfg` like the desktop app does and never rewrites a file the deck would not read. Two departures from the first draft: labels are English only, as the rest of Utility; and the write is not held until no deck plays, because the core has no play-state accessor yet. One small write per batch of changes is assumed harmless next to the play history the deck already writes; this is measured on hardware before release. Still to come with layer 3: a row showing a module stopped after an error (OFF after an error), and turning it back ON to clear the quarantine.
+**2. Interactive Utility rows.** The RX3 TOOLKIT rows become choice rows built like DISPLAY MODE (the same stock row words and guards); a commit is read from the row by the core's watcher thread, wherever the row sits. Each module that honours `module_disabled_by_switch` gets an ON/OFF row, followed while it runs by the options its manifest declares (`settings`: key, deck label in English, environment name, live, closed list of choices); the build turns the declarations into `modules/settings` and the shell into `RX3_UTILITY_ROWS`, within the existing 25-row limit and with no help text. Decided by François, 2026-11-08: ON/OFF writes `<module>.enabled = off` and applies at the next insertion until layer 3's gate makes it live; KEY SYNC range and mode and the KEY MATCH rules are live (served by `services->settings->value()`, read from each module's `tick()`), the third BROWSE column applies at the next insertion. A row waiting for the next insertion reads "AFTER REPLUG". The core leaves every key the DJ touched in `/tmp/rx3-settings.pending` two seconds after the last change; a small shell loop left by `core_after_launch` for the insertion (the seed of layer 4's watcher) merges it into `settings.cfg` like the desktop app does and never rewrites a file the deck would not read. Two departures from the first draft: labels are English only, as the rest of Utility; and the write is not held until no deck plays, because the core has no play-state accessor yet. One small write per batch of changes is assumed harmless next to the play history the deck already writes; this is measured on hardware before release.
 
-**3. Fault containment inside `rbp`.** Every module entry is wrapped by the core:
-- A macro at the top of each hook replacement and around each descriptor callback the core dispatches records a recovery point with `__sigsetjmp(env, 0)` (no mask save, so no system call on hot paths) in a per-thread slot (indexed by tid from a raw `gettid`, or by stack range; to be chosen after the cost measurement). If the module is gated, or on return from a fault, the wrapper calls the original firmware function with the same arguments. A C macro in the function keeps the real signature, so the 5- and 6-argument hooks need no assembly thunk.
-- The core installs its handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE with `SA_SIGINFO | SA_NODEFER` (so the signal is not left blocked after `siglongjmp` without a mask save). In the handler: if the thread holds an active recovery point, record the module id and the faulting PC (async-signal-safe `write` to a RAM file), gate the module, set a "notice pending" flag, and `siglongjmp`. Otherwise chain to the previous action, and to the default action last, so faults in `rbp` itself are not masked.
-- `rbp`'s own `signal_handler` replaces ours during DeviceSQL calls. The core hooks it at 0x1757b0: on a tid mismatch it hands the signal to the core's handler instead of returning, which also removes the endless fault loop described above.
-- The quarantine is written to the settings file (`guard.<module> = off`, flushed by layer 4) and lasts until the DJ turns the module back on in Utility (François, 2026-11-08). The render thread shows a short notice in DJ language.
-- Expected effect: the module's feature falls back to stock (full track instead of stems, stock text instead of a key title) and at most one audio block is lost.
+**3. Fault containment inside `rbp`: dropped.** The draft wrapped every module entry in `__sigsetjmp(env, 0)`, installed a SIGSEGV/SIGBUS/SIGILL/SIGFPE handler that jumped back and gated the module, and hooked `rbp`'s own `signal_handler` (0x1757b0). Module code is reached through its own hooks (18), the descriptor callbacks, the callbacks it registers with the core's services (panels, BROWSE markers, images, text colour, audio stages, often per glyph or per audio block) and its own threads; covering all of them touches most of the code base, a jump skips the module's cleanup and can leave a firmware lock held, and the cost on hot paths was never measured. A first lot covering only the hooks and descriptor callbacks would still leave most of the risky code outside. Not worth it until a module is seen to crash on hardware; then containment, if any, is scoped to that module.
 
-**4. Resident watcher and relaunch.** `mod/autoexec.sh` leaves a small shell process that watches the `rbp` PID. When `rbp` dies, it reads the last blame record, adds `guard.<module> = off` for the module that was running, relaunches `rbp` through the existing `launch_rbp` and `announce_media` without that module, and falls back to a stock preload after two failed relaunches within a short window (François, 2026-11-08). Audio stops for the relaunch time and the decks are empty afterwards; reloading tracks and positions is out of scope. The same process flushes the settings file (layer 1). The core's existing safety nets (`write_guarded`, readiness markers, rollback) are unchanged.
+**4. Relaunch after a crash.** The small loop layer 2 leaves running for each insertion (`session_watcher` in `mod/lib/module-api.sh`, started by `core_after_launch` with the player's pid) also watches `rbp` once a second. When the player dies it is relaunched as it was through the orchestrator's own `launch_rbp` and `announce_media`; a second death within `RBP_CRASH_WINDOW` (600 s) relaunches it without the mods' preload (the guarded words stay: they only widen the image ID range and change beat-jump constants, which stock `rbp` ignores or runs fine with); a third death leaves it stopped. While an insertion holds `/tmp/rx3-runtime.lock` the player may be stopped on purpose, so the loop does nothing; a newer insertion's token ends the old loop, checked again after each sleep. The loop ends when the drive is removed. Audio stops for the relaunch time and the decks are empty afterwards; the DJ can then turn the suspect module OFF in Utility. The core's existing safety nets (`write_guarded`, readiness markers, rollback) are unchanged.
 
 <a id="doc-adr-0002-live-settings-and-fault-containment--limits"></a>
 ##### Limits accepted
 
-- A wild write that corrupts memory without faulting is not contained.
-- A fault inside a firmware function that a module called, while that function holds a firmware lock, can leave the lock held after the jump. The module is gated, but the player may stall. A stall watchdog (heartbeat from the render and audio threads, read by the watcher) is a follow-up, not part of this decision.
-- Stack overflow needs an alternate signal stack (`sigaltstack`, not imported; raw system call possible). Until it is set up per thread, an overflow in module code is not contained.
-- Module code running on its own threads (theme worker, loader worker, Now Playing worker, OverCue worker) needs the same wrapper at the thread entry; a fault there gates the module and ends that thread.
-- `siglongjmp` skips the module's cleanup. Wrappers sit at the outermost module frame, so only the faulting module's state is abandoned, and that module stays gated until the DJ re-enables it, which restarts its state from scratch (`stop` then `start`, or a start that tolerates leftovers).
+- A crash still cuts the audio: several seconds on the emulator, not measured on hardware, plus reloading the tracks.
+- The module that crashed is not named; the DJ chooses what to turn off.
+- A player that hangs instead of dying is not detected.
+- Once the drive is removed nothing watches the player.
+- Live Utility changes saved during the session apply to a relaunched player only from the next insertion: the relaunch reuses the environment of the insertion.
 
 <a id="doc-adr-0002-live-settings-and-fault-containment--options-considered"></a>
 ##### Options considered
 
 | Option | Why not chosen |
 | --- | --- |
-| Watcher and relaunch only (AZ-MODS's crash-loop guard). | Every module fault costs seconds of silence and empty decks. Kept as layer 4, behind containment. |
+| Containment inside `rbp` (sigsetjmp at every module entry, a signal handler, a hook on `rbp`'s handler). | Touches most of the code base for partial coverage, with failure modes (skipped cleanup, held firmware locks) that are hard to test. Dropped for the relaunch alone (AZ-MODS's crash-loop guard). |
 | Generic assembly thunk in `install_hook` that sets the recovery point. | Must re-pass an unknown number of stack arguments; the census shows a C macro with the real signature is enough. |
 | Unhooking a faulted module live. | The hook service forbids hot unload, and REFERENCES records half-written windows when patching live code. A gate gives the same effect with no code change in `rbp`. |
 | Settings on the deck (`/root/settings`), as AZ-MODS does. | Breaks "drive out, deck stock" and writes persistent deck storage. Rejected by François, 2026-11-08. |
@@ -934,16 +929,14 @@ One mechanism, a **gate per module** owned by the core, serves the menu, the set
 <a id="doc-adr-0002-live-settings-and-fault-containment--consequences"></a>
 ##### Consequences
 
-- Every module gains two duties: declare its settings, and accept being gated at any entry (and, for `live` options, apply a change on the stated thread).
-- Two new libc names enter `ALLOWED` in `tests/test_hook_symbols.py`: `__sigsetjmp` and `siglongjmp` (`sigaction`, `sigemptyset`, `sigprocmask` too if the handler is installed through libc rather than raw system calls). All are imported by `rbp` 1.19 and 1.20.
-- One more firmware address is hooked (0x1757b0) and joins `scripts/check_addresses.py`.
-- The orchestrator stops being a run-and-exit script: one process stays resident for the session.
-- The drive gets one more writer during a set; writes happen only while no deck plays.
+- A module declares the options it shows in Utility, and applies `live` ones from `tick()`.
+- The orchestrator stops being a run-and-exit script: one small shell loop stays for each insertion.
+- The drive gets one more writer during a set: one small write a couple of seconds after the last Utility change.
 
 <a id="doc-adr-0002-live-settings-and-fault-containment--validation"></a>
 ##### Validation
 
-Host tests: settings parser (version, size, unknown keys, duplicates, corrupt file refused and kept), gate and wrapper on the host build (a replacement that faults returns the original's result and gates its module; a fault outside any wrapper reaches the previous handler), watcher decisions (blame, quarantine, two-failure fallback). Emulator: a diagnostics-only test module that faults on a pad press, with a track playing: audio level keeps flowing (driver `level`), the module reads OFF in Utility, the notice shows, a power cycle keeps it OFF, Utility ON brings it back; the same during a BROWSE search (DeviceSQL guard active); `kill -9 rbp` brings the player back through the watcher. Hardware: the same sequence by ear, then a full set.
+Host tests: settings parser and merge (version, size, unknown keys, duplicates, corrupt file refused and kept), Utility rows and live values (C, host build), the round trip of every declared choice through its module's shell, relaunch decisions (as it was, without the mods, stopped) and the loop standing aside while an insertion holds the lock. Emulator, firmware 1.19, 2026-11-08: Utility rows edited and saved on the drive, applied after a reinsertion; `kill -9 rbp` three times: relaunched with the core (LIGHT, KEY tab), then without the mods (stock DARK), then left stopped; a reinsertion that restarts the player causes no extra launch and the new loop relaunches the new player. Hardware: the same by ear, the relaunch time, and a drive write during playback.
 
 <a id="doc-adr-0002-live-settings-and-fault-containment--step-0"></a>
 ##### Step 0 measurements
@@ -953,10 +946,10 @@ Emulator, 2026-11-08: firmware 1.19 sysroot, test image v1 ee72153 (core, keyshi
 | Measurement | Result | Consequence |
 | --- | --- | --- |
 | Signals caught by `rbp` | `SigCgt` 0x180000000 (only 32 and 33, glibc's internal thread signals), `SigIgn` 0x1006 (SIGINT, SIGQUIT, SIGPIPE), `SigBlk` 0, at idle and over 600 samples every 50 ms during SOURCE, browse, load and playback. No DeviceSQL guard window was caught at that rate. | Outside DeviceSQL calls a SIGSEGV takes the default action and kills `rbp`: the core's handler is the only one most of the time. |
-| Threads | 75. Audio output `JuceALSA` is SCHED_FIFO 99 on CPU 3; `UiMain`, `TouchPanel`, `JogCom:1/2`, `GpioManager` FIFO 98; `Player:0`, `Player:1` SCHED_RR 35; DeviceSQL tasks (`DB_*`, `DBSMain_Tsk`, `DBComm_Tsk-*`) RR 15-21; `gui_task` RR 24; `Tot_LoadTASK` x2 RR 33. List: `threads-idle.txt`. | `apl_start` sets `kernel.sched_rt_runtime_us=-1`, so a FIFO 99 thread caught in `rbp`'s fault loop (tid mismatch) would hold CPU 3 for good. Hooking `signal_handler` is required, not optional. Which thread runs each of our hooks is inferred from names, not traced. |
+| Threads | 75. Audio output `JuceALSA` is SCHED_FIFO 99 on CPU 3; `UiMain`, `TouchPanel`, `JogCom:1/2`, `GpioManager` FIFO 98; `Player:0`, `Player:1` SCHED_RR 35; DeviceSQL tasks (`DB_*`, `DBSMain_Tsk`, `DBComm_Tsk-*`) RR 15-21; `gui_task` RR 24; `Tot_LoadTASK` x2 RR 33. List: `threads-idle.txt`. | `apl_start` sets `kernel.sched_rt_runtime_us=-1`, so a FIFO 99 thread caught in `rbp`'s fault loop (tid mismatch) would hold CPU 3 for good. Hooking `signal_handler` would have been required for containment, which was dropped. Which thread runs each of our hooks is inferred from names, not traced. |
 | Relaunch cost | `kill -9` with DO IT playing: process gone 0.48 s, new `rbp` alive 0.69 s, USB channels open 7.85 s, drive announced 7.95 s. HOME then painted in LIGHT with the KEY and STEMS tabs (core active again), both decks "Not Loaded."; reloading DO IT and PLAY gave sound again (RMS 0.0184, as before the kill). | Layer 4 works with the existing `launch_rbp` and `announce_media` steps; on the deck, expect a few seconds of silence plus the DJ's reload. Hardware time not measured. |
 
-Still open: the cost of `__sigsetjmp(env, 0)` on the render and audio hot paths (needs the layer 3 prototype), the relaunch time on hardware, and the effect of a drive write during playback from the same drive (hardware only).
+Still open: the relaunch time on hardware, and the effect of a drive write during playback from the same drive (hardware only).
 
 <a id="doc-adr-0002-live-settings-and-fault-containment--actions"></a>
 ##### Actions
@@ -964,9 +957,9 @@ Still open: the cost of `__sigsetjmp(env, 0)` on the render and audio hot paths 
 1. [x] Step 0: static evidence and emulator measurements. [ ] Hot-path cost and hardware measurements.
 2. [x] Settings file on the drive, written by the app, read by the modules (layer 1, shell-side).
 3. [x] Manifest declarations, settings index, core settings service and editable RX3 TOOLKIT rows, saved to the drive by a small resident loop (layer 2; emulator 1.19, not yet on hardware). Unblocks the layout option of PR #52. [ ] Drive write during playback measured on hardware.
-4. [ ] Gate, wrappers, handler, hook on `signal_handler`, quarantine and notice (layer 3), with the diagnostics fault module.
-5. [ ] Resident watcher, blame, relaunch and stock fallback (layer 4).
-6. [ ] Stall watchdog and alternate signal stacks (follow-up ADR if needed).
+4. [-] Gate, wrappers, handler and hook on `signal_handler` (layer 3): dropped, see layer 3.
+5. [x] Relaunch after a crash and fallback without the mods (layer 4, reduced; emulator only).
+6. [ ] Hardware: relaunch time, drive write during playback, a full set.
 
 ---
 
@@ -3251,8 +3244,8 @@ the watcher thread. Options declared `live: false` and the ON/OFF rows apply at
 the next insertion and read "AFTER REPLUG" until then. Changes reach the drive
 through `/tmp/rx3-settings.pending`, replaced as a whole by the core two
 seconds after the last change and merged into `RX3_RUNTIME/settings.cfg` by
-`settings_writer`, the small loop core_after_launch leaves running for the
-insertion. tests/test_module_consistency.py round-trips every declared choice
+`session_watcher`, the small loop core_after_launch leaves running for the
+insertion (it also relaunches `rbp` after a crash, see ADR-0002). tests/test_module_consistency.py round-trips every declared choice
 through the module's own shell.
 
 **Memory.** `services->memory` is one ledger for stems, sample banks and the

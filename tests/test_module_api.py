@@ -232,16 +232,16 @@ class ModuleApiTests(unittest.TestCase):
             script = (
                 f"USB={shlex.quote(str(usb))}\n"
                 f"SETTINGS_PENDING={shlex.quote(str(pending))}\n"
-                f"SETTINGS_WRITER={shlex.quote(str(token))}\n"
-                "start_settings_writer || exit 10\n"
-                "until [ -s \"$SETTINGS_WRITER\" ]; do :; done\n"
+                f"SESSION_WATCHER={shlex.quote(str(token))}\n"
+                "start_session_watcher '' || exit 10\n"
+                "until [ -s \"$SESSION_WATCHER\" ]; do :; done\n"
                 "printf 'key-sync.range = 4\\n' > \"$SETTINGS_PENDING\"\n"
                 "for i in 1 2 3 4 5 6 7 8 9 10; do\n"
                 "  [ -e \"$USB/RX3_RUNTIME/settings.cfg\" ] && [ ! -e \"$SETTINGS_PENDING\" ] && break\n"
                 "  sleep 0.5\n"
                 "done\n"
                 "cat \"$USB/RX3_RUNTIME/settings.cfg\"\n"
-                "echo other > \"$SETTINGS_WRITER\"; sleep 1.5\n"
+                "echo other > \"$SESSION_WATCHER\"; sleep 1.5\n"
                 "printf 'key-sync.range = 9\\n' > \"$SETTINGS_PENDING\"; sleep 1.5\n"
                 "cat \"$USB/RX3_RUNTIME/settings.cfg\"; ls \"$SETTINGS_PENDING\"\n"
             )
@@ -249,6 +249,54 @@ class ModuleApiTests(unittest.TestCase):
             self.assertEqual(result.stdout.splitlines(),
                              ["version = 1", "key-sync.range = 4",
                               "version = 1", "key-sync.range = 4", str(pending)],
+                             result.stderr)
+
+    CRASH_HARNESS = (
+        'P=$(mktemp -d); PROC_ROOT=$P; echo "100.00 1.00" > $P/uptime\n'
+        'RUNTIME_PRELOAD_ENTRIES=" /root/pdj/librx3_core.so"\n'
+        'RBP_PRELOAD=/root/pdj/librx3_core.so; RBP_RESTORE_OUTPUT=/dev/null; NEW=10\n'
+        'say() { echo "say: $*"; }\n'
+        'rbp_alive() { [ -e "$P/alive.$1" ]; }\n'
+        'launch_rbp() { NEW=$((NEW + 1)); : > "$P/alive.$NEW"; echo "launch $NEW ${RBP_PRELOAD:-none}"; }\n'
+        'announce_media() { echo "announce $NEW"; }\n'
+        'at() { echo "$1.00 1.00" > $P/uptime; }\n'
+    )
+
+    def test_a_dead_player_is_relaunched_then_relaunched_without_the_mods(self):
+        result = run_shell(self.CRASH_HARNESS + (
+            '_rx3_rbp=10; _rx3_crashed_at=; _rx3_without_mods=0\n'
+            'rbp_relaunch_after_crash; echo "watching ${_rx3_rbp:-none}"\n'
+            'at 800; rbp_relaunch_after_crash\n'      # long after: as it was
+            'at 900; rbp_relaunch_after_crash\n'      # again soon: no mods
+            'at 950; rbp_relaunch_after_crash; echo "watching ${_rx3_rbp:-none}"\n'
+        ))
+        lines = [line for line in result.stdout.splitlines() if not line.startswith("say: ")]
+        self.assertEqual(lines, [
+            "launch 11 /root/pdj/librx3_core.so", "announce 11", "watching 11",
+            "launch 12 /root/pdj/librx3_core.so", "announce 12",
+            "launch 13 none", "announce 13",
+            "watching none",
+        ], result.stderr)
+        self.assertIn("say: STOP: rbp pid 13 died again without the mods; not relaunched",
+                      result.stdout)
+
+    def test_the_watcher_leaves_the_player_alone_while_an_insertion_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            usb = Path(directory) / "usb"
+            (usb / "RX3_RUNTIME").mkdir(parents=True)
+            result = run_shell(self.CRASH_HARNESS + (
+                f"USB={shlex.quote(str(usb))}\n"
+                f"LOCK={shlex.quote(directory)}/lock; mkdir $LOCK\n"
+                f"SESSION_WATCHER={shlex.quote(directory)}/token\n"
+                f"SETTINGS_PENDING={shlex.quote(directory)}/pending\n"
+                f"OUT={shlex.quote(directory)}/out\n"
+                'echo me > $SESSION_WATCHER\n'
+                'session_watcher me 10 > $OUT 2>&1 &\n'
+                'sleep 2.5; echo "locked: $(grep -c ^launch $OUT)"\n'
+                'rmdir $LOCK; sleep 2.5; echo "unlocked: $(grep -c ^launch $OUT)"\n'
+                'echo other > $SESSION_WATCHER; wait\n'
+            ))
+            self.assertEqual(result.stdout.splitlines(), ["locked: 0", "unlocked: 1"],
                              result.stderr)
 
     def test_logo_without_artwork_is_skipped_not_fatal(self):

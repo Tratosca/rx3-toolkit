@@ -58,6 +58,8 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- **The deck comes back on its own after a crash**: if the player stops while the mod drive is in, it restarts within a few seconds and shows your drive again; load your tracks again. If it stops a second time within ten minutes, it restarts without the mods. Checked in the emulator on firmware 1.19; not yet run on hardware.
+
 - **Change your mods from the deck**: in UTILITY > RX3 TOOLKIT, press the browse encoder on a line to turn a mod ON or OFF or to change its options (KEY SYNC range and mode, Energy Boost rules, third BROWSE column). KEY SYNC and Energy Boost change at once; the rest reads AFTER REPLUG until you plug the drive in again. Your choices are saved in `RX3_RUNTIME/settings.cfg` on the drive. Checked in the emulator on firmware 1.19; not yet run on hardware.
 
 - Your settings now live on the USB drive, in `RX3_RUNTIME/settings.cfg`, instead of inside the mod: KEY SYNC range and mode, KEY MATCH suggestions and the third BROWSE column. Building from the Toolkit writes them there and keeps any other line of that file, and the light theme's start mode can be set there too (`theme-white.mode = light`, `dark`, `wait` or `switch`). A drive without the file starts with the defaults. If you copy only `autoexec.bin` to another drive, copy `RX3_RUNTIME/settings.cfg` with it. Not yet run on hardware.

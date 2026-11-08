@@ -180,6 +180,8 @@ Open **UTILITY** and scroll to the end. The **RX3 TOOLKIT** section shows **VERS
 
 Press the browse encoder on a line to change it. KEY SYNC range and mode and the Energy Boost rules change at once. Turning a mod ON or OFF and the third BROWSE column read **AFTER REPLUG** until you plug the drive in again. Your choices are saved in `RX3_RUNTIME/settings.cfg` on the drive a couple of seconds after the last change. A mod you turn OFF there stays off, even after a new build, until you turn it back ON in UTILITY.
 
+If the player stops during a set with the mod drive in, it restarts by itself within a few seconds and shows the drive again; the decks are empty, so load your tracks again. A second stop within ten minutes restarts it without the mods. You can then turn the suspect mod OFF in UTILITY.
+
 Then try a selected feature with a suitable track. **Troubleshooting report** is off by default; turn it on in Modules if you need a report. It writes `RX3_RUNTIME/session.txt` to the drive. `=== complete ===` means installation finished; it does not prove every audio and control path works on hardware. A `STOP:` or `FAILED:` line calls for [Troubleshooting](REFERENCES.md#doc-troubleshooting), followed by a clean restart without the mod drive if the player is misbehaving.
 
 </details>

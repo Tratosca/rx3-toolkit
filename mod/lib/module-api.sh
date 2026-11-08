@@ -577,13 +577,18 @@ module_disabled_by_switch()
     return 0
 }
 
-# Changes made in Utility reach the drive through one small loop per
-# insertion: the core leaves "key = value" lines in RAM once the DJ stops
+# One small loop per insertion, for as long as the drive stays in. It saves
+# Utility changes: the core leaves "key = value" lines in RAM once the DJ stops
 # changing things, and this merges them into settings.cfg like the desktop app
-# does (other lines kept, one line per key). A file the deck would not read is
-# never rewritten. A newer insertion takes over by writing its own token.
+# does (other lines kept, one line per key); a file the deck would not read is
+# never rewritten. It also relaunches the player when it dies, so a crash costs
+# seconds of silence and empty decks instead of the rest of the set; a second
+# death within RBP_CRASH_WINDOW seconds relaunches it without the mods' preload.
+# While an insertion holds $LOCK the player may be stopped on purpose, so the
+# loop leaves it alone. A newer insertion takes over by writing its own token.
 SETTINGS_PENDING=/tmp/rx3-settings.pending
-SETTINGS_WRITER=/tmp/rx3-settings-writer
+SESSION_WATCHER=/tmp/rx3-session-watcher
+RBP_CRASH_WINDOW=600
 
 settings_merge()
 {
@@ -626,10 +631,43 @@ settings_merge()
     return 1
 }
 
-settings_writer()
+# Sets _rx3_rbp to the relaunched player, or empties it to stop watching.
+rbp_relaunch_after_crash()
 {
-    while [ -d "$USB/RX3_RUNTIME" ] && [ "$(cat "$SETTINGS_WRITER" 2>/dev/null)" = "$1" ]; do
+    _rx3_now=$(sed 's/[. ].*//' "$PROC_ROOT/uptime" 2>/dev/null)
+    if [ -n "$_rx3_crashed_at" ] && [ "$((_rx3_now - _rx3_crashed_at))" -lt "$RBP_CRASH_WINDOW" ]; then
+        if [ "$_rx3_without_mods" = 1 ]; then
+            say "STOP: rbp pid $_rx3_rbp died again without the mods; not relaunched"
+            _rx3_rbp=
+            return 0
+        fi
+        say "rbp pid $_rx3_rbp died twice within ${RBP_CRASH_WINDOW}s; relaunching it without the mods"
+        RBP_PRELOAD=$(preload_without_runtime "$RBP_PRELOAD")
+        _rx3_without_mods=1
+    else
+        say "rbp pid $_rx3_rbp died; relaunching it"
+    fi
+    _rx3_crashed_at=$_rx3_now
+    launch_rbp "$RBP_RESTORE_OUTPUT"
+    announce_media
+    _rx3_rbp=$NEW
+    say "rbp relaunched, pid=$NEW, preload=${RBP_PRELOAD:-none}"
+}
+
+session_watcher()
+{
+    _rx3_token=$1
+    _rx3_rbp=$2
+    _rx3_crashed_at=
+    _rx3_without_mods=0
+    while [ -d "$USB/RX3_RUNTIME" ]; do
         sleep 1
+        # Checked after the sleep: a newer insertion may have stopped this
+        # player and finished while we slept.
+        [ "$(cat "$SESSION_WATCHER" 2>/dev/null)" = "$_rx3_token" ] || break
+        if [ -n "$_rx3_rbp" ] && [ ! -d "$LOCK" ] && ! rbp_alive "$_rx3_rbp"; then
+            rbp_relaunch_after_crash
+        fi
         mv -f "$SETTINGS_PENDING" "$SETTINGS_PENDING.taken" 2>/dev/null || continue
         if settings_merge "$SETTINGS_PENDING.taken" "$USB/RX3_RUNTIME/settings.cfg"; then
             say "Utility changes saved in settings.cfg"
@@ -640,10 +678,11 @@ settings_writer()
     done
 }
 
-start_settings_writer()
+# $1: the pid of the player this insertion leaves running.
+start_session_watcher()
 {
-    echo "$$" > "$SETTINGS_WRITER" || return 1
-    settings_writer "$$" < /dev/null > /dev/null 2>&1 &
+    echo "$$" > "$SESSION_WATCHER" || return 1
+    session_watcher "$$" "$1" < /dev/null > /dev/null 2>&1 &
 }
 
 preload_contains()
