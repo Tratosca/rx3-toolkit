@@ -58,6 +58,8 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- **Change your mods from the deck**: in UTILITY > RX3 TOOLKIT, press the browse encoder on a line to turn a mod ON or OFF or to change its options (KEY SYNC range and mode, Energy Boost rules, third BROWSE column). KEY SYNC and Energy Boost change at once; the rest reads AFTER REPLUG until you plug the drive in again. Your choices are saved in `RX3_RUNTIME/settings.cfg` on the drive. Checked in the emulator on firmware 1.19; not yet run on hardware.
+
 - Your settings now live on the USB drive, in `RX3_RUNTIME/settings.cfg`, instead of inside the mod: KEY SYNC range and mode, KEY MATCH suggestions and the third BROWSE column. Building from the Toolkit writes them there and keeps any other line of that file, and the light theme's start mode can be set there too (`theme-white.mode = light`, `dark`, `wait` or `switch`). A drive without the file starts with the defaults. If you copy only `autoexec.bin` to another drive, copy `RX3_RUNTIME/settings.cfg` with it. Not yet run on hardware.
 
 - Light theme: after SHIFT + SHORTCUT on the main screen, the thin margins beside and under the deck strips now follow the new mode instead of keeping the old colour, and an empty deck no longer shows "Not Loaded." twice. Checked in the emulator on firmware 1.19 and 1.20; not yet run on hardware.

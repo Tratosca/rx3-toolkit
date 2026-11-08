@@ -480,17 +480,38 @@ reconcile_module_set()
     done
     module_export RX3_ACTIVE_MODULES "$_rx3_count" "Module summary" || :
     # Utility lists each loaded module as NAME|ON rev, rows joined by ";". The
-    # build wrote names and revisions; only the state is decided here.
+    # build wrote names and revisions; only the state is decided here. A row
+    # the DJ can change adds |KEY|LIVE|VALUE|WORD=TEXT,...: a module that
+    # honours module_disabled_by_switch gets an ON/OFF row (next insertion),
+    # and an active module's declared options follow it, indented.
     _rx3_rows=
     _rx3_utility="${RX3_ISO_ROOT:-/mnt/iso}/modules/utility"
-    [ -r "$_rx3_utility" ] && while IFS='|' read -r _rx3_id _rx3_label _rx3_revision; do
+    _rx3_index="${RX3_ISO_ROOT:-/mnt/iso}/modules/settings"
+    [ -r "$_rx3_utility" ] && while IFS='|' read -r _rx3_id _rx3_label _rx3_revision _rx3_switch; do
         case " $LOADED_MODULES " in *" $_rx3_id "*) ;; *) continue ;; esac
         case "$_rx3_label$_rx3_revision" in *[!A-Za-z0-9' ().+-']*) continue ;; esac
         case " $DISABLED_MODULES $INACTIVE_MODULES " in
             *" $_rx3_id "*) _rx3_state=OFF ;;
             *) _rx3_state=ON ;;
         esac
-        _rx3_rows="$_rx3_rows${_rx3_rows:+;}$_rx3_label|$_rx3_state $_rx3_revision"
+        case "$_rx3_switch: $INACTIVE_MODULES " in
+            1:*" $_rx3_id "*|[!1]*|"") _rx3_rows="$_rx3_rows${_rx3_rows:+;}$_rx3_label|$_rx3_state $_rx3_revision" ;;
+            *) _rx3_rows="$_rx3_rows${_rx3_rows:+;}$_rx3_label|$_rx3_revision|$_rx3_id.enabled|0|$(
+                   [ "$_rx3_state" = ON ] && echo on || echo off)|on=ON,off=OFF" ;;
+        esac
+        [ "$_rx3_state" = ON ] && [ -r "$_rx3_index" ] &&
+            while IFS='|' read -r _rx3_owner _rx3_key _rx3_text _rx3_live _rx3_env _rx3_choices; do
+                [ "$_rx3_owner" = "$_rx3_id" ] || continue
+                case "$_rx3_key" in ""|*[!a-z0-9-]*) continue ;; esac
+                case "$_rx3_live" in 0|1) ;; *) continue ;; esac
+                case "$_rx3_env" in RX3_*) ;; *) continue ;; esac
+                case "$_rx3_env" in *[!A-Z0-9_]*) continue ;; esac
+                case "$_rx3_text$_rx3_choices" in ""|*[!A-Za-z0-9' ().+=,-']*) continue ;; esac
+                # The environment name was checked above: RX3_ and upper case.
+                eval "_rx3_value=\${$_rx3_env-}"
+                case "$_rx3_value" in ""|*[!A-Za-z0-9.+-]*) continue ;; esac
+                _rx3_rows="$_rx3_rows;  $_rx3_text||$_rx3_id.$_rx3_key|$_rx3_live|$_rx3_value|$_rx3_choices"
+            done < "$_rx3_index"
     done < "$_rx3_utility"
     module_export RX3_UTILITY_ROWS "$_rx3_rows" "Utility rows" || :
     # The version is only shown to the operator: an image without a valid one
@@ -536,16 +557,93 @@ module_inactive()
     esac
 }
 
+# The DJ's own switch, set from Utility, lives on the drive as
+# "<module>.enabled = off" and lasts until it is turned back on there.
 module_disabled_by_switch()
 {
     _rx3_switch=$(module_switch_path "$1")
-    [ -e "$_rx3_switch" ] || return 1
+    if [ -e "$_rx3_switch" ]; then
+        _rx3_why="$_rx3_switch exists"
+    elif [ "$(module_setting "$1.enabled" on)" = off ]; then
+        _rx3_why="$1.enabled = off in settings.cfg"
+    else
+        return 1
+    fi
     case " $DISABLED_MODULES " in
         *" $1 "*) ;;
         *) DISABLED_MODULES="$DISABLED_MODULES $1" ;;
     esac
-    say "$1 disabled: $_rx3_switch exists"
+    say "$1 disabled: $_rx3_why"
     return 0
+}
+
+# Changes made in Utility reach the drive through one small loop per
+# insertion: the core leaves "key = value" lines in RAM once the DJ stops
+# changing things, and this merges them into settings.cfg like the desktop app
+# does (other lines kept, one line per key). A file the deck would not read is
+# never rewritten. A newer insertion takes over by writing its own token.
+SETTINGS_PENDING=/tmp/rx3-settings.pending
+SETTINGS_WRITER=/tmp/rx3-settings-writer
+
+settings_merge()
+{
+    [ -s "$1" ] || return 0
+    _rx3_existed=0
+    if [ -e "$2" ]; then
+        [ "$(wc -c < "$2" 2>/dev/null || echo 65537)" -le 65536 ] || return 1
+        _rx3_existed=1
+    fi
+    awk -v existed="$_rx3_existed" '
+        FILENAME == ARGV[1] {
+            sub(/\r$/, "")
+            if ($0 !~ /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]* = [A-Za-z0-9.+-]+$/) next
+            at = index($0, " = "); k = substr($0, 1, at - 1)
+            if (!(k in value)) order[++count] = k
+            value[k] = substr($0, at + 3)
+            next
+        }
+        {
+            sub(/\r$/, ""); line[++lines] = $0; at = index($0, "=")
+            if (!at || $0 ~ /^[ \t]*#/) next
+            k = substr($0, 1, at - 1); gsub(/^[ \t]+|[ \t]+$/, "", k); key[lines] = k
+            if (k == "version") { v = substr($0, at + 1); gsub(/^[ \t]+|[ \t]+$/, "", v); version = v }
+        }
+        END {
+            if (existed && version != "1") exit 1
+            if (!existed) print "version = 1"
+            for (i = 1; i <= lines; i++) {
+                k = key[i]
+                if (k != "" && (k in value)) {
+                    if (!(k in done)) print k " = " value[k]
+                    done[k] = 1
+                } else print line[i]
+            }
+            for (j = 1; j <= count; j++) if (!(order[j] in done)) print order[j] " = " value[order[j]]
+        }
+    ' "$1" "$( [ "$_rx3_existed" = 1 ] && echo "$2" || echo /dev/null)" > "$2.new" &&
+        mv -f "$2.new" "$2" && sync && return 0
+    rm -f "$2.new"
+    return 1
+}
+
+settings_writer()
+{
+    while [ -d "$USB/RX3_RUNTIME" ] && [ "$(cat "$SETTINGS_WRITER" 2>/dev/null)" = "$1" ]; do
+        sleep 1
+        mv -f "$SETTINGS_PENDING" "$SETTINGS_PENDING.taken" 2>/dev/null || continue
+        if settings_merge "$SETTINGS_PENDING.taken" "$USB/RX3_RUNTIME/settings.cfg"; then
+            say "Utility changes saved in settings.cfg"
+        else
+            say "WARNING: settings.cfg is not a version 1 settings file; Utility changes not saved"
+        fi
+        rm -f "$SETTINGS_PENDING.taken"
+    done
+}
+
+start_settings_writer()
+{
+    echo "$$" > "$SETTINGS_WRITER" || return 1
+    settings_writer "$$" < /dev/null > /dev/null 2>&1 &
 }
 
 preload_contains()

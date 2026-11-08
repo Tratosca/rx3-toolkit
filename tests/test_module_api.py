@@ -143,6 +143,114 @@ class ModuleApiTests(unittest.TestCase):
                 "STEMS|OFF 8351ffc;TROUBLESHOOTING REPORT|OFF 1d824ea+",
             )
 
+    def test_utility_rows_carry_switches_and_declared_options(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "modules").mkdir()
+            (Path(directory) / "modules/utility").write_text(
+                "key-sync|KEY SYNC|abc1234|1\n"
+                "logo|LOGO|0123456|0\n"
+                "samples|SAMPLES|1111111|1\n"
+                "browse-columns|THIRD BROWSE COLUMN|2222222|1\n",
+                encoding="ascii",
+            )
+            (Path(directory) / "modules/settings").write_text(
+                "key-sync|range|SYNC RANGE|1|RX3_KEY_SYNC_RANGE|1=1 SEMITONE,2=2 SEMITONES\n"
+                "key-sync|mode|SYNC MODE|1|PATH|harmonic=NEAREST MATCH\n"
+                "key-sync|gone|GONE|1|RX3_NOT_EXPORTED|1=ONE,2=TWO\n"
+                "key-sync|odd|ODD|2|RX3_KEY_SYNC_RANGE|1=ONE,2=TWO\n"
+                "browse-columns|column|THIRD COLUMN|0|RX3_BROWSE_FIELD|13=BPM,7=ARTIST\n",
+                encoding="ascii",
+            )
+            result = run_shell(
+                f'RX3_ISO_ROOT={shlex.quote(directory)}\n'
+                'for m in core key-sync logo samples browse-columns; do module_begin $m x || exit 10; done\n'
+                'DISABLED_MODULES=" browse-columns"\n'
+                'module_inactive samples\n'
+                'export RX3_KEY_SYNC_RANGE=2 RX3_BROWSE_FIELD=13\n'
+                'rbp_environment_value() { :; }\n'
+                'reconcile_module_set || exit 14\n'
+                'printf "%s" "$RX3_UTILITY_ROWS"\n'
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # An option follows its module only while the module runs; a name
+            # outside RX3_, an unset value or an odd field drops the option.
+            self.assertEqual(result.stdout.splitlines()[-1].split(";"), [
+                "KEY SYNC|abc1234|key-sync.enabled|0|on|on=ON,off=OFF",
+                "  SYNC RANGE||key-sync.range|1|2|1=1 SEMITONE,2=2 SEMITONES",
+                "LOGO|ON 0123456",
+                "SAMPLES|OFF 1111111",
+                "THIRD BROWSE COLUMN|2222222|browse-columns.enabled|0|off|on=ON,off=OFF",
+            ])
+
+    def test_the_drive_can_switch_a_module_off(self):
+        for value, disabled in (("off", True), ("on", False), ("OFF", False)):
+            with tempfile.TemporaryDirectory() as usb:
+                write_settings(usb, "stems.enabled", value)
+                result = run_shell(
+                    f"USB={shlex.quote(usb)}\n"
+                    "module_switch_path() { printf '%s/none' \"$USB\"; }\n"
+                    "module_disabled_by_switch stems; echo \"rc=$? [$DISABLED_MODULES]\"\n"
+                )
+                self.assertEqual(result.stdout.strip(),
+                                 "rc=0 [ stems]" if disabled else "rc=1 []", value)
+
+    def merge(self, existing, pending):
+        """settings.cfg after the deck merges `pending` into `existing` bytes."""
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "settings.cfg"
+            if existing is not None:
+                target.write_bytes(existing)
+            (Path(directory) / "pending").write_bytes(pending)
+            result = run_shell(f"settings_merge {shlex.quote(directory)}/pending "
+                               f"{shlex.quote(str(target))}; echo \"rc=$?\"\n")
+            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()),
+                             sorted({"pending"} | ({"settings.cfg"} if target.exists() else set())))
+            return result.stdout.strip(), target.read_bytes() if target.exists() else None
+
+    def test_utility_changes_merge_into_the_settings_file(self):
+        rc, data = self.merge(
+            b"# mine\r\nversion = 1\r\ntheme-white.mode = dark\r\nkey-sync.range = 2\r\n"
+            b"guard.stems = off\r\nkey-sync.range = 5\r\n",
+            b"key-sync.range = 7\nnot a setting\nKEY.x = 1\nstems.enabled = off\nx.y = a b\n")
+        self.assertEqual(rc, "rc=0")
+        self.assertEqual(data, b"# mine\nversion = 1\ntheme-white.mode = dark\n"
+                               b"key-sync.range = 7\nguard.stems = off\nstems.enabled = off\n")
+        self.assertEqual(self.merge(None, b"key-sync.mode = identical\n"),
+                         ("rc=0", b"version = 1\nkey-sync.mode = identical\n"))
+        # Nothing to merge leaves even a missing file missing.
+        self.assertEqual(self.merge(None, b""), ("rc=0", None))
+        # A file the deck would not read is never rewritten.
+        for content in (b"key-sync.range = 2\n", b"version = 2\n", b"",
+                        b"version = 1\n" + b"#" * 65536):
+            self.assertEqual(self.merge(content, b"key-sync.range = 3\n"), ("rc=1", content))
+
+    def test_the_writer_saves_pending_changes_until_a_newer_one_takes_over(self):
+        with tempfile.TemporaryDirectory() as directory:
+            usb = Path(directory) / "usb"
+            (usb / "RX3_RUNTIME").mkdir(parents=True)
+            pending, token = Path(directory) / "pending", Path(directory) / "token"
+            script = (
+                f"USB={shlex.quote(str(usb))}\n"
+                f"SETTINGS_PENDING={shlex.quote(str(pending))}\n"
+                f"SETTINGS_WRITER={shlex.quote(str(token))}\n"
+                "start_settings_writer || exit 10\n"
+                "until [ -s \"$SETTINGS_WRITER\" ]; do :; done\n"
+                "printf 'key-sync.range = 4\\n' > \"$SETTINGS_PENDING\"\n"
+                "for i in 1 2 3 4 5 6 7 8 9 10; do\n"
+                "  [ -e \"$USB/RX3_RUNTIME/settings.cfg\" ] && [ ! -e \"$SETTINGS_PENDING\" ] && break\n"
+                "  sleep 0.5\n"
+                "done\n"
+                "cat \"$USB/RX3_RUNTIME/settings.cfg\"\n"
+                "echo other > \"$SETTINGS_WRITER\"; sleep 1.5\n"
+                "printf 'key-sync.range = 9\\n' > \"$SETTINGS_PENDING\"; sleep 1.5\n"
+                "cat \"$USB/RX3_RUNTIME/settings.cfg\"; ls \"$SETTINGS_PENDING\"\n"
+            )
+            result = run_shell(script)
+            self.assertEqual(result.stdout.splitlines(),
+                             ["version = 1", "key-sync.range = 4",
+                              "version = 1", "key-sync.range = 4", str(pending)],
+                             result.stderr)
+
     def test_logo_without_artwork_is_skipped_not_fatal(self):
         with tempfile.TemporaryDirectory() as directory:
             core = Path(directory) / "librx3_core.so"

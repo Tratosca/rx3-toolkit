@@ -10,4 +10,6 @@ int write_code(unsigned long, const void *, size_t);
 void clear_instruction_cache(unsigned long, unsigned long);
 /* Compare, then write through write_code. Returns 1 on success. */
 int rx3_write_guarded(unsigned long, const void *, const void *, unsigned int);
+/* rename(2) as a raw system call: rbp's libc import list is not widened. */
+int rx3_rename(const char *, const char *);
 #endif

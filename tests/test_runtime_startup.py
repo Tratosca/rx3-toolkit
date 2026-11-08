@@ -128,6 +128,9 @@ static int rx3_write_guarded(unsigned long a,const void *e,const void *r,unsigne
 static void rx3_input_bind_mode_keys(void (*f)(void)){bound+=f==leave_performance_panel;}
 static void rx3_panels_bind_refresh(void (*f)(void)){bound+=f==refresh_performance_ui;}
 static void rx3_modules_bind_writer(int (*f)(unsigned long,const void *,const void *,unsigned)){bound+=f==rx3_write_guarded;}
+static unsigned watch_utility_only;
+static int rx3_settings_service;
+static void rx3_modules_bind_settings(const void *s){(void)s;}
 static unsigned rx3_modules_start(void){modules_started++;return __builtin_popcount(selection&127);}
 static unsigned rx3_modules_failures(void){return module_fail;}
 static int rx3_modules_uses_audio(void){return !!(selection&2);}

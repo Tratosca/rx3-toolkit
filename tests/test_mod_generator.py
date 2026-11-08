@@ -162,8 +162,25 @@ class ModGeneratorTests(unittest.TestCase):
                 "1.19", ["keyshift"], key, directory, root=REPOSITORY
             )
             plain = load_firmware_codec().read_autoexec(result.output, key)
-            self.assertRegex(plain, rb"keyshift\|KEY SHIFT\|[0-9a-f]{7,12}\+?\n")
+            # The last field says the module can be switched off from Utility.
+            self.assertRegex(plain, rb"keyshift\|KEY SHIFT\|[0-9a-f]{7,12}\+?\|1\n")
             self.assertNotIn(b"|SHARED COMPONENTS|", plain)
+
+    def test_the_image_lists_declared_options_for_utility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            key = directory / "aes256.key"
+            key.write_bytes(b"0123456789012345678901234567890\n")
+            result = build_runtime(
+                "1.19", ["key-sync", "browse-columns"], key, directory, root=REPOSITORY
+            )
+            plain = load_firmware_codec().read_autoexec(result.output, key)
+            self.assertIn(b"key-sync|mode|SYNC MODE|1|RX3_KEY_SYNC_MODE|"
+                          b"harmonic=NEAREST MATCH,identical=MASTER KEY\n", plain)
+            self.assertIn(b"browse-columns|column|THIRD COLUMN|0|RX3_BROWSE_FIELD|"
+                          b"13=BPM,15=KEY,7=ARTIST,11=TIME\n", plain)
+            # key-match came in as a dependency: its option is listed too.
+            self.assertIn(b"key-match|rules|ENERGY BOOST|1|RX3_KEY_MATCH_RULES|0=OFF,", plain)
 
 if __name__ == "__main__":
     unittest.main()

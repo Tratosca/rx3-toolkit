@@ -40,7 +40,7 @@ Choose the features you want in the desktop app. It prepares your USB drive; you
 | **Beat Jump** | Jump 32 beats with pads 7 and 8. Optional immediate repeat makes consecutive jumps respond without waiting for another quantized step. |
 | **Finding tracks** | Add a third BROWSE column for BPM, Camelot key, artist or duration; tap a heading to sort. Optional search without accents finds titles such as "NIÑO" when you type "NINO". |
 | **Display and broadcast** | Add a logo, choose a light screen, hide either deck title, or send Now Playing information to a computer over the rear USB-B connection. These are separate optional modules. |
-| **Checking the drive** | **UTILITY** ends with an **RX3 TOOLKIT** section: the Toolkit version, then each mod on the drive, ON or OFF. |
+| **Checking the drive** | **UTILITY** ends with an **RX3 TOOLKIT** section: the Toolkit version, then each mod on the drive, ON or OFF, and its options. Change them right there; they are saved on the drive. |
 
 The usual RX3 controls remain available unless a selected feature needs their screen space. **Key Shift or Stems uses the touchscreen positions normally occupied by ZOOM and GRID; Samples takes the STATUS position.** You can still use the player's normal playback, cueing and mixing controls. The [module guides](mod/modules) explain individual controls and limits.
 
@@ -177,6 +177,8 @@ If you need to **skip the mod for this insertion**, hold **SHIFT** on either dec
 <summary><b>How can I tell whether it loaded?</b></summary>
 
 Open **UTILITY** and scroll to the end. The **RX3 TOOLKIT** section shows **VERSION**, then one line per mod on the drive with **ON** or **OFF** and the revision it was built from. OFF means the mod is switched off or has nothing to do, for example SAMPLES on a drive without a sample bank.
+
+Press the browse encoder on a line to change it. KEY SYNC range and mode and the Energy Boost rules change at once. Turning a mod ON or OFF and the third BROWSE column read **AFTER REPLUG** until you plug the drive in again. Your choices are saved in `RX3_RUNTIME/settings.cfg` on the drive a couple of seconds after the last change. A mod you turn OFF there stays off, even after a new build, until you turn it back ON in UTILITY.
 
 Then try a selected feature with a suitable track. **Troubleshooting report** is off by default; turn it on in Modules if you need a report. It writes `RX3_RUNTIME/session.txt` to the drive. `=== complete ===` means installation finished; it does not prove every audio and control path works on hardware. A `STOP:` or `FAILED:` line calls for [Troubleshooting](REFERENCES.md#doc-troubleshooting), followed by a clean restart without the mod drive if the player is misbehaving.
 

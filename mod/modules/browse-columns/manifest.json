@@ -31,6 +31,32 @@
   "build_files": [
     "rx3_browse_columns_module.c"
   ],
+  "settings": [
+    {
+      "key": "column",
+      "label": "THIRD COLUMN",
+      "environment": "RX3_BROWSE_FIELD",
+      "live": false,
+      "choices": [
+        [
+          "13",
+          "BPM"
+        ],
+        [
+          "15",
+          "KEY"
+        ],
+        [
+          "7",
+          "ARTIST"
+        ],
+        [
+          "11",
+          "TIME"
+        ]
+      ]
+    }
+  ],
   "messages": {
     "en": {
       "browseColumn.field": "Third column",

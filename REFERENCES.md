@@ -871,7 +871,7 @@ Physical data consolidation and a shell replacement are separate optional follow
 <a id="doc-adr-0002-live-settings-and-fault-containment"></a>
 ### ADR-0002: Live settings, interactive Utility rows and runtime fault containment
 
-**Status:** Proposed; step 0 static evidence and emulator measurements done, hardware measurements and hot-path cost pending
+**Status:** Proposed; step 0, layer 1 (settings file) and layer 2 (editable Utility rows) built and checked in the emulator; hardware measurements, hot-path cost and layers 3 and 4 pending
 **Date:** 2026-11-08
 **Deciders:** François Brille
 **Scope:** The C core (`librx3_core.so`), the module contract, `mod/autoexec.sh` and a new resident watcher, the desktop app's drive writer. Inspired by AZ-MODS for the XDJ-AZ (issue #50), whose source is GPL-3.0-only: only ideas and documented behaviour are reused, no code.
@@ -898,9 +898,9 @@ Every module runs inside `rbp`. A fault in module code kills the player, and wit
 
 One mechanism, a **gate per module** owned by the core, serves the menu, the settings and the fault containment. A gated module keeps its hooks installed (no live unpatching, see the hook service's "No hot unload") but every entry passes straight to the original firmware function. Four layers are built in this order (François, 2026-11-08: settings and menu first).
 
-**1. Settings file on the USB drive.** One `key = value` text file on the drive, `RX3_RUNTIME/settings.cfg` (François, 2026-11-08: beside the display word, the sample banks and the logs), with a `version = 1` line, `#` comments, unknown keys kept, last duplicate wins, CR ignored, 64 KB at most. Keys are `<module>.<key>`. The drive is the source of truth and the options leave the image: a drive without the file runs with the defaults. Nothing is written to the deck's persistent storage, so "drive out, deck stock" still holds. Layer 1 is shell-side only (François, 2026-11-08): `module_setting` in `mod/lib/module-api.sh` reads the file as data at each insertion, the module validates the value, and the environment stays the transport to `rbp`. The desktop app writes the file before the image, changing only its own keys and keeping every other line; a file the deck would not read is left untouched and stops the build with a message. First keys: `key-sync.range`, `key-sync.mode`, `key-match.rules`, `browse-columns.column`, `theme-white.mode` (the older `RX3_RUNTIME/display` word still counts when that key is absent). Layer 2 adds what live changes need: each module's settings declared in its manifest (type, default, EN and FR labels, live or next start) and turned into an index the deck reads, a RAM copy owned by the core, a settings service with change notifications, and the flush to the drive by the watcher while no deck plays.
+**1. Settings file on the USB drive.** One `key = value` text file on the drive, `RX3_RUNTIME/settings.cfg` (François, 2026-11-08: beside the display word, the sample banks and the logs), with a `version = 1` line, `#` comments, unknown keys kept, last duplicate wins, CR ignored, 64 KB at most. Keys are `<module>.<key>`. The drive is the source of truth and the options leave the image: a drive without the file runs with the defaults. Nothing is written to the deck's persistent storage, so "drive out, deck stock" still holds. Layer 1 is shell-side only (François, 2026-11-08): `module_setting` in `mod/lib/module-api.sh` reads the file as data at each insertion, the module validates the value, and the environment stays the transport to `rbp`. The desktop app writes the file before the image, changing only its own keys and keeping every other line; a file the deck would not read is left untouched and stops the build with a message. First keys: `key-sync.range`, `key-sync.mode`, `key-match.rules`, `browse-columns.column`, `theme-white.mode` (the older `RX3_RUNTIME/display` word still counts when that key is absent). Layer 2 adds what live changes need, as built on 2026-11-08 (see layer 2).
 
-**2. Interactive Utility rows.** The DISPLAY MODE mechanism (choice list, commit read from the row, polling on the render thread) becomes a core service. The RX3 TOOLKIT rows become editable: ON/OFF per module and the module's declared options, within the existing 25-row limit and with no help text. ON/OFF toggles the gate, so it is live for every module; an option a module cannot apply live reads "at next start" in DJ language. A row also shows a module stopped by layer 3 (proposed value text: OFF after an error), and turning it back ON clears the quarantine.
+**2. Interactive Utility rows.** The RX3 TOOLKIT rows become choice rows built like DISPLAY MODE (the same stock row words and guards); a commit is read from the row by the core's watcher thread, wherever the row sits. Each module that honours `module_disabled_by_switch` gets an ON/OFF row, followed while it runs by the options its manifest declares (`settings`: key, deck label in English, environment name, live, closed list of choices); the build turns the declarations into `modules/settings` and the shell into `RX3_UTILITY_ROWS`, within the existing 25-row limit and with no help text. Decided by François, 2026-11-08: ON/OFF writes `<module>.enabled = off` and applies at the next insertion until layer 3's gate makes it live; KEY SYNC range and mode and the KEY MATCH rules are live (served by `services->settings->value()`, read from each module's `tick()`), the third BROWSE column applies at the next insertion. A row waiting for the next insertion reads "AFTER REPLUG". The core leaves every key the DJ touched in `/tmp/rx3-settings.pending` two seconds after the last change; a small shell loop left by `core_after_launch` for the insertion (the seed of layer 4's watcher) merges it into `settings.cfg` like the desktop app does and never rewrites a file the deck would not read. Two departures from the first draft: labels are English only, as the rest of Utility; and the write is not held until no deck plays, because the core has no play-state accessor yet. One small write per batch of changes is assumed harmless next to the play history the deck already writes; this is measured on hardware before release. Still to come with layer 3: a row showing a module stopped after an error (OFF after an error), and turning it back ON to clear the quarantine.
 
 **3. Fault containment inside `rbp`.** Every module entry is wrapped by the core:
 - A macro at the top of each hook replacement and around each descriptor callback the core dispatches records a recovery point with `__sigsetjmp(env, 0)` (no mask save, so no system call on hot paths) in a per-thread slot (indexed by tid from a raw `gettid`, or by stack range; to be chosen after the cost measurement). If the module is gated, or on return from a fault, the wrapper calls the original firmware function with the same arguments. A C macro in the function keeps the real signature, so the 5- and 6-argument hooks need no assembly thunk.
@@ -963,7 +963,7 @@ Still open: the cost of `__sigsetjmp(env, 0)` on the render and audio hot paths 
 
 1. [x] Step 0: static evidence and emulator measurements. [ ] Hot-path cost and hardware measurements.
 2. [x] Settings file on the drive, written by the app, read by the modules (layer 1, shell-side).
-3. [ ] Manifest declarations, settings index, RAM copy and core settings service; Utility row service and editable RX3 TOOLKIT rows (layer 2); unblocks the layout option of PR #52.
+3. [x] Manifest declarations, settings index, core settings service and editable RX3 TOOLKIT rows, saved to the drive by a small resident loop (layer 2; emulator 1.19, not yet on hardware). Unblocks the layout option of PR #52. [ ] Drive write during playback measured on hardware.
 4. [ ] Gate, wrappers, handler, hook on `signal_handler`, quarantine and notice (layer 3), with the diagnostics fault module.
 5. [ ] Resident watcher, blame, relaunch and stock fallback (layer 4).
 6. [ ] Stall watchdog and alternate signal stacks (follow-up ADR if needed).
@@ -3236,6 +3236,24 @@ have emulator and host-test evidence; they have not yet run on hardware. The
 native selection index remains zero while focus is on the BROWSE sidebar.
 The list's `0x10` focus flag controls whether that row keeps its white ink;
 without focus, it takes the same dark ink as the other light rows.
+
+**Settings (API version 22).** A module declares the options a DJ may change
+in Utility in its manifest, under `settings`: a `key`, a deck `label`, the
+`environment` name its module.sh exports, `live`, and a closed list of
+`choices` (value, deck text). The build writes them to `modules/settings`
+beside `modules/utility`, which now ends with a 1 when the module honours
+`module_disabled_by_switch`. At each insertion module-api.sh turns both into
+`RX3_UTILITY_ROWS`: an ON/OFF row per switchable module, then its options while
+it runs, each with the value the module exported. `services->settings->value(key)`
+returns the value the DJ chose for a live option, or null when the key has no
+live row (the environment then holds it); modules read it from `tick()`, on
+the watcher thread. Options declared `live: false` and the ON/OFF rows apply at
+the next insertion and read "AFTER REPLUG" until then. Changes reach the drive
+through `/tmp/rx3-settings.pending`, replaced as a whole by the core two
+seconds after the last change and merged into `RX3_RUNTIME/settings.cfg` by
+`settings_writer`, the small loop core_after_launch leaves running for the
+insertion. tests/test_module_consistency.py round-trips every declared choice
+through the module's own shell.
 
 **Memory.** `services->memory` is one ledger for stems, sample banks and the
 theme arena. A module reserves before it allocates, settles once the pages are

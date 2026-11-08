@@ -30,6 +30,49 @@ def modules_by_id():
     return {patch.patch_id: patch for patch in discover_patches()}
 
 
+class UtilitySettingsTests(unittest.TestCase):
+    """An option declared in a manifest is shown in Utility from the value the
+    module's shell exported, and written back under the key that shell reads.
+    The declaration and the shell must name the same two things."""
+
+    def test_declared_options_match_what_the_module_reads_and_exports(self):
+        from tests.test_module_api import run_shell, write_settings
+        declared = 0
+        for patch in discover_patches():
+            for setting in patch.settings:
+                declared += 1
+                for word, _ in setting.choices:
+                    with self.subTest(module=patch.patch_id, key=setting.key, word=word), \
+                            tempfile.TemporaryDirectory() as usb:
+                        write_settings(usb, f"{patch.patch_id}.{setting.key}", word)
+                        core = Path(usb) / "core.so"
+                        core.write_bytes(b"")
+                        result = run_shell(
+                            f"USB='{usb}'\nCORE_OBJECT='{core}'\n"
+                            "module_export() { export \"$1=$2\"; }\n"
+                            f". '{patch.directory / 'module.sh'}'\n"
+                            f"{patch.namespace}_prepare || exit 9\n"
+                            f'printf "%s" "${setting.environment}"\n')
+                        self.assertEqual((result.returncode, result.stdout), (0, word),
+                                         result.stderr)
+        self.assertGreaterEqual(declared, 4)
+
+    def test_unsafe_declarations_are_refused(self):
+        from app.runtime.build import _module_settings
+        good = {"key": "range", "label": "SYNC RANGE", "environment": "RX3_X",
+                "live": True, "choices": [["1", "ONE"], ["2", "TWO"]]}
+        self.assertEqual(len(_module_settings(Path("m.json"), [good])), 1)
+        for change in ({"key": "enabled"}, {"key": "Bad"}, {"label": "a|b"},
+                       {"label": "lower"}, {"environment": "PATH"}, {"live": 1},
+                       {"choices": [["1", "ONE"]]}, {"choices": [["1", "ONE"], ["1", "TWO"]]},
+                       {"choices": [["a=b", "ONE"], ["2", "TWO"]]},
+                       {"choices": [["1", "ONE,TWO"], ["2", "TWO"]]}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                _module_settings(Path("m.json"), [{**good, **change}])
+        with self.assertRaises(ValueError):
+            _module_settings(Path("m.json"), [good, good])
+
+
 class StemHeaderTests(unittest.TestCase):
     """The `.rx3stem` header is declared in Python and parsed in C."""
 

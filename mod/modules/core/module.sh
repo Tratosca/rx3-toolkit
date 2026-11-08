@@ -111,6 +111,7 @@ core_prepare()
 core_after_launch()
 {
     [ "$CORE_INSTALLED" = "1" ] || return 0
+    start_settings_writer || say "WARNING: Utility changes will not be saved on this drive"
     if [ "$CORE_RESIDENT" = "1" ] && [ "$NEW" = "$PID" ]; then
         say "OK: performance core still active from the previous insertion"
         return 0

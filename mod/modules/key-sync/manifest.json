@@ -29,6 +29,80 @@
       "executable": false
     }
   ],
+  "settings": [
+    {
+      "key": "range",
+      "label": "SYNC RANGE",
+      "environment": "RX3_KEY_SYNC_RANGE",
+      "live": true,
+      "choices": [
+        [
+          "1",
+          "1 SEMITONE"
+        ],
+        [
+          "2",
+          "2 SEMITONES"
+        ],
+        [
+          "3",
+          "3 SEMITONES"
+        ],
+        [
+          "4",
+          "4 SEMITONES"
+        ],
+        [
+          "5",
+          "5 SEMITONES"
+        ],
+        [
+          "6",
+          "6 SEMITONES"
+        ],
+        [
+          "7",
+          "7 SEMITONES"
+        ],
+        [
+          "8",
+          "8 SEMITONES"
+        ],
+        [
+          "9",
+          "9 SEMITONES"
+        ],
+        [
+          "10",
+          "10 SEMITONES"
+        ],
+        [
+          "11",
+          "11 SEMITONES"
+        ],
+        [
+          "12",
+          "12 SEMITONES"
+        ]
+      ]
+    },
+    {
+      "key": "mode",
+      "label": "SYNC MODE",
+      "environment": "RX3_KEY_SYNC_MODE",
+      "live": true,
+      "choices": [
+        [
+          "harmonic",
+          "NEAREST MATCH"
+        ],
+        [
+          "identical",
+          "MASTER KEY"
+        ]
+      ]
+    }
+  ],
   "messages": {
     "en": {
       "keyshift.syncRange": "Maximum key shift",

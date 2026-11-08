@@ -18,6 +18,20 @@ static int keyshift_feature_install(const struct rx3_services *services)
     if(rx3_keyshift_ready()){keyshift_metadata_install();keyshift_effective_install();}
     return rx3_keyshift_ready() && framework->panels->register_row(&keyshift_row);
 }
+/* KEY SYNC and KEY MATCH options the DJ changes in Utility apply here, on
+   the watcher thread, within one tick. */
+static void keyshift_feature_tick(void)
+{
+    const struct rx3_settings_service *settings=framework->settings;
+    const char *value;
+    if(settings && (value=settings->value("key-sync.range")))
+        keyshift_sync_range=keyshift_parse_sync_range(value);
+    if(settings && (value=settings->value("key-sync.mode")))
+        keyshift_sync_harmonic=keyshift_parse_sync_mode(value);
+    if(settings && (value=settings->value("key-match.rules")))
+        keyshift_match_rules=rx3_match_rules(value);
+    keyshift_effective_poll();
+}
 static void keyshift_feature_remove(void)
 {
     keyshift_effective_remove();
