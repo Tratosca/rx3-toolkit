@@ -101,6 +101,15 @@ static void fake_colour(void *led, int state, int dim, const void *rgb) {
     const uint8_t *c = rgb;
     writes[count++] = (struct write){led, state, dim, 0, 0, (uint32_t)c[0] << 16 | c[1] << 8 | c[2]};
 }
+static void fake_force(void *led, int state, unsigned period, unsigned origin, long x, int dim) {
+    (void)x; writes[count++] = (struct write){led, state + 10, dim, period, origin, 0};
+}
+static void mixer(unsigned deck, unsigned control, struct rx3_light *light) {
+    assert(deck == RX3_NO_DECK);
+    if (control == RX3_LIGHT_COLOR_FX_SPACE) light->state = RX3_LIGHT_ON;
+    if (control == RX3_LIGHT_COLOR_FX_DUB_ECHO) light->state = RX3_LIGHT_OFF;
+    if (control == RX3_LIGHT_COLOR_FX_SWEEP) light->state = RX3_LIGHT_BLINK;
+}
 static unsigned asked;
 static void slip(unsigned deck, unsigned control, struct rx3_light *light) {
     asked++; assert(deck == 1);
@@ -118,7 +127,7 @@ static void set_led(unsigned i, unsigned id, unsigned channel) {
 }
 static const char owner = 0;
 int main(void) {
-    led_state_writer = fake_state; led_colour_writer = fake_colour;
+    led_state_writer = fake_state; led_colour_writer = fake_colour; led_force_writer = fake_force;
     assert(rx3_input.register_lights(&owner, RX3_LIGHTS_SLIP_LOOP, slip));
     assert(!rx3_input.register_lights(&owner, RX3_LIGHTS_SLIP_LOOP, slip));
     assert(rx3_input.register_lights(&owner, RX3_LIGHTS_PADS, pads));
@@ -149,9 +158,21 @@ int main(void) {
     assert(count == 4);
     assert(writes[0].led == entries[0] && writes[0].state == 1 && writes[1].flag == 1 && writes[1].rgb == 0x123456);
     assert(writes[2].led == entries[2] && writes[3].flag == 0 && writes[3].rgb == 0xff0000);
-    /* The last owner gone, both native refreshes are handed back. */
+    /* The mixer refresh forces the COLOR FX LEDs it is answered for: SPACE 46,
+       DUB ECHO 43, SWEEP 42; FILTER (41) left native, 99 is not a COLOR FX. */
+    assert(rx3_input.register_lights(&owner, RX3_LIGHTS_MIXER, mixer));
+    assert(!rx3_input.register_lights(&owner, RX3_LIGHTS_MIXER, mixer));
+    count = 0; set_led(0, 46, 0); set_led(1, 43, 0); set_led(2, 42, 0);
+    set_led(3, 41, 0); set_led(4, 99, 0); set_led(5, 44, 0);
+    void (*mixer_refresh)(void *, void *) = hooked(0x002d0874u);
+    mixer_refresh(0, list);
+    assert(count == 3);
+    assert(writes[0].led == entries[0] && writes[0].state == 11 && writes[0].flag == 0);
+    assert(writes[1].led == entries[1] && writes[1].state == 10);
+    assert(writes[2].led == entries[2] && writes[2].state == 12 && writes[2].period == 500);
+    /* The last owner gone, every native refresh is handed back. */
     rx3_input.unregister_owner(&owner);
-    assert(detached == 2 && released == 2);
+    assert(detached == 3 && released == 3);
     return 0;
 }
 """, [], ['-D_DEFAULT_SOURCE', '-D_DARWIN_C_SOURCE'])
@@ -251,7 +272,14 @@ static unsigned long native_stream(void *s, unsigned long p, struct rx3_stereo *
 static void native_talkover(void *s, void *t, struct rx3_stereo *o, int n) {
     (void)s; (void)t; (void)n; talkover_calls++; seen_by_talkover = o[0].left;
 }
+static float effect_saw, recorded; static int position_passed;
+static void native_operate(void *m, struct rx3_stereo *o, int n, int p) {
+    (void)m; (void)n; effect_saw = o[0].left; position_passed = p; o[0].left *= 10;
+}
+static void native_capture(void *m, const struct rx3_stereo *o, int n) { (void)m; (void)n; recorded = o[0].left; }
 static void *original_for(unsigned long a) {
+    if (a == 0x0008a52cu) return (void *)native_operate;
+    if (a == 0x0008af50u) return (void *)native_capture;
     return a == 0x000c292cu ? (void *)native_stream : (void *)native_talkover;
 }
 static unsigned deck_seen = 9; static int position_seen;
@@ -260,6 +288,10 @@ static void deck_client(unsigned d, const void *r, int p, struct rx3_stereo *o, 
     o[0].left = 2;
 }
 static void master_client(struct rx3_stereo *o, unsigned n) { (void)n; o[0].left += 0.5f; }
+static void fx_capture(struct rx3_stereo *o, unsigned n) { (void)n; o[0].left = 3; }
+static void fx_send(struct rx3_stereo *o, unsigned n) { (void)n; o[0].left -= 1; }
+static void fx_ret(struct rx3_stereo *o, unsigned n) { (void)n; o[0].left += 1; }
+static const struct rx3_beat_fx_client fx = {fx_capture, fx_send, fx_ret};
 static const char owner = 0, other = 0;
 int main(void) {
     assert(rx3_audio.claim_deck_stream(&owner, deck_client));
@@ -283,6 +315,18 @@ int main(void) {
     rx3_audio.release_master(&owner); assert(detached == 1 && released == 1);
     rx3_audio.release_deck_stream(&owner); assert(detached == 2 && released == 2);
     assert(rx3_audio.claim_deck_stream(&other, deck_client) && installed == 3);
+    /* BEAT FX: the pre-capture records the client's copy, the bus keeps its
+       own block; send runs before the effect, ret after it. */
+    assert(rx3_audio.claim_beat_fx(&owner, &fx) && installed == 5);
+    assert(!rx3_audio.claim_beat_fx(&other, &fx));
+    void (*capture)(void *, const struct rx3_stereo *, int) = hooked(0x0008af50u);
+    void (*operate)(void *, struct rx3_stereo *, int, int) = hooked(0x0008a52cu);
+    out[0].left = 2; capture(0, out, 1); assert(recorded == 3 && out[0].left == 2);
+    operate(0, out, 1, 1); assert(effect_saw == 1 && out[0].left == 11 && position_passed == 1);
+    /* Longer than the copy: recorded as is. */
+    static struct rx3_stereo big[RX3_BEAT_FX_CAPTURE_FRAMES + 1];
+    big[0].left = 5; capture(0, big, RX3_BEAT_FX_CAPTURE_FRAMES + 1); assert(recorded == 5);
+    rx3_audio.release_beat_fx(&owner); assert(detached == 4 && released == 4);
     return 0;
 }
 ''', ['core/services/rx3_audio.c'], ['-D_DEFAULT_SOURCE', '-D_DARWIN_C_SOURCE'])

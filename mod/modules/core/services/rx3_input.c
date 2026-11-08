@@ -14,12 +14,15 @@
 #define PHYSICAL_KEY   ((unsigned long)0x00306b78)
 #define SET_LED_COLOR  ((unsigned long)0x0033e4f8)
 #define SET_LED_STATE  ((unsigned long)0x0033e3f4)
+#define CHECK_MIXER_LED ((unsigned long)0x002d0874)
+#define SET_LED_FORCE  ((unsigned long)0x0033e4a0)
 
 static const uint8_t pad_guard[8] = {0xb8,0x30,0xd1,0xe1,0xf0,0x4f,0x2d,0xe9};
 static const uint8_t send_key_guard[8] = {0xf0,0x4f,0x2d,0xe9,0x0c,0xd0,0x4d,0xe2};
 /* This prologue contains a PC-relative ldr and requires literal relocation. */
 static const uint8_t slip_led_guard[8] = {0xb4,0x3d,0x9f,0xe5,0xf0,0x4f,0x2d,0xe9};
 static const uint8_t led_stat_guard[8] = {0xf0,0x4f,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
+static const uint8_t check_mixer_led_guard[8] = {0xf0,0x4f,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
 static const uint8_t physical_guard[8] = {0xb8,0x30,0xd1,0xe1,0x00,0xc0,0xa0,0xe3};
 
 typedef int (*on_key_pad_fn)(void *, const void *);
@@ -30,6 +33,10 @@ typedef void (*led_refresh_fn)(void *, void *);
    With State 2 the panel runs the blink itself. */
 typedef void (*set_led_state_fn)(void *, int, unsigned int, unsigned int, long, int);
 typedef void (*set_led_color_fn)(void *, int, int, const void *);
+/* uif::Led::setForceState, same arguments: setState ranks BLINK over OFF over
+   ON and keeps the first; this one overrides and locks the LED for the rest
+   of the refresh. */
+typedef set_led_state_fn set_led_force_fn;
 
 #define CLIENT_LIMIT 4u
 #define KEY_CHANNELS 4u
@@ -47,6 +54,7 @@ struct shared_hook {
 #define LED_LIMIT 256u
 /* uif::Led::State. With BLINK the panel runs the blink itself from a
    half-period and an origin in juce::Time::currentTimeMillis. */
+#define LED_OFF 0
 #define LED_ON 1
 #define LED_BLINK 2
 #define BLINK_PERIOD_MS 500u
@@ -54,16 +62,22 @@ struct shared_hook {
 static struct pad_client pad_clients[CLIENT_LIMIT];
 static struct key_client key_clients[CLIENT_LIMIT];
 static unsigned int pad_client_count, key_client_count;
-static const void *slip_led_owner, *pad_led_owner, *mode_key_owners[CLIENT_LIMIT];
-static rx3_light_fn slip_light, pad_light;
+static const void *slip_led_owner, *pad_led_owner, *mixer_led_owner, *mode_key_owners[CLIENT_LIMIT];
+static rx3_light_fn slip_light, pad_light, mixer_light;
 static volatile unsigned int blink_origin, blink_valid;
-static struct shared_hook pad_hook, key_hook, slip_led_hook, pad_led_hook, mode_key_hook;
+static struct shared_hook pad_hook, key_hook, slip_led_hook, pad_led_hook, mixer_led_hook, mode_key_hook;
 static void (*mode_key_action)(void);
 static uint8_t shift_held[KEY_CHANNELS];
 static unsigned int key_trace_limit, key_traced;
 /* The firmware's LED writers. */
 static set_led_state_fn led_state_writer = (set_led_state_fn)SET_LED_STATE;
 static set_led_color_fn led_colour_writer = (set_led_color_fn)SET_LED_COLOR;
+static set_led_force_fn led_force_writer = (set_led_force_fn)SET_LED_FORCE;
+/* The COLOR FX LED IDs in RX3_LIGHT_COLOR_FX order (SPACE, DUB ECHO, SWEEP,
+   NOISE, CRUSH, FILTER). Mixer::checkLedStat blinks the selected type's LED
+   from tMixerChStat +8 bits 3..7; CRUSH (+9 bit 0) is the sixth ID of
+   PcController's Id_cfx table, 41..46, by elimination. */
+static const uint8_t colour_fx_led[RX3_LIGHT_COLOR_FX_COUNT] = {46u, 43u, 42u, 44u, 45u, 41u};
 
 static void enter(struct shared_hook *hook) { __atomic_add_fetch(&hook->active, 1u, __ATOMIC_SEQ_CST); }
 static void leave(struct shared_hook *hook) { __atomic_sub_fetch(&hook->active, 1u, __ATOMIC_SEQ_CST); }
@@ -259,6 +273,34 @@ static void pad_led_hooked(void *self, void *state)
     leave(&pad_led_hook);
 }
 
+/* The mixer's refresh: the COLOR FX buttons, single-colour LEDs. Forced, so
+   the native rule (the selected type blinks) cannot win back. */
+static void mixer_led_hooked(void *mixer, void *state)
+{
+    enter(&mixer_led_hook);
+    ((led_refresh_fn)mixer_led_hook.original)(mixer, state);
+    rx3_light_fn light_of = __atomic_load_n(&mixer_light, __ATOMIC_SEQ_CST);
+    uint8_t *entries;
+    unsigned int count;
+    if (light_of && led_list(state, &entries, &count)) {
+        for (unsigned int i = 0; i < count; i++) {
+            uint8_t *led = entries + i * LED_STRIDE;
+            unsigned int id = *(const uint32_t *)led;
+            for (unsigned int control = 0; control < RX3_LIGHT_COLOR_FX_COUNT; control++) {
+                if (id != colour_fx_led[control]) continue;
+                struct rx3_light light = {RX3_LIGHT_NATIVE, 0u};
+                light_of(RX3_NO_DECK, control, &light);
+                if (light.state == RX3_LIGHT_BLINK)
+                    led_force_writer(led, LED_BLINK, BLINK_PERIOD_MS, blink_origin_ms(), 0, 0);
+                else if (light.state != RX3_LIGHT_NATIVE)
+                    led_force_writer(led, light.state == RX3_LIGHT_OFF ? LED_OFF : LED_ON, 0u, 0u, 0,
+                                     light.state == RX3_LIGHT_DIM);
+            }
+        }
+    }
+    leave(&mixer_led_hook);
+}
+
 /* 1.19 inlines SLIP LOOP in onPhysicalKey. Never consume a native mode event
    or add a page to its cycle: the core only closes its own panels. */
 static int mode_key_hooked(void *player, const void *input)
@@ -311,7 +353,15 @@ static int register_key(const void *owner, unsigned int priority, rx3_key_handle
 
 static int register_lights(const void *owner, unsigned int refresh, rx3_light_fn light)
 {
-    if (!owner || !light || refresh > RX3_LIGHTS_PADS) return 0;
+    if (!owner || !light || refresh > RX3_LIGHTS_MIXER) return 0;
+    if (refresh == RX3_LIGHTS_MIXER) {
+        if (mixer_led_owner ||
+            !acquire(&mixer_led_hook, CHECK_MIXER_LED, check_mixer_led_guard, (void *)mixer_led_hooked, 0))
+            return 0;
+        mixer_led_owner = owner;
+        __atomic_store_n(&mixer_light, light, __ATOMIC_SEQ_CST);
+        return 1;
+    }
     if (refresh == RX3_LIGHTS_SLIP_LOOP) {
         if (slip_led_owner ||
             !acquire(&slip_led_hook, CHECK_SLIP_LED, slip_led_guard, (void *)slip_led_hooked, 1))
@@ -363,6 +413,10 @@ static void unregister_owner(const void *owner)
         __atomic_store_n(&pad_light, 0, __ATOMIC_SEQ_CST);
         pad_led_owner = 0;
     }
+    if (mixer_led_owner == owner) {
+        __atomic_store_n(&mixer_light, 0, __ATOMIC_SEQ_CST);
+        mixer_led_owner = 0;
+    }
     for (unsigned int i = 0; i < CLIENT_LIMIT; i++) {
         if (mode_key_owners[i] == owner) mode_key_owners[i] = 0;
         if (mode_key_owners[i]) modes++;
@@ -370,11 +424,12 @@ static void unregister_owner(const void *owner)
     /* Handlers the owner left behind can still be running; wait them out
        before its code or state may be released. */
     drain(&pad_hook); drain(&key_hook); drain(&slip_led_hook);
-    drain(&pad_led_hook); drain(&mode_key_hook);
+    drain(&pad_led_hook); drain(&mixer_led_hook); drain(&mode_key_hook);
     if (!pads) { relinquish(&pad_hook); if (!pad_hook.original) pad_client_count = 0; }
     if (!keys) { relinquish(&key_hook); if (!key_hook.original) key_client_count = 0; }
     if (!slip_led_owner) relinquish(&slip_led_hook);
     if (!pad_led_owner) relinquish(&pad_led_hook);
+    if (!mixer_led_owner) relinquish(&mixer_led_hook);
     if (!modes) relinquish(&mode_key_hook);
 }
 
@@ -397,7 +452,8 @@ void rx3_input_trace_keys(unsigned int limit)
 
 unsigned int rx3_input_count(void)
 {
-    return pad_client_count + key_client_count + (slip_led_owner != 0) + (pad_led_owner != 0);
+    return pad_client_count + key_client_count + (slip_led_owner != 0) + (pad_led_owner != 0) +
+           (mixer_led_owner != 0);
 }
 
 const struct rx3_input_service rx3_input = {

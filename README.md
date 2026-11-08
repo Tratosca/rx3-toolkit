@@ -145,7 +145,7 @@ In **Modules**, turn on the features you want. The app selects required companio
 | **Send track info to a computer** | Select **Now playing**. It sends each deck's title, BPM, tempo and on-air state over UDP port 50123 on the rear USB-B connection. Its [module guide](mod/modules/now-playing/README.md) explains the receiver. Not yet tested on hardware. |
 | **Collect a troubleshooting report** | Select **Troubleshooting report** to write `RX3_RUNTIME/session.txt` when you insert the drive. The detailed report and Telnet access are technical options; leave them off for ordinary sets. |
 
-Beat Jump, Immediate Beat Jump, Key Shift, Key Sync and Stems are selected by default; Key Sync also brings in Enhanced Key Match. Samples, Third BROWSE column, Accent-insensitive search, Now playing, Logo, Light theme, Heard key, Asshole mode and the troubleshooting options start off. You can see and change the exact selection in **Modules**.
+Beat Jump, Immediate Beat Jump, Key Shift, Key Sync and Stems are selected by default; Key Sync also brings in Enhanced Key Match. Samples, Third BROWSE column, Accent-insensitive search, Now playing, Logo, Light theme, Heard key, Asshole mode, BEAT FX frequency bands and the troubleshooting options start off. You can see and change the exact selection in **Modules**.
 
 ### 5. Install the mod on the USB drive
 
@@ -197,6 +197,8 @@ Tap **KEY** for manual Key Shift. The left and right controls move the selected 
 In **Beat Jump**, pads 7 and 8 give you the longer jumps. For **Samples**, tap **SAMPLES** on the touchscreen (where STATUS normally sits) and tap it again to return to STATUS. Each pad plays once, while held, in a loop or as a latch (press again to stop), at its own level; drag the on-screen bar for the bank volume. If the bank has SHIFT silence on, SHIFT alone stops every pad. Changing screens does not intentionally stop a playing loop or latch. The sample panel and the stored Hot Cues are separate.
 
 With **Light theme**, the deck starts in LIGHT; **SHIFT + SHORTCUT**, or **DISPLAY MODE** in UTILITY, switches between DARK and LIGHT at any time. With **Asshole mode**, tap the eye at the start of a deck's title to hide or show it; each deck has its own, and both titles come back at startup.
+
+With **BEAT FX frequency bands**, SPACE, DUB ECHO and SWEEP stand for LOW, MID and HIGH: a lit button sends its band through BEAT FX, a dark one keeps it dry. All three are lit at startup, which is the stock effect.
 
 With **Third BROWSE column**, tap a column heading to sort, tap it again to reverse, and use the physical **LOAD 1 / LOAD 2** buttons. Earlier versions of the column slowed scrolling on a real RX3; a first RX3 test of the current one scrolled clearly faster ([#15](https://github.com/Tratosca/rx3-toolkit/issues/15)). If something does not respond as described, use the [troubleshooting guide](REFERENCES.md#doc-troubleshooting) and test again without the mod drive.
 
@@ -277,7 +279,7 @@ The list is grouped by what you can play, what needs fixing, then ways to make t
 | **Key Sync and Heard key** | Finish Key Sync and show the key you actually hear when MASTER TEMPO is off, as requested in [#28](https://github.com/Tratosca/rx3-toolkit/issues/28). | Both are in 1.0.0-alpha.1; not yet tested on hardware. |
 | **Hide track titles** | An eye for each deck so you can hide its title without affecting the other deck. | In 1.0.0-alpha.1 as Asshole mode; not yet tested on hardware. |
 | **Quantized stems** | Optionally bring a stem in or out on the next beat or bar. The current immediate response stays the default. | Planned; needs a reliable beat position in the audio path. |
-| **LOW / MID / HIGH CUT for Beat FX** | Choose which frequencies enter an effect while leaving the dry track alone. Planned controls use SPACE, DUB ECHO and SWEEP, with an active light and adjustable cutoff. | Planned; audio and controls need testing. |
+| **BEAT FX frequency bands** | Choose which bands go through BEAT FX, as with FX FREQUENCY on Pioneer DJM mixers: SPACE, DUB ECHO and SWEEP become LOW, MID and HIGH. | Optional module in development; checked in the emulator, not yet tested on hardware. |
 | **Connected RX3 ideas** | Explore Link Export over USB or Wi-Fi, live audio streaming and remote control from [#32](https://github.com/Tratosca/rx3-toolkit/issues/32) and [#37](https://github.com/Tratosca/rx3-toolkit/issues/37). | Contributor proposals, not supported features. SSH and screen streaming are research tools. |
 | **Waveforms for tracks without rekordbox analysis** | Investigate a moving waveform for an unanalysed track, separate from the Browse request in [#15](https://github.com/Tratosca/rx3-toolkit/issues/15). | Research only. |
 

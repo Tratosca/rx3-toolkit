@@ -27,6 +27,7 @@ The current overview comes first. The engineering findings from `docs/` follow, 
 - [8. Faster decoder polling](#8-faster-decoder-polling)
 - [9. Building and running](#9-building-and-running)
 - [Appendix A: front-panel codes](#appendix-a-front-panel-codes)
+- [Appendix B: BEAT FX frequency bands](#doc-beatfx-eq)
 
 ### Complete documents from `docs/`
 
@@ -118,7 +119,7 @@ The sections below are the stable overview. Exact procedures, binary layouts, me
 | Operating and recovery | [Troubleshooting](#doc-troubleshooting) (symptoms and recovery), [root filesystem and key source](#doc-extract-initramfs) (manual procedure), [macOS distribution](#doc-macos-distribution) (packaging), [module recovery](#doc-recovering-a-module) (provenance and address gates) |
 | Runtime contracts | [Shared framework](#doc-runtime-framework) (service ownership and API versions), [reinsertion](#doc-runtime-reinsertion-plan) (restart decision), [performance tabs](#doc-performance-tab-matrix) (visible panels), [ADR 0001](#doc-adr-0001-restructure-in-place) (desktop restructuring decision), [ADR 0002](#doc-adr-0002-live-settings-and-fault-containment) (live settings and fault containment) |
 | Audio data and preparation | [Stem package](#doc-stem-package) (binary contract), [migration](#doc-stems-migration) (v0.5.2 files), [waveform formats](#doc-waveform-formats) (Blue/RGB/3Band), [transposition](#doc-transposition) (harmonic rules), [local sample projects](#doc-samples-local-projects) (host storage) |
-| Audio investigations | [In-memory waveform tests](#doc-waveform-in-memory-tests), [waveform performance](#doc-waveform-performance-antisocial), [OverCue static analysis](#doc-overcue-static-analysis), [OverCue prototype](#doc-overcue-prototype), [physical RX3 benchmark](#doc-overcue-rx3-benchmark), [superseded stems design](#doc-history-legacy-stems) |
+| Audio investigations | [BEAT FX frequency bands](#doc-beatfx-eq), [In-memory waveform tests](#doc-waveform-in-memory-tests), [waveform performance](#doc-waveform-performance-antisocial), [OverCue static analysis](#doc-overcue-static-analysis), [OverCue prototype](#doc-overcue-prototype), [physical RX3 benchmark](#doc-overcue-rx3-benchmark), [superseded stems design](#doc-history-legacy-stems) |
 | Display and interaction | [Pad visual design](#doc-pad-visual-design), [Key Sync follow-up](#doc-key-sync-follow-up), [title visibility](#doc-title-visibility), [BROWSE scrolling](#doc-browse-scroll-performance). The [DJ UX audit](#doc-ux-audit-dj) is a dated audit with proposals; check current UI before treating a proposal as pending. |
 | Validation and incidents | [0.6.0 acceptance campaign](docs/acceptance/0.6.0/ACCEPTANCE.md#doc-acceptance-0-6-0-readme) and its cases, [hardware feedback](#doc-hardware-feedback-20260929), [emulator feedback](#doc-emulator-feedback-20260929), [startup incident](#doc-rx3-startup-incident) |
 
@@ -703,6 +704,49 @@ These travel a different path from the pads: a table pumped by the interface cyc
 | 17 | Back |
 
 Menu is worth calling out: the handler measures how long the key is held, so tapping it is a *different gesture*, not a faster one.
+
+### COLOR FX buttons
+
+Names from `PcControlKeyData::keyCode2Text` and `allinone_debug::button`; `EupRxDataCheck::checkOtherData` sends each press through `IKeyManager::sendKey` twice, for channels 1 and 2. The EUP bit is the frame's logical byte 90 (firmware offset `0x59` after the 32-bit swap). LED IDs are those `Mixer::checkLedStat` blinks for the selected type.
+
+| Code | Button | EUP bit | LED ID | `EnSoundColorFxType` |
+| --- | --- | --- | --- | --- |
+| `0x50a1` | SPACE | `0x08` | 46 | 5 |
+| `0x50a2` | DUB ECHO | `0x40` | 43 | 4 |
+| `0x50a3` | SWEEP | `0x20` | 42 | 3 |
+| `0x50a4` | NOISE | `0x80` | 44 | 2 |
+| `0x50a5` | CRUSH | not traced | 45, by elimination | 6 |
+| `0x50a6` | FILTER | `0x10` | 41 | 1 |
+
+`0x50a7` is the COLOR knob (an analogue value, not a button).
+
+<a id="doc-beatfx-eq"></a>
+## Appendix B: BEAT FX frequency bands
+
+Static evidence on rbp 1.19 (SHA-256 `60bcbd8876116bf09f0d8f747f95d7c7d3081ebd39d6fe14d56005a22f7f3b09`), ELF symbols and ARM disassembly; no hardware run yet. The module is `beatfx-eq`; the core owns every hook below.
+
+**Effect path.** `MixerChannel::updateFilter` and `MasterOutChannel::update` call, on the bus BEAT FX is assigned to, `BeatEffectManager::copyMusicData(const Float2 *, int)` (`0x0008af50`, Roll and Slip Roll record ahead) and then `BeatEffectManager::operateBeatEffect(Float2 *, int, bool)` (`0x0008a52c`, in place, the effect mixes its own direct sound). The core's BEAT FX stage rewrites a copy of the first and wraps the second: `send` before the effect, `ret` after it.
+
+**Routing, as on the DJM-900NXS2, A9 and V10 FX FREQUENCY.** The block is split into LOW, MID and HIGH; the lit bands go to the effect, the dark ones are added back after it, so they skip both the effect and its own direct mix. All three lit leaves the block untouched. Pioneer's manuals say a lit band receives the effect and give no crossover frequencies.
+
+**Crossover.** The player's isolator split, `IsolatorCoeffs_AllinOne` at `0x0042a6f8`, installed by the `Isolator` constructor at `0x000ba978`: biquads at about 284 Hz and 4649 Hz (fs 44100), Q 0.7071068, each run twice. LOW = LP284^2, MID = LP4649^2(HP284^2), HIGH = HP4649^2. The three bands sum flat within -0.040 to +0.0002 dB from 20 Hz to 20 kHz, with the crossover's phase. Band changes ramp linearly over 145 frames (the isolator's `SMOOTHING_TIME`, 3.3 ms). Whether a DJM uses the same split is not known.
+
+**Controls.** SPACE, DUB ECHO and SWEEP (`0x50a1`..`0x50a3`) are consumed before the player sees them, so `MixerChInnards::onEv_ColorFxSW` (`0x002d3684`) never selects their COLOR FX. Their LEDs are forced after `Mixer::checkLedStat` (`0x002d0874`) with `uif::Led::setForceState` (`0x0033e4a0`): `setState` ranks BLINK over OFF over ON and keeps the first, so it cannot turn a lit COLOR FX LED off.
+
+**Emulator check (1.19).** Image `bb35d44d` (core, beatfx-eq, logging); a test track of three equal sines (60 Hz, 1 kHz, 10 kHz) on deck 1; BEAT FX ECHO on MASTER, LEVEL/DEPTH at maximum. Tone amplitudes at the output, each the same over four readings after about 10 s of audio:
+
+| State | 60 Hz | 1 kHz | 10 kHz |
+| --- | --- | --- | --- |
+| BEAT FX off | 0.0119 | 0.0119 | 0.0119 |
+| ECHO, all lit | 0.0083 | 0.0396 | 0.0312 |
+| SPACE dark (LOW dry) | 0.0118 | 0.0394 | 0.0312 |
+| SWEEP dark (HIGH dry) | 0.0084 | 0.0396 | 0.0121 |
+| DUB ECHO dark (MID dry) | 0.0082 | 0.0121 | 0.0306 |
+| ECHO, all lit again | 0.0082 | 0.0396 | 0.0312 |
+
+Each press also flips one steady bit of the LED frame (EUP TX byte 19: SPACE `0x20`, DUB ECHO `0x04`, SWEEP `0x02`). The emulator's channel 2 is silent with or without the module, and its idle panel frame holds LEVEL/DEPTH (`0x448f`, wire bytes `0x4c`/`0x4d`) at zero; CH SELECT is wire `0x5a` bits 2-4 (0 is MASTER), BEAT FX ON wire `0x5b` bit `0x04`.
+
+**Not established.** CPU cost on the deck (two crossovers, 16 biquads per stereo frame); the native block size (the stage copies at most 4096 frames); effect tails and Roll on hardware; a switch of the BEAT FX channel while a band is dark briefly continues the previous bus's filter state.
 
 <!-- BEGIN INTEGRATED DOCS -->
 ## Complete documents migrated from `docs/`

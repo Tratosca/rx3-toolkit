@@ -69,7 +69,7 @@ static const struct rx3_input_service input = {.register_pad = register_pad, .re
     .register_lights = register_lights, .claim_mode_keys = claim_modes,
     .unregister_owner = unregister_owner, .shift_held = shift_held,
     .blink_on = blink_on, .blink_restart = blink_restart};
-static const struct rx3_audio_service audio = {claim_stream, release_stream, claim_master, release_master};
+static const struct rx3_audio_service audio = {claim_stream, release_stream, claim_master, release_master, 0, 0};
 static const struct rx3_services services = {.log_line = quiet, .log_number = quiet_number,
     .panels = &panels, .input = &input, .audio = &audio, .memory = &memory_mock,
     .provide_mix = provide_mix, .withdraw_mix = withdraw_mix,

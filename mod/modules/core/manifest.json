@@ -129,6 +129,7 @@
       "browse-columns/rx3_browse_columns_module.c",
       "core/services/rx3_titles.c",
       "asshole-mode/rx3_asshole_module.c",
+      "beatfx-eq/rx3_beatfx_eq_module.c",
       "core/services/rx3_input.c",
       "core/services/rx3_audio.c",
       "core/services/rx3_memory.c",

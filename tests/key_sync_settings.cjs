@@ -153,7 +153,7 @@ for (const language of ['en', 'fr']) {
     const allGroups=ui.document.getElementById('module-list').children;
     const groups=allGroups.filter(group=>group.id!=='modules-advanced');
     assert.deepEqual(Array.from(groups,group=>group.dataset.category),
-      ['beatjump','harmonic-mixing','samples','stems','screen','streaming','diagnostics']);
+      ['beatjump','harmonic-mixing','samples','stems','effects','screen','streaming','diagnostics']);
     for(const group of groups) {
       const module=data.modules.find(item=>item.category===group.dataset.category);
       assert.equal(group.children[0].children[0].children[0].textContent,module.categoryUi.name[language]);
