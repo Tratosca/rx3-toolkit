@@ -15,9 +15,8 @@ def sync_mode(value="harmonic") -> str:
     return value
 
 
-def files(value=1, mode="harmonic") -> dict[str, bytes]:
-    return {"sync-range.txt": f"{sync_range(value)}\n".encode("ascii"),
-            "sync-mode.txt": f"{sync_mode(mode)}\n".encode("ascii")}
+def settings(value=1, mode="harmonic") -> dict[str, str]:
+    return {"key-sync.range": str(sync_range(value)), "key-sync.mode": sync_mode(mode)}
 
 
 def _accepts(reference, candidate, native_keys, rules):

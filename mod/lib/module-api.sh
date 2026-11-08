@@ -425,6 +425,35 @@ module_export()
     return 0
 }
 
+# The DJ's settings live on the drive, not in the image, so one drive keeps its
+# setup from deck to deck. RX3_RUNTIME/settings.cfg is plain data, never
+# sourced: a "version = 1" line, then "<module>.<key> = <value>" lines, "#"
+# comments, the last line of a key wins. Without that version line, or over
+# 64 KB, it is not a settings file and every key reads as its default.
+# Prints the value of $1, or $2. The module still validates what it gets.
+module_setting()
+{
+    _rx3_settings="$USB/RX3_RUNTIME/settings.cfg"
+    if [ ! -r "$_rx3_settings" ] ||
+       [ "$(wc -c < "$_rx3_settings" 2>/dev/null || echo 65537)" -gt 65536 ]; then
+        printf '%s' "$2"
+        return 0
+    fi
+    awk -v want="$1" -v fallback="$2" '
+        { sub(/\r$/, "") }
+        /^[ \t]*(#|$)/ { next }
+        {
+            at = index($0, "=")
+            if (!at) next
+            key = substr($0, 1, at - 1); value = substr($0, at + 1)
+            gsub(/^[ \t]+|[ \t]+$/, "", key); gsub(/^[ \t]+|[ \t]+$/, "", value)
+            if (key == "version") version = value
+            else if (key == want) { found = 1; wanted = value }
+        }
+        END { printf "%s", (version == "1" && found) ? wanted : fallback }
+    ' "$_rx3_settings"
+}
+
 # An absent module has no prepare hook to retract its old environment setting.
 # Record the ordered image selection and runtime switches as one startup value
 # so removing or disabling a module asks for a safe restart of the old player.

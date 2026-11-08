@@ -9,5 +9,5 @@ def field(value=DEFAULT_FIELD):
         raise LocalizedError("error.browseColumn")
     return value
 
-def files(value=DEFAULT_FIELD):
-    return {"column.txt": f"{field(value)}\n".encode("ascii")}
+def settings(value=DEFAULT_FIELD):
+    return {"browse-columns.column": str(field(value))}

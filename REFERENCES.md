@@ -898,7 +898,7 @@ Every module runs inside `rbp`. A fault in module code kills the player, and wit
 
 One mechanism, a **gate per module** owned by the core, serves the menu, the settings and the fault containment. A gated module keeps its hooks installed (no live unpatching, see the hook service's "No hot unload") but every entry passes straight to the original firmware function. Four layers are built in this order (François, 2026-11-08: settings and menu first).
 
-**1. Settings file on the USB drive.** One `key = value` text file on the drive (proposed `RX3_SETTINGS/settings.cfg`), with a `version = 1` line, `#` comments, unknown keys kept, last duplicate wins, LF line ends, a size cap. The drive is the source of truth; nothing is written to the deck's persistent storage, so "drive out, deck stock" still holds. The desktop app writes it next to the image; the image keeps the defaults. At start the orchestrator copies it to RAM (`/tmp`); the core reads that copy and owns it in memory. Changes made on the deck go to the RAM copy at once, and the resident watcher (layer 4) writes the drive only while no deck is playing, through a temporary file, rename and `sync`. A file that fails to parse is neither used nor overwritten. Each module declares its settings in its manifest (key, type: switch, choice or range, default, EN and FR labels, `live` or `next start`); the build turns them into the index the deck reads. The core exposes a settings service: read a value, be told when it changes, on a stated thread.
+**1. Settings file on the USB drive.** One `key = value` text file on the drive, `RX3_RUNTIME/settings.cfg` (François, 2026-11-08: beside the display word, the sample banks and the logs), with a `version = 1` line, `#` comments, unknown keys kept, last duplicate wins, CR ignored, 64 KB at most. Keys are `<module>.<key>`. The drive is the source of truth and the options leave the image: a drive without the file runs with the defaults. Nothing is written to the deck's persistent storage, so "drive out, deck stock" still holds. Layer 1 is shell-side only (François, 2026-11-08): `module_setting` in `mod/lib/module-api.sh` reads the file as data at each insertion, the module validates the value, and the environment stays the transport to `rbp`. The desktop app writes the file before the image, changing only its own keys and keeping every other line; a file the deck would not read is left untouched and stops the build with a message. First keys: `key-sync.range`, `key-sync.mode`, `key-match.rules`, `browse-columns.column`, `theme-white.mode` (the older `RX3_RUNTIME/display` word still counts when that key is absent). Layer 2 adds what live changes need: each module's settings declared in its manifest (type, default, EN and FR labels, live or next start) and turned into an index the deck reads, a RAM copy owned by the core, a settings service with change notifications, and the flush to the drive by the watcher while no deck plays.
 
 **2. Interactive Utility rows.** The DISPLAY MODE mechanism (choice list, commit read from the row, polling on the render thread) becomes a core service. The RX3 TOOLKIT rows become editable: ON/OFF per module and the module's declared options, within the existing 25-row limit and with no help text. ON/OFF toggles the gate, so it is live for every module; an option a module cannot apply live reads "at next start" in DJ language. A row also shows a module stopped by layer 3 (proposed value text: OFF after an error), and turning it back ON clears the quarantine.
 
@@ -962,8 +962,8 @@ Still open: the cost of `__sigsetjmp(env, 0)` on the render and audio hot paths 
 ##### Actions
 
 1. [x] Step 0: static evidence and emulator measurements. [ ] Hot-path cost and hardware measurements.
-2. [ ] Settings file, manifest declarations and settings service (layer 1).
-3. [ ] Utility row service and editable RX3 TOOLKIT rows (layer 2); unblocks the layout option of PR #52.
+2. [x] Settings file on the drive, written by the app, read by the modules (layer 1, shell-side).
+3. [ ] Manifest declarations, settings index, RAM copy and core settings service; Utility row service and editable RX3 TOOLKIT rows (layer 2); unblocks the layout option of PR #52.
 4. [ ] Gate, wrappers, handler, hook on `signal_handler`, quarantine and notice (layer 3), with the diagnostics fault module.
 5. [ ] Resident watcher, blame, relaunch and stock fallback (layer 4).
 6. [ ] Stall watchdog and alternate signal stacks (follow-up ADR if needed).
@@ -3016,13 +3016,13 @@ renders the rail and preserves theme adaptation and the selected-state frame.
 <a id="doc-runtime-framework--key-sync-configuration"></a>
 ##### KEY SYNC configuration
 
-The Toolkit supplies `keyshift/sync-range.txt` to the runtime builder as module
-content (integer 1–12, default 1). The module exports `RX3_KEY_SYNC_RANGE` through
+The Toolkit writes `key-sync.range` to the drive's `RX3_RUNTIME/settings.cfg`
+(integer 1–12, default 1), read on the deck by `module_setting`. The module exports `RX3_KEY_SYNC_RANGE` through
 `module_export`, including its restart detection. The KEY client declares a
 second standard button only while a valid sync offer exists; the core owns its
 layout, rendering and touch dispatch. No KEY-specific drawing is added.
 
-KEY SYNC additionally supplies `sync-mode.txt`. New Toolkit preferences use `harmonic`, a one-semitone limit and no optional Energy Boost rules. Stored preferences and legacy missing-file defaults are preserved. API version 12 adds a copied harmonic reference and deck-key publication to the BROWSE service. Both clients use the observed native key set, the local MASTER and its effective transposed key; the KEY client never changes the MASTER through KEY SYNC. The pure shared solver is checked against the Python preview implementation. See [Transposition](#doc-transposition) for evidence and unavailable-reference behavior.
+KEY SYNC additionally writes `key-sync.mode`. New Toolkit preferences use `harmonic`, a one-semitone limit and no optional Energy Boost rules. Stored preferences and legacy missing-file defaults are preserved. API version 12 adds a copied harmonic reference and deck-key publication to the BROWSE service. Both clients use the observed native key set, the local MASTER and its effective transposed key; the KEY client never changes the MASTER through KEY SYNC. The pure shared solver is checked against the Python preview implementation. See [Transposition](#doc-transposition) for evidence and unavailable-reference behavior.
 
 <a id="doc-runtime-framework--passive-panel-statuses-api-version-7"></a>
 ##### Passive panel statuses (API version 7)

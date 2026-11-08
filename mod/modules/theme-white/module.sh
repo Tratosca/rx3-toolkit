@@ -15,12 +15,10 @@ theme_white_prepare()
     }
     module_disabled_by_switch theme-white && return 0
 
-    # Which mode the deck starts in is the operator's, not ours, and a drive is
-    # the only thing that reaches the player. One word in one file, written by
-    # the computer beside the mod it built; a drive without it behaves as every
-    # drive did before this existed.
-    mode=
-    if [ -r "$USB/RX3_RUNTIME/display" ]; then
+    # Which mode the deck starts in is the DJ's, kept on the drive. The older
+    # one-word RX3_RUNTIME/display file still counts when settings.cfg is silent.
+    mode=$(module_setting theme-white.mode "")
+    if [ -z "$mode" ] && [ -r "$USB/RX3_RUNTIME/display" ]; then
         IFS= read -r mode < "$USB/RX3_RUNTIME/display" || :
     fi
     # Choosing the module is asking for the light display, so a drive that

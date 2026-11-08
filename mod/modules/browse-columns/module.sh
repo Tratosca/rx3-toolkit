@@ -5,10 +5,7 @@ browse_columns_prepare()
 {
     [ -r "$CORE_OBJECT" ] || return 1
     module_disabled_by_switch browse-columns && return 0
-    browse_field=13
-    if [ -r /mnt/iso/modules/browse-columns/column.txt ]; then
-        read -r browse_field < /mnt/iso/modules/browse-columns/column.txt
-    fi
+    browse_field=$(module_setting browse-columns.column 13)
     case "$browse_field" in
         7|11|13|15) ;; *) browse_field=13 ;;
     esac

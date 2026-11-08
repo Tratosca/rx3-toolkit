@@ -39,6 +39,24 @@ RUNNING_HOOK=""
 '''
 
 
+def settings_reader() -> str:
+    """module_setting from module-api.sh, for module scripts tested alone."""
+    import re
+    text = MODULE_API.read_text(encoding="utf-8")
+    return re.search(r"^module_setting\(\)\n\{.*?^\}\n", text, re.S | re.M).group(0)
+
+
+def write_settings(usb, key, raw) -> None:
+    """A drive whose settings file sets `key` to `raw`, or none when raw is None."""
+    path = Path(usb) / "RX3_RUNTIME" / "settings.cfg"
+    if raw is None:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(f"version = 1\n{key} = {raw.strip()}\n", encoding="utf-8")
+
+
 def run_shell(body: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["sh", "-s", "--", str(MODULE_API)],
@@ -50,6 +68,34 @@ def run_shell(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class ModuleApiTests(unittest.TestCase):
+    def setting(self, content, key, fallback="d"):
+        """What module_setting prints for `key` on a drive holding `content`."""
+        with tempfile.TemporaryDirectory() as usb:
+            if content is not None:
+                runtime = Path(usb) / "RX3_RUNTIME"
+                runtime.mkdir()
+                data = content if isinstance(content, bytes) else content.encode()
+                (runtime / "settings.cfg").write_bytes(data)
+            result = run_shell(f"USB={shlex.quote(usb)}\n"
+                               f"module_setting {shlex.quote(key)} {shlex.quote(fallback)}\n")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout
+
+    def test_settings_file_is_read_as_data_with_its_rules(self):
+        self.assertEqual(self.setting(None, "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.b = 4\n", "a.b"), "4")
+        self.assertEqual(self.setting("version = 1\r\n  a.b=4  \r\n", "a.b"), "4")
+        self.assertEqual(self.setting("version = 1\na.b = 4\na.b = 7\n", "a.b"), "7")
+        self.assertEqual(self.setting("version = 1\n# a.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.bc = 4\n", "a.b"), "d")
+        # Not a settings file: no version, another version, or too large.
+        self.assertEqual(self.setting("a.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 2\na.b = 4\n", "a.b"), "d")
+        self.assertEqual(self.setting("version = 1\na.b = 4\n" + "#" * 65536, "a.b"), "d")
+        # A value is text for the module to validate, never shell code.
+        self.assertEqual(self.setting("version = 1\na.b = $(touch injected) x\n", "a.b"),
+                         "$(touch injected) x")
+
     def test_summary_exports_selected_module_count_and_image_version(self):
         with tempfile.TemporaryDirectory() as directory:
             version = Path(directory) / "toolkit-version"

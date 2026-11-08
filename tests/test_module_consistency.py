@@ -204,13 +204,17 @@ class DisplayModeTests(unittest.TestCase):
         unread = exported - understood - {"s"}
         self.assertEqual(unread, set(), f"the module exports {unread}, which the core ignores")
 
-    def prepared_letter(self, display=None):
-        """The letter the module exports for a drive holding `display`."""
+    def prepared_letter(self, display=None, settings=None):
+        """The letter the module exports for a drive holding `display` and `settings`."""
+        api = (Path(__file__).resolve().parents[1] / "mod/lib/module-api.sh").read_text(encoding="utf-8")
+        reader = re.search(r"^module_setting\(\)\n\{.*?^\}\n", api, re.S | re.M).group(0)
         with tempfile.TemporaryDirectory() as usb:
             runtime = Path(usb) / "RX3_RUNTIME"
             runtime.mkdir()
             if display is not None:
                 (runtime / "display").write_text(display + "\n", encoding="utf-8")
+            if settings is not None:
+                (runtime / "settings.cfg").write_text(settings, encoding="utf-8")
             core = Path(usb) / "librx3_core.so"
             core.write_bytes(b"")
             script = (
@@ -220,6 +224,7 @@ class DisplayModeTests(unittest.TestCase):
                 "module_export() { [ \"$1\" = RX3_THEME ] && printf '%s\\n' \"$2\"; }\n"
                 "register_prepare_hook() { :; }\n"
                 "register_after_launch_hook() { :; }\n"
+                + reader +
                 f". '{self.MODULE}'\n"
                 "theme_white_prepare\n"
             )
@@ -234,6 +239,11 @@ class DisplayModeTests(unittest.TestCase):
         # with it selected looks like the module did not load.
         self.assertEqual(self.prepared_letter(), "l")
         self.assertEqual(self.prepared_letter("switch"), "s")
+
+    def test_the_settings_file_wins_over_the_older_display_word(self):
+        self.assertEqual(self.prepared_letter("switch", "version = 1\ntheme-white.mode = dark\n"), "d")
+        # A settings file without the mode leaves the display word in charge.
+        self.assertEqual(self.prepared_letter("switch", "version = 1\n"), "s")
 
     def test_every_mode_the_core_reads_can_be_asked_for(self):
         unreachable = self.understood() - self.exported()

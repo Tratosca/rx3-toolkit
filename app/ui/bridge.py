@@ -40,6 +40,7 @@ from app.services import browse_columns as browse_columns_service
 from app.services import logo as logo_service
 from app.services import mod as mod_service
 from app.services import samples as samples_service
+from app.services import settings as settings_service
 from app.services import stems as stems_service
 from app.stems import processes
 
@@ -550,17 +551,22 @@ class Bridge:
             resolved = {module.patch_id for module in build_module.resolve_patches(
                 build_module.discover_patches(None, firmware), chosen)}
             supplied = {}
+            values = {}
             if "key-sync" in resolved:
-                supplied["key-sync"] = keyshift_service.files(key_sync_range, key_sync_mode)
+                values.update(keyshift_service.settings(key_sync_range, key_sync_mode))
             if "browse-columns" in chosen:
-                supplied["browse-columns"] = browse_columns_service.files(browse_column)
+                values.update(browse_columns_service.settings(browse_column))
             if "key-match" in resolved:
-                supplied["key-match"] = key_match_service.files(key_match_rules)
+                values.update(key_match_service.settings(key_match_rules))
             if frame:
                 self._step(Message("job.logo"))
                 path, canvas, framing, invert = frame
                 supplied[logo_service.MODULE_ID] = logo_service.files(
                     path, canvas, invert_light=invert, **framing)
+            # Before the image, so a file this version cannot update stops the
+            # build early; new settings beside an older image are ignored by it.
+            if values:
+                settings_service.update(destination, values)
             result = build_module.build_runtime(
                 firmware,
                 chosen,

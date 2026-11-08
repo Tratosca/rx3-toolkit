@@ -21,7 +21,7 @@ centre keeps its selection frame independently of the key colour.
 
 KEY SYNC follows the local MASTER reported by the shared BROWSE service. It never offers to transpose the MASTER itself. The service copies the native Traffic Light key set and applies the MASTER's current semitone shift to both its reference key and its accepted keys. No known local MASTER or unavailable reference data means no sync offer. Reading the native set requires a BROWSE update; the implementation does not substitute an assumed Camelot policy before that data is available.
 
-The Toolkit presents compatibility choices first, then KEY SYNC mode and maximum shift. New preferences use `harmonic`, one semitone and no optional Energy Boost rules. Existing stored values, including `identical`, are preserved. The generated module carries `sync-range.txt`, `sync-mode.txt` and the dependent Key Match `rules.txt`. Legacy runtime defaults for missing files remain unchanged.
+The Toolkit presents compatibility choices first, then KEY SYNC mode and maximum shift. New preferences use `harmonic`, one semitone and no optional Energy Boost rules. Existing stored values, including `identical`, are preserved. The Toolkit writes `key-sync.range`, `key-sync.mode` and the dependent `key-match.rules` to the drive's `RX3_RUNTIME/settings.cfg`. A drive without them uses the defaults.
 
 Same key mode seeks the MASTER's effective key. Compatible mode accepts the observed native set and the selected directed +2/+7/+4 rules. Both seek the smallest additional shift, respect the configured range and the absolute +/-12 semitone bound, and prefer an exact match on equal-distance ties, then a positive shift. An already accepted key remains unchanged. Transposition preserves the track's major/minor mode.
 
