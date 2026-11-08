@@ -7,7 +7,6 @@
 #define THEME_JOB_BUDGET 4u
 static uint8_t theme_requested[(STOCK_IMAGE_COUNT + 7u) / 8u];
 static unsigned int theme_request_cursor;
-static unsigned long theme_memory_kb;
 static uint64_t theme_memory_next_us;
 static struct {
     const uint16_t *source;
@@ -51,8 +50,7 @@ static void theme_remap_image(unsigned int image)
         image == 0x829u || image == 0x820u || image == 0x81au ||
         image == 0x7eeu || image == 0x7fbu ||
         image == 0x96du) return;
-    if ((!theme_light_active() && !theme_global_dark) ||
-        !framework->images->variants_ready() || image >= STOCK_IMAGE_COUNT) return;
+    if (!framework->images->variants_ready() || image >= STOCK_IMAGE_COUNT) return;
     unsigned int bit = 1u << (image & 7u);
     if (!(theme_id_done[image >> 3u] & bit)) theme_requested[image >> 3u] |= bit;
 }
@@ -105,7 +103,9 @@ static int theme_begin_conversion(unsigned int image)
     theme_job.count = native.width * native.height;
     theme_job.width = native.width;
     theme_job.height = native.height;
-    theme_job.light = theme_light_active() != 0;
+    /* A switchable DARK screen prewarms its dormant LIGHT table. The global
+       dark remap is a separate mode and still converts to dark pixels. */
+    theme_job.light = !theme_global_dark;
     /* Native list icons are keyed bitmaps, but some use an opaque neutral
        square behind the symbol. Let the LIGHT row colour show through. */
     theme_job.clear_icon_backdrop = theme_job.light &&
@@ -119,22 +119,23 @@ static int theme_begin_conversion(unsigned int image)
 static int theme_run_conversions(void)
 {
     uint8_t *arena = __atomic_load_n(&theme_arena, __ATOMIC_SEQ_CST);
-    if ((!theme_light_active() && !theme_global_dark) ||
-        !arena || !framework->images->variants_ready() ||
+    if (!arena || !framework->images->variants_ready() ||
         __atomic_load_n(&theme_memory_kb, __ATOMIC_SEQ_CST) < THEME_CONVERT_RESERVE_KB) return 0;
     /* A partial result belongs to the mode it was started in. Its source stays
        queued, and its uncommitted arena space can be reused on a mode change. */
     if (theme_job.source) {
         struct rx3_native_image native;
-        if (theme_job.light != (theme_light_active() != 0) ||
+        if (theme_job.light != !theme_global_dark ||
             !framework->images->native_image(theme_job.image, &native) ||
             theme_job.source != native.pixels ||
             theme_job.count != native.width * native.height)
             memset(&theme_job, 0, sizeof(theme_job));
     }
-    unsigned int remaining = THEME_PIXEL_BUDGET;
+    unsigned int urgent = !theme_light_active() &&
+        __atomic_load_n(&theme_toggle_pending, __ATOMIC_SEQ_CST);
+    unsigned int remaining = urgent ? THEME_PIXEL_BUDGET * 8u : THEME_PIXEL_BUDGET;
     int changed = 0;
-    for (unsigned int jobs = 0; jobs < THEME_JOB_BUDGET && remaining; jobs++) {
+    for (unsigned int jobs = 0; jobs < (urgent ? 16u : THEME_JOB_BUDGET) && remaining; jobs++) {
         if (!theme_job.source) {
             int image = theme_next_request();
             if (image < 0) break;

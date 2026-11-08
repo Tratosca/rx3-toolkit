@@ -58,6 +58,10 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- Light theme: when you first switch from DARK to LIGHT, HOME waits for its images to be ready, so the controls and time counters no longer flash on dark boxes. Checked in the emulator with empty decks; not yet run on hardware.
+
+- Light theme: in UTILITY, the row name turns dark as soon as you start changing its value; the value stays white on blue. Checked in the emulator; not yet run on hardware.
+
 - UTILITY lists SAMPLES as OFF when the drive carries no sample bank, instead of ON while the pads do nothing. Not yet run on hardware.
 
 - A drive built without the Toolkit's settings files (command-line builds) now starts KEY SYNC in harmonic mode and KEY MATCH with no added suggestion, the same defaults as the Toolkit. Not yet run on hardware.
@@ -72,7 +76,7 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 - Show a four-second native boot summary when the Toolkit is active, with its build version and enabled mod count in the selected screen language. The native top strip clears when the notice expires. Verified on cold boot and autoexec relaunch in the emulator; not yet run on hardware.
 
-- Light theme: with the module chosen, the deck now starts in LIGHT; SHIFT + SHORTCUT or DISPLAY MODE in Utility switches between DARK and LIGHT at any time, and a switch made while the deck is still starting is no longer undone by the next one. Known: after switching from DARK to LIGHT, the two time counters at the top of the main screen can keep a dark box until you open another screen. Checked in the emulator; not yet run on hardware.
+- Light theme: with the module chosen, the deck now starts in LIGHT; SHIFT + SHORTCUT or DISPLAY MODE in Utility switches between DARK and LIGHT at any time, and a switch made while the deck is still starting is no longer undone by the next one. Known: after a switch, a thin strip at the far left and right edges of the deck strips can keep the old colour until you open another screen. Checked in the emulator; not yet run on hardware.
 
 - Fix: with the light theme and the third BROWSE column both chosen, the mod no longer refuses to start and falls back to the stock player. Checked in the emulator through the real installation; not yet run on hardware.
 - Light theme: coloured numbers and marks that sat on small black plates now sit on the light background: the orange BPM of the MASTER deck, the arcs around the playing deck number, the loop length and the coloured list icons. Checked in the emulator; not yet run on hardware.

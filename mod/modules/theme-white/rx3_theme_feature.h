@@ -23,6 +23,7 @@ static unsigned char theme_source_row_blue[2];
 /* Utility paints exactly one blue cell: the chosen row's name, or its value
    while the value is being changed. 0 until a cell has been seen. */
 static unsigned int theme_utility_blue_cell;
+static unsigned int theme_utility_name_refresh_pending;
 static const uint8_t theme_browse_rect_guard[8] = {
     0xb0, 0x31, 0xd1, 0xe1, 0xf0, 0x4f, 0x2d, 0xe9
 };
@@ -33,7 +34,9 @@ static int theme_key_registered;
  */
 static uint8_t *theme_arena;
 static size_t theme_arena_used;
+static unsigned long theme_memory_kb;
 static int theme_run_conversions(void);
+static int theme_requests_pending(void);
 static unsigned int theme_render_active;
 static uint8_t theme_id_done[(STOCK_IMAGE_COUNT + 7u) / 8u];
 static const uint16_t *theme_seen_source[4096];
@@ -110,9 +113,15 @@ static void theme_browse_rect(void *render, void *rect)
         memcpy(&colour, model + 0x28u, sizeof(colour));
         if (view == 7u && layer == 0x0001u && colour == 0xff1c1f00u &&
             box[1] < 12u * 52u &&
-            ((box[0] == 8u && box[2] == 734u) || (box[0] == 735u && box[2] == 1280u)))
-            theme_utility_blue_cell = (((box[1] + 10u) / 52u) << 2) |
-                                      (box[0] == 8u ? 1u : 2u);
+            ((box[0] == 8u && box[2] == 734u) || (box[0] == 735u && box[2] == 1280u))) {
+            unsigned int cell = (((box[1] + 10u) / 52u) << 2) |
+                                (box[0] == 8u ? 1u : 2u);
+            if (cell != theme_utility_blue_cell) {
+                theme_utility_name_refresh_pending =
+                    theme_utility_name_row(theme_utility_blue_cell, cell);
+                theme_utility_blue_cell = cell;
+            }
+        }
         if (view == 3u && layer == 0x0801u && box[0] == 0u &&
             box[1] == 50u && box[2] == 1280u && box[3] == 659u) {
             theme_browse_track_active = 0u;
@@ -206,6 +215,7 @@ static uint8_t theme_shortcut_swallowed;
  * is how a key press turns into a dropped frame.
  */
 static volatile int theme_toggle_pending;
+static uint64_t theme_arena_wait_deadline_us;
 static unsigned int theme_refresh_pending;
 static unsigned int theme_home_repaint_pending;
 static int theme_last_text_view = -1;
@@ -266,13 +276,36 @@ static void theme_run_pending_toggle(void)
     /* An armed start becomes an ordinary toggle request rather than a second
        way of switching. The tab artwork, the image table and the waveform
        palette then move together, through the one path that already does it. */
+    int starting_light = 0;
     if (theme_light_armed && !theme_light_active() &&
         monotonic_enough_us() >= theme_start_light_not_before_us) {
         theme_light_armed = 0;
+        starting_light = 1;
         __sync_bool_compare_and_swap(&theme_toggle_pending, 0, 1);
         log_line("display mode: the player has painted, taking the display light");
     }
     int request = __atomic_load_n(&theme_toggle_pending, __ATOMIC_SEQ_CST);
+    if ((request == 1 || request == 2) && !starting_light &&
+        !theme_light_active() && !theme_global_dark && theme_requests_pending()) {
+        uint64_t now = monotonic_enough_us();
+        if (!theme_arena_wait_deadline_us)
+            theme_arena_wait_deadline_us = now + 1000000u;
+        /* The watcher allocates after the firmware publishes its image table.
+           Give it a bounded chance before falling back to the stock pixels. */
+        if (!__atomic_load_n(&theme_arena, __ATOMIC_SEQ_CST) &&
+            now < theme_arena_wait_deadline_us)
+            return;
+    }
+    /* During DARK, images drawn on the current screen are converted into the
+       dormant LIGHT table. If a DJ switches before that work is complete,
+       finish it under the still-dark screen before exposing the light one. */
+    if ((request == 1 || request == 2) && !starting_light &&
+        !theme_light_active() && !theme_global_dark &&
+        __atomic_load_n(&theme_arena, __ATOMIC_SEQ_CST) &&
+        __atomic_load_n(&theme_memory_kb, __ATOMIC_SEQ_CST) >= THEME_CONVERT_RESERVE_KB &&
+        theme_requests_pending())
+        return;
+    theme_arena_wait_deadline_us = 0;
     if ((request == 1 || request == 2) &&
         __sync_bool_compare_and_swap(&theme_toggle_pending, request, 3)) {
         /* A request taken while the start is still armed came from the DJ
@@ -367,6 +400,10 @@ static unsigned int theme_refresh_home_child(unsigned int target)
 static void theme_refresh_text_for_view(void)
 {
     int view = ((int (*)(void))0x001126d0u)();
+    if (view != 7) {
+        theme_utility_blue_cell = 0;
+        theme_utility_name_refresh_pending = 0;
+    }
     if (theme_light_active() && view != theme_last_text_view &&
         (view == 3 || view == 7 || view == 12))
         framework->text->invalidate();
@@ -374,7 +411,22 @@ static void theme_refresh_text_for_view(void)
 }
 
 static unsigned int theme_browse_refresh_due;
-static int theme_requests_pending(void);
+static void theme_refresh_utility_name(void *manager)
+{
+    unsigned int pending = theme_utility_name_refresh_pending;
+    theme_utility_name_refresh_pending = 0;
+    if (!pending || pending > 12u || !theme_light_active() ||
+        ((int (*)(void))0x001126d0u)() != 7 ||
+        memcmp((const void *)THEME_REFRESH_OBJECT, theme_refresh_object_guard, 8) ||
+        memcmp((const void *)THEME_UTILITY_NAME_IDS, theme_utility_name_ids_guard, 8) ||
+        memcmp((const void *)THEME_UTILITY_ROOT_LITERAL, theme_utility_root_literal_guard, 8))
+        return;
+    const uint16_t *names = (const uint16_t *)THEME_UTILITY_NAME_IDS;
+    void *root = *(void **)THEME_UTILITY_ROOT_PTR;
+    if (!root) return;
+    ((void (*)(void *, unsigned int))THEME_REFRESH_OBJECT)(root, names[pending - 1u]);
+    original_theme_render_pass(manager);
+}
 static void hooked_theme_render_pass(void *manager)
 {
     if (theme_render_active) { original_theme_render_pass(manager); return; }
@@ -383,11 +435,15 @@ static void hooked_theme_render_pass(void *manager)
     theme_run_pending_toggle();
     theme_refresh_text_for_view();
     int converted = theme_run_conversions();
-    int repaint = converted || previous_theme != theme_light_active();
+    /* A DARK prewarm publishes only into the dormant LIGHT table. It changes
+       no visible pixel, so it must not dirty every native window. */
+    int repaint = (converted && (theme_light_active() || theme_global_dark)) ||
+                  previous_theme != theme_light_active();
     /* Rail tiles drawn before their conversion was published keep the stock
        pixels: the dirty-window pass does not reach them. Once nothing is left
        to convert, ask BROWSE for one native refresh. */
-    if (converted && ((int (*)(void))0x001126d0u)() == 3) theme_browse_refresh_due = 1u;
+    if (converted && theme_light_active() &&
+        ((int (*)(void))0x001126d0u)() == 3) theme_browse_refresh_due = 1u;
     if (theme_browse_refresh_due && !theme_requests_pending()) {
         theme_browse_refresh_due = 0u;
         theme_refresh_pending = 1u;
@@ -408,6 +464,7 @@ static void hooked_theme_render_pass(void *manager)
     } else if (repaint && theme_refresh_header()) {
         original_theme_render_pass(manager);
     }
+    theme_refresh_utility_name(manager);
     theme_render_active = 0;
 }
 
@@ -578,6 +635,7 @@ static void theme_feature_remove(void)
     framework->input->unregister_owner(&theme_enabled);
     theme_key_registered = 0;
     theme_toggle_pending = 0;
+    theme_arena_wait_deadline_us = 0;
 }
 
 #endif /* RX3_THEME_FEATURE_H */
