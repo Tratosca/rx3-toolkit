@@ -1192,6 +1192,7 @@ static void theme_run_pending_toggle(void) {
     if(pending) { light_state=!light_state; pending=0; switches++; }
 }
 static void theme_refresh_text_for_view(void) {}
+static void theme_run_margin_repaint(void) {}
 static void theme_refresh_utility_name(void *manager) { (void)manager; }
 ''' + function(core, "run_pending_ui") + r'''
 static void native_render(void *manager) {

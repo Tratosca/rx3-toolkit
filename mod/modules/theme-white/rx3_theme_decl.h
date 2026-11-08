@@ -93,6 +93,45 @@ static const uint8_t theme_show_screen_guard[8] = {
     0x10, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
 };
 
+/* ui_CTRL_SIMPLE_COUNTER_Clear: BROWSE's independent counter windows can
+   survive a HOME winscape reload. Its 400x60 caution boxes and five margin
+   windows (IDs 227..231, y709..789) then cover the newly painted HOME.
+   Use the same teardown as the native switch back to full counters. */
+#define THEME_SIMPLE_COUNTER_CLEAR ((unsigned long)0x002b5780)
+static const uint8_t theme_simple_counter_clear_guard[8] = {
+    0xf8, 0x45, 0x2d, 0xe9, 0x4c, 0x42, 0x9f, 0xe5
+};
+
+/* DS_HW_ClearScreen: fills the screen surface of each display layer with the
+   layer's colour. The player calls it once, when it sets the resolution at
+   start; keyed windows show that surface wherever they are transparent. */
+#define THEME_CLEAR_SCREEN ((unsigned long)0x001ab900)
+static const uint8_t theme_clear_screen_guard[8] = {
+    0x70, 0x40, 0x2d, 0xe9, 0x10, 0x00, 0xc0, 0xf2
+};
+
+/* DS_HW_FillRect(window, x, y, width | height << 16): fills part of one
+   window with the window's colour and marks the area for the next update. */
+#define THEME_HW_FILL_RECT ((unsigned long)0x001a85f4)
+static const uint8_t theme_hw_fill_rect_guard[8] = {
+    0x30, 0x40, 0x2d, 0xe9, 0x00, 0x40, 0xa0, 0xe1
+};
+/* Display layer 0 and its window records, as DS_HW_UpdateScreen reads them.
+   The base is the literal that function loads; it is checked before use. */
+#define THEME_LAYER0 0x0245b810ul
+#define THEME_LAYER0_LITERAL 0x001a6924ul
+#define THEME_LAYER_WINDOWS 0x70u
+#define THEME_WINDOW_WIDTH 0x08u
+#define THEME_WINDOW_HEIGHT 0x0au
+#define THEME_WINDOW_COLOUR 0x28u
+#define THEME_WINDOW_Y 0x58u
+#define THEME_WINDOW_NEXT 0x84u
+#define THEME_WINDOW_WALK_LIMIT 400u
+#define THEME_MARGIN_MAX_WIDTH 20u
+#define THEME_MARGIN_TOP 709
+#define THEME_MARGIN_BOTTOM 789
+#define THEME_MARGIN_REPAINT_PASSES 3u
+
 #define THEME_COMPONENT_MANAGER ((unsigned long)0x001d0a30)
 static const uint8_t theme_component_manager_guard[8] = {
     0x10, 0x40, 0x2d, 0xe9, 0x20, 0x40, 0x9f, 0xe5
