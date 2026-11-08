@@ -203,7 +203,11 @@ static unsigned int theme_fill_for_rect(unsigned int width, unsigned int height)
 /* The core calls this for solid fills while the light table is shown. */
 static unsigned int theme_fill(unsigned int colour, unsigned int width, unsigned int height)
 {
-    return theme_fill_is_chrome(colour) ? theme_fill_for_rect(width, height) : colour;
+    if (!theme_fill_is_chrome(colour)) return colour;
+    /* The main screen shows no ground: its panes are covered except at thin
+       margins and rows that a switch exposes, and those read as panel. */
+    if (((int (*)(void))0x001126d0u)() == 1) return THEME_FILL_PANEL;
+    return theme_fill_for_rect(width, height);
 }
 
 /* Set when a SHORTCUT press was taken for the combination, so its release is

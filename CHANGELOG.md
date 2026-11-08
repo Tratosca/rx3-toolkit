@@ -58,6 +58,8 @@ The full list of changes since 0.5.2 is in the Unreleased section below.
 
 ## Unreleased
 
+- Light theme: the main screen keeps one background shade after SHIFT + SHORTCUT, instead of a darker grey along the top and bottom edges and beside the deck strips. Checked in the emulator; not yet run on hardware.
+
 - Light theme: after SHIFT + SHORTCUT on the main screen, the thin margins beside and under the deck strips now follow the new mode instead of keeping the old colour, and an empty deck no longer shows "Not Loaded." twice. Checked in the emulator on firmware 1.19 and 1.20; not yet run on hardware.
 
 - Light theme: the KEY, STEMS and SAMPLES tabs now look exactly like STATUS and BEAT FX beside them (same grey border, grey text, and a mid-grey selected tab), instead of a darker style of their own. Checked in the emulator; not yet run on hardware.
