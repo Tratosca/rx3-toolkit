@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 import pathlib
 import json
+import re
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -51,6 +52,97 @@ int main(void) {
 }
 ''', [], flags=('-Wno-unused-function',))
 
+    def test_rating_shows_the_native_stars_like_any_other_field(self):
+        self.run_units(r'''
+#include "core/services/rx3_browse.c"
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
+int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
+int detach_hook(struct installed_hook *h){(void)h;return 1;}
+int release_hook(struct installed_hook *h){(void)h;return 1;}
+static unsigned requests,streams,formats,text_frees,item_frees,drains,number,missing;
+static uint32_t *current;
+static int meta(void *db,unsigned kind,unsigned id){assert(db && kind==2 && id==42);requests++;return 1;}
+static int rec(void *db,unsigned k,unsigned *f,unsigned n,unsigned x,unsigned y,unsigned z) {
+    assert(db && k==2 && !*f && n==1 && !x && y==1 && !z);streams++;return 1;
+}
+/* Firmware 1.19 on an XDJ-RX3: the rating record carries the 0..5 value in
+ * r[0] and a pointer in r[1]; ConvertRKey2RStr returns five U+2605/U+2606. */
+static int next(void *db,uint32_t *r,int a,void *b) {
+    assert(db && !a && !b);r[0]=number;r[1]=0x2e48f708u;r[2]=10;r[7]=1;current=r;return 1;
+}
+static uint16_t text[6];
+static uint16_t *fmt(uint32_t a,uint32_t b,unsigned kind,unsigned flags) {
+    assert(a==number && b==0x2e48f708u && kind==10 && flags==65535);formats++;
+    current[0]=current[1]=0xffffffffu;
+    for(unsigned i=0;i<5;i++)text[i]=i<number?0x2605:0x2606;
+    text[5]=0;return missing?0:text;
+}
+static void drop_text(void *p){assert(p==text);text_frees++;}
+static void drop_item(void *p){assert(p==(void *)1);item_frees++;}
+static void drain(void *db){assert(db);drains++;}
+static int stars(const uint16_t *value,unsigned filled) {
+    for(unsigned i=0;i<5;i++)if(value[i]!=(i<filled?0x2605:0x2606))return 0;
+    return !value[5];
+}
+int main(void) {
+    static uint32_t db[8];uint16_t value[128],other[128];
+    metadata=meta;records=rec;next_record=next;format=fmt;
+    free_text=drop_text;free_item=drop_item;skip=drain;
+    assert(!local_field(10) && sort_for_field(10)==5);
+    /* Every rating, the empty one included, is the firmware's own text. */
+    for(number=0;number<=5;number++) {
+        unsigned before=requests;
+        assert(values_for(db,42,0,10,value,0,other));
+        assert(requests==before+1 && streams==requests && formats==requests);
+        assert(item_frees==requests && drains==requests && text_frees==requests);
+        assert(stars(value,number));
+    }
+    /* Rating in the native column is copied unchanged; one format call. */
+    number=4;unsigned formats_before=formats;
+    assert(values_for(db,42,0,10,value,10,other));
+    assert(stars(value,4) && stars(other,4) && formats==formats_before+1);
+    /* No text means unknown: not complete, nothing shown, still released. */
+    missing=1;unsigned freed=text_frees;
+    assert(!values_for(db,42,0,10,value,0,other) && !value[0] && text_frees==freed);
+    assert(item_frees==requests && drains==requests);
+    /* Rating stays on the generic metadata path and shares its cache. */
+    uint8_t row[532]={0};unsigned context=0;
+    metadata_bind(&context,db,1,2,4,10,0);
+    missing=0;number=3;unsigned before=requests;
+    metadata_values(db,42,row,0,10,value,0,other);
+    assert(requests==before+1 && stars(value,3));
+    metadata_values(db,42,row,0,10,value,0,other);
+    assert(requests==before+1 && stars(value,3));
+    /* An unknown rating is not cached: the next draw asks again. */
+    invalidate_metadata();metadata_bind(&context,db,1,2,4,10,0);missing=1;
+    before=requests;
+    metadata_values(db,42,row,0,10,value,0,other);
+    metadata_values(db,42,row,0,10,value,0,other);
+    assert(requests==before+2 && !value[0]);
+    /* Zero stars reach the row as five empty stars; unknown as U+2014. */
+    static uint8_t connection[0xb98];uint8_t context_rows[0x18000]={0},message[8192]={0};
+    db[0]=(unsigned long)connection;
+    put_word(context_rows+0x6f3c,(unsigned long)db);
+    put_word(context_rows+0x17ea8,1);put_word(context_rows+0x17eac,42);put_half(context_rows+0x17eb0,4);
+    const uint16_t caption[]={'R',0};const struct rx3_browse_column col={10,caption};
+    for(unsigned pass=0;pass<2;pass++) {
+        memset(message,0,sizeof(message));invalidate_metadata();
+        put_word(message+0x1c,68);put_half(message+0x80,2);
+        put_half(message+0x84,13);put_half(message+0x98,1);put_half(message+0x9a,'B');
+        put_half(message+0x9c,13);put_half(message+0xb0,1);put_half(message+0xb2,'0');
+        number=0;missing=pass;before=requests;process(context_rows,message,&col,0);
+        unsigned entry=0x84+22+half(message+0x98)*2;
+        assert(track_list && requests==before+1);
+        if(!pass) {
+            assert(half(message+entry+20)==10);
+            for(unsigned i=0;i<5;i++)assert(half(message+entry+28+i*2)==0x2606);
+        } else assert(half(message+entry+20)==6 && half(message+entry+28)==0x2014);
+    }
+    return 0;
+}
+''', [], flags=('-Wno-unused-function','-fno-pie','-no-pie'))
+
     def test_setting_is_data_and_reaches_the_packaged_module(self):
         self.assertEqual(browse_columns.settings(), {'browse-columns.column': '13'})
         for value in (None, True, 0, 14, '15', '$(id)'):
@@ -74,7 +166,9 @@ int main(void) {
         for locale,label in (('en','Rating'),('fr','Note')):
             self.assertEqual(manifest['messages'][locale]['browseColumn.rating'],label)
         source=pathlib.Path('app/ui/web/app.js').read_text()
-        self.assertIn('[7,10,11,13,15].indexOf(value)',source)
+        fields=re.search(r'\[([\d,\s]+)\]\.indexOf\(value\)',source)
+        self.assertIsNotNone(fields)
+        self.assertEqual({int(value) for value in fields[1].split(',')},set(browse_columns.FIELDS))
         self.assertIn('[10,"rating"]',source)
 
     def test_row_extension_survives_native_utf16_strings_and_capacity(self):
@@ -263,7 +357,7 @@ static int sorted(void *c,void *r,void *q,int code,const uint16_t *label){(void)
 static int validate(void *c,void *m){(void)c;(void)m;return 1;}
 static int passthrough(void *c,void *r,void *q){(void)c;(void)r;(void)q;forwarded++;return 9;}
 int main(void){
-    const uint16_t label[]={'B',0};const struct rx3_browse_column col={13,label};
+    const uint16_t label[]={'B',0};struct rx3_browse_column col={13,label};
     assert(observed_sort(8)==136 && observed_sort(0x4008)==8 && observed_sort(0xc004)==132 && observed_sort(2)==2);
     native_task=task_id;
     original_sort_keys=native_keys;set_sort_type=comparator;
@@ -294,7 +388,11 @@ int main(void){
     assert(!rx3_browse_touch(1200,120,1));assert(!rx3_browse_touch(1200,75,1));assert(!rx3_browse_touch(1200,75,0));assert(!sort_pending);
     visible=0;assert(!rx3_browse_touch(1200,75,1));visible=1;menu=1;assert(!rx3_browse_touch(1200,75,1));
     menu=0;track_list=0;assert(!rx3_browse_touch(1200,75,1));track_list=1;column=0;assert(!rx3_browse_touch(1200,75,1));
-    assert(sort_for_field(7)==2 && sort_for_field(15)==12 && sort_for_field(11)==8 && !sort_for_field(255));
+    rx3_browse_touch(1200,75,0);column=&col;col.field=10;sort_observed=4;
+    rx3_browse_touch(1200,75,1);rx3_browse_touch(1200,75,0);assert(sort_pending==5);
+    sort_pending=0;sort_observed=5;
+    rx3_browse_touch(1200,75,1);rx3_browse_touch(1200,75,0);assert(sort_pending==133);
+    assert(sort_for_field(10)==5 && sort_for_field(7)==2 && sort_for_field(15)==12 && sort_for_field(11)==8 && !sort_for_field(255));
     return 0;
 }
 ''',[])
