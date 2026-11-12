@@ -178,7 +178,7 @@ class ModGeneratorTests(unittest.TestCase):
             self.assertIn(b"key-sync|mode|SYNC MODE|1|RX3_KEY_SYNC_MODE|"
                           b"harmonic=NEAREST MATCH,identical=MASTER KEY\n", plain)
             self.assertIn(b"browse-columns|column|THIRD COLUMN|0|RX3_BROWSE_FIELD|"
-                          b"13=BPM,15=KEY,7=ARTIST,11=TIME\n", plain)
+                          b"13=BPM,15=KEY,7=ARTIST,11=TIME,10=RATING\n", plain)
             # key-match came in as a dependency: its option is listed too.
             self.assertIn(b"key-match|rules|ENERGY BOOST|1|RX3_KEY_MATCH_RULES|0=OFF,", plain)
 

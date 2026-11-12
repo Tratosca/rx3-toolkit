@@ -104,10 +104,13 @@ const browseItem={id:'browse-columns',requires:[],conflicts:[],selectable:true};
 ui=load();ui.state.modules=[browseItem];ui.state.selected=['browse-columns'];
 assert.equal(ui.state.browseColumn,13);
 let browseSelect=ui.moduleTile(browseItem).children[1].children[1];
-assert.equal(browseSelect.children.length,4);assert.equal(browseSelect.disabled,false);
+assert.equal(browseSelect.children.length,5);assert.equal(browseSelect.disabled,false);
+assert.equal(browseSelect.children[4].value,'10');
 browseSelect.value='15';browseSelect.events.change();
 assert.equal(ui.state.browseColumn,15);assert.equal(load().state.browseColumn,15);
 assert.deepEqual(Array.from(ui.state.selected),['browse-columns']);
+browseSelect.value='10';browseSelect.events.change();
+assert.equal(ui.state.browseColumn,10);assert.equal(load().state.browseColumn,10);
 ui.state.selected=[];assert.equal(ui.moduleTile(browseItem).children[1].children[1].disabled,true);
 for(const invalid of ['0','14','oops','1.5']) {
  storage.set('rx3.browseColumn',invalid);assert.equal(load().state.browseColumn,13);

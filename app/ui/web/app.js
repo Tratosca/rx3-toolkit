@@ -28,7 +28,7 @@ var state = {
 function savedBrowseColumn() {
   try {
     var value=Number(window.localStorage.getItem("rx3.browseColumn"));
-    if ([7,11,13,15].indexOf(value)>=0) return value;
+    if ([7,10,11,13,15].indexOf(value)>=0) return value;
   } catch (_) {}
   return 13;
 }
@@ -402,7 +402,7 @@ function moduleTile(item) {
     label.htmlFor="browse-column";
     var select=document.createElement("select");select.id="browse-column";select.disabled=!on;
     select.setAttribute("aria-describedby","browse-column-help");
-    [[13,"bpm"],[15,"key"],[7,"artist"],[11,"time"]].forEach(function(field) {
+    [[13,"bpm"],[15,"key"],[7,"artist"],[11,"time"],[10,"rating"]].forEach(function(field) {
       var option=el("option",null,t("browseColumn."+field[1]));option.value=String(field[0]);
       select.append(option);
     });

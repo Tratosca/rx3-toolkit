@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 import pathlib
+import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -54,14 +55,27 @@ int main(void) {
         self.assertEqual(browse_columns.settings(), {'browse-columns.column': '13'})
         for value in (None, True, 0, 14, '15', '$(id)'):
             with self.assertRaises(LocalizedError): browse_columns.settings(value)
+        for value in (7, 10, 11, 13, 15):
+            self.assertEqual(browse_columns.settings(value), {'browse-columns.column': str(value)})
         result=SimpleNamespace(output='autoexec.bin',size=1,sha256='x',patches=('browse-columns',))
         bridge=Bridge()
         with tempfile.TemporaryDirectory() as drive:
             with patch('app.ui.bridge.build_module.build_runtime',return_value=result) as writer, patch.object(bridge,'_settle'):
-                bridge._build('1.19',['browse-columns'],pathlib.Path('key'),pathlib.Path(drive),None,build.Cancellation(),1,'identical',3,15)
+                bridge._build('1.19',['browse-columns'],pathlib.Path('key'),pathlib.Path(drive),None,build.Cancellation(),1,'identical',3,10)
             self.assertEqual(writer.call_args.kwargs['supplied_files'],{})
             self.assertEqual((pathlib.Path(drive)/'RX3_RUNTIME'/'settings.cfg').read_text(),
-                             'version = 1\nbrowse-columns.column = 15\n')
+                             'version = 1\nbrowse-columns.column = 10\n')
+
+    def test_manifest_and_app_offer_the_same_fields(self):
+        manifest=json.loads(pathlib.Path('mod/modules/browse-columns/manifest.json').read_text())
+        choices=manifest['settings'][0]['choices']
+        self.assertEqual({int(value) for value,label in choices},set(browse_columns.FIELDS))
+        self.assertIn(['10','RATING'],choices)
+        for locale,label in (('en','Rating'),('fr','Note')):
+            self.assertEqual(manifest['messages'][locale]['browseColumn.rating'],label)
+        source=pathlib.Path('app/ui/web/app.js').read_text()
+        self.assertIn('[7,10,11,13,15].indexOf(value)',source)
+        self.assertIn('[10,"rating"]',source)
 
     def test_row_extension_survives_native_utf16_strings_and_capacity(self):
         self.run_units(r'''
@@ -335,19 +349,20 @@ int main(void){
 #include "core/api/rx3_module_api.h"
 extern const struct rx3_module rx3_browse_columns_module;
 static unsigned expected,registered,removed;
-static int add(const void *owner,const struct rx3_browse_column *c){assert(owner&&c&&c->caption&&c->field==expected);registered++;return 1;}
+static int add(const void *owner,const struct rx3_browse_column *c){assert(owner&&c&&c->caption&&c->field==expected);
+if(expected==10){const uint16_t rating[]={'R','A','T','I','N','G',0};assert(!memcmp(c->caption,rating,sizeof(rating)));}registered++;return 1;}
 static void remove_owner(const void *owner){assert(owner);removed++;}
 static const struct rx3_browse_service browse={.column=add,.unregister_owner=remove_owner};
 static const struct rx3_services api={.browse=&browse};
 int main(void){
     unsetenv("RX3_BROWSE_COLUMNS");assert(!rx3_browse_columns_module.configured());
     setenv("RX3_BROWSE_COLUMNS","1",1);assert(rx3_browse_columns_module.configured());
-    const char *choices[]={"13","15","7","11","14","15junk"};unsigned fields[]={13,15,7,11,13,13};
-    for(unsigned i=0;i<6;i++) {
+    const char *choices[]={"13","15","7","11","10","14","15junk"};unsigned fields[]={13,15,7,11,10,13,13};
+    for(unsigned i=0;i<7;i++) {
         setenv("RX3_BROWSE_FIELD",choices[i],1);expected=fields[i];
         assert(rx3_browse_columns_module.start(&api));rx3_browse_columns_module.stop();
     }
-    assert(registered==6&&removed==6);return 0;
+    assert(registered==7&&removed==7);return 0;
 }
 ''',['browse-columns/rx3_browse_columns_module.c'])
 
@@ -362,7 +377,7 @@ register_prepare_hook(){ :; }
 module_disabled_by_switch(){ return 1; }
 module_export(){ printf '%s=%s\\n' "$1" "$2"; }
 '''
-            for raw,expected in ((None,13),('15\n',15),('7\n',7),('11\n',11),('14\n',13),('$(touch injected)\n',13)):
+            for raw,expected in ((None,13),('15\n',15),('7\n',7),('11\n',11),('10\n',10),('14\n',13),('$(touch injected)\n',13)):
                 write_settings(temp,'browse-columns.column',raw)
                 result=subprocess.run(['sh'],input=prefix+script+'\nbrowse_columns_prepare\n',text=True,capture_output=True,check=True,cwd=temp)
                 self.assertIn(f'RX3_BROWSE_FIELD={expected}\n',result.stdout)
