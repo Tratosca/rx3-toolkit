@@ -143,6 +143,73 @@ int main(void) {
 }
 ''', [], flags=('-Wno-unused-function','-fno-pie','-no-pie'))
 
+    def test_sorted_by_rating_the_native_column_keeps_bpm_and_key(self):
+        self.run_units(r"""
+#include "core/services/rx3_browse.c"
+void *install_hook(struct installed_hook *h,unsigned long a,const uint8_t g[8],void *r,void **o){(void)o;(void)h;(void)a;(void)g;(void)r;return 0;}
+int hook_is_installed(const struct installed_hook *h){return h->record!=0;}
+const uint8_t *hook_original_code(unsigned long a){return (const uint8_t *)a;}
+int detach_hook(struct installed_hook *h){(void)h;return 1;}
+int release_hook(struct installed_hook *h){(void)h;return 1;}
+static unsigned position,keys;
+static int meta(void *db,unsigned kind,unsigned id){assert(db && kind==2 && id==42);return 2;}
+static int rec(void *db,unsigned k,unsigned *f,unsigned n,unsigned x,unsigned y,unsigned z){(void)db;(void)k;(void)f;(void)n;(void)x;(void)y;(void)z;position=0;return 1;}
+static int next(void *db,uint32_t *r,int a,void *b){(void)db;(void)a;(void)b;r[0]=3;r[2]=position++?10:13;return 1;}
+static uint16_t *fmt(uint32_t a,uint32_t b,unsigned kind,unsigned flags) {
+    (void)a;(void)b;(void)flags;
+    static uint16_t bpm[16],stars[8];
+    static const uint16_t b0[]={'1','2','4','.','0',' ','b','p','m',0},s0[]={0x2605,0x2605,0x2605,0x2606,0x2606,0};
+    memcpy(bpm,b0,sizeof(b0));memcpy(stars,s0,sizeof(s0));
+    return kind==13?bpm:stars;
+}
+static void done(void *db){(void)db;}
+static void drop(void *p){(void)p;}
+static unsigned get_key(void *db,unsigned id){(void)db;assert(id==42);keys++;return 7;}
+static uint8_t context_rows[0x18000],message[8192];
+static void page(unsigned category,const struct rx3_browse_column *col) {
+    memset(message,0,sizeof(message));invalidate_metadata();
+    put_word(message+0x1c,68);put_half(message+0x80,2);
+    put_half(message+0x84,category);put_half(message+0x98,1);put_half(message+0x9a,'R');
+    put_half(message+0x9c,category);put_half(message+0xb0,1);put_half(message+0xb2,'x');
+    process(context_rows,message,col,0);
+}
+static unsigned native_text(unsigned row,uint16_t *out) {
+    unsigned entry=0x84;
+    if(row)entry+=22+half(message+0x98)*2;
+    unsigned n=0,len=half(message+entry+20);
+    while(n<len && half(message+entry+22+n*2)!=SEP){out[n]=half(message+entry+22+n*2);n++;}
+    out[n]=0;return half(message+entry);
+}
+static int same(const uint16_t *a,const char *b) {
+    unsigned i=0;for(;b[i];i++)if(a[i]!=(uint8_t)b[i])return 0;
+    return !a[i];
+}
+int main(void) {
+    static uint32_t db[8];static uint8_t connection[0xb98];db[0]=(unsigned long)connection;
+    metadata=meta;records=rec;next_record=next;format=fmt;skip=done;free_text=drop;track_key=get_key;
+    put_word(context_rows+0x6f3c,(unsigned long)db);
+    put_word(context_rows+0x17ea8,1);put_word(context_rows+0x17eac,42);put_half(context_rows+0x17eb0,4);
+    const uint16_t caption[]={'R',0};const struct rx3_browse_column rating={10,caption},bpm={13,caption};
+    uint16_t text[256];
+    assert(semantic_field(100,0)==10 && semantic_field(100,13)==10);
+    /* MENU > SORT > RATING: the native column would repeat the stars. */
+    page(100,&rating);
+    assert(native_text(0,text)==100 && same(text,"BPM"));
+    assert(native_text(1,text)==13 && same(text,"124.0 bpm - 4A") && secondary_field==13 && keys);
+    /* Tapping the Rating heading preserves that BPM and key. */
+    preserve_field=13;preserve_db=(unsigned)(unsigned long)db;preserve_depth=word((uint8_t *)db+4);
+    page(13,&rating);
+    assert(native_text(1,text)==13 && same(text,"124.0 bpm - 4A"));
+    /* Unsorted, the native composite is left to the firmware. */
+    preserve_field=0;secondary_field=0;page(13,&rating);
+    assert(native_text(1,text)==13 && same(text,"x"));
+    /* Another third column keeps a preserved rating rather than a blank. */
+    preserve_field=10;page(100,&bpm);
+    assert(native_text(1,text)==10 && text[0]==0x2605 && text[3]==0x2606 && !text[5]);
+    return 0;
+}
+""", [], flags=('-Wno-unused-function','-fno-pie','-no-pie'))
+
     def test_setting_is_data_and_reaches_the_packaged_module(self):
         self.assertEqual(browse_columns.settings(), {'browse-columns.column': '13'})
         for value in (None, True, 0, 14, '15', '$(id)'):
