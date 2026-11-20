@@ -7,7 +7,7 @@ browse_columns_prepare()
     module_disabled_by_switch browse-columns && return 0
     browse_field=$(module_setting browse-columns.column 13)
     case "$browse_field" in
-        7|11|13|15) ;; *) browse_field=13 ;;
+        7|10|11|13|15) ;; *) browse_field=13 ;;
     esac
     module_export RX3_BROWSE_COLUMNS 1 "Browse Columns"
     module_export RX3_BROWSE_FIELD "$browse_field" "Browse third column"

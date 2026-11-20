@@ -195,6 +195,7 @@ int main(void) {
  assert(!memcmp(value,expected_bpm,sizeof(expected_bpm)) && !memcmp(other,expected_time,sizeof(expected_time)));
  /* Fields the snapshot did not capture send the client to its own path. */
  assert(!local_cached_values(2,42,7,value,0,other,&key));
+ assert(!local_field(10) && !local_values(database,42,10,value,0,other,&key));
  assert(!local_cached_values(2,42,15,value,0,other,&key));
  /* An artist column fetches the name. */
  col.field=7;local_page_rows(&context,0);local_record(&context,record,2,1,1,0);
@@ -208,6 +209,11 @@ int main(void) {
  assert(!local_cached_values(3,42,13,value,0,other,&key));
  local_record(&context,record,3,1,1,0);
  assert(local_cached_values(3,42,15,value,0,other,&key) && !key && !value[0]);
+ /* Rating bypasses a populated local snapshot and reuses the generic stream. */
+ uint8_t row[532]={0};metadata_bind(&context,database,1,2,4,10,0);
+ metadata_values(database,42,row,0,10,value,0,other);
+ assert(requests==1 && streams==1 && drains==1 && !key_requests && !frees);
+ metadata_values(database,42,row,0,10,value,0,other);assert(requests==1);
  unsigned saved=selection;local_record(&context,record,2,2,1,0);assert(selection==saved);
  local_page_rows(&context,0);assert(!local_cached_values(2,42,13,value,0,other,&key));
  return 0;

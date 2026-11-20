@@ -5,8 +5,8 @@
     "fr": "3ème colonne BROWSE"
   },
   "description": {
-    "en": "Adds a third column to BROWSE: BPM, key, artist or duration.",
-    "fr": "Ajoute une troisième colonne dans BROWSE : BPM, tonalité, artiste ou durée."
+    "en": "Adds a third column to BROWSE: BPM, key, artist, duration or rating.",
+    "fr": "Ajoute une troisième colonne dans BROWSE : BPM, tonalité, artiste, durée ou note."
   },
   "firmwares": [
     "1.19",
@@ -53,6 +53,10 @@
         [
           "11",
           "TIME"
+        ],
+        [
+          "10",
+          "RATING"
         ]
       ]
     }
@@ -64,6 +68,7 @@
       "browseColumn.key": "Key (Camelot)",
       "browseColumn.artist": "Artist",
       "browseColumn.time": "Duration",
+      "browseColumn.rating": "Rating",
       "browseColumn.help": "The first two columns follow your rekordbox My Settings."
     },
     "fr": {
@@ -72,6 +77,7 @@
       "browseColumn.key": "Tonalité (Camelot)",
       "browseColumn.artist": "Artiste",
       "browseColumn.time": "Durée",
+      "browseColumn.rating": "Note",
       "browseColumn.help": "Les deux premières colonnes suivent vos paramètres My Settings de rekordbox."
     }
   }
