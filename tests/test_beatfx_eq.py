@@ -5,7 +5,17 @@ import unittest
 from tests import test_framework
 
 HARNESS = r'''
-#include <math.h>
+/* No libm: the Linux runner links none. */
+#define PI 3.14159265358979323846
+#define fabsf __builtin_fabsf
+static double sine(double x) {
+    x -= 2 * PI * (double)(long long)(x / (2 * PI));
+    if (x > PI) x -= 2 * PI;
+    if (x < -PI) x += 2 * PI;
+    double term = x, sum = x;
+    for (int n = 1; n < 10; n++) { term *= -x * x / ((2 * n) * (2 * n + 1)); sum += term; }
+    return sum;
+}
 #include "beatfx-eq/rx3_beatfx_eq_module.c"
 static rx3_key_handler key_handler; static rx3_light_fn mixer_lights;
 static const struct rx3_beat_fx_client *fx; static unsigned refuse, released, unregistered;
@@ -36,7 +46,7 @@ static void killer(struct rx3_stereo *b, unsigned n) { for (unsigned i = 0; i < 
 static float through(double hz, void (*effect)(struct rx3_stereo *, unsigned)) {
     static struct rx3_stereo b[BLOCK]; float peak = 0; unsigned t = 0;
     for (unsigned k = 0; k < BLOCKS; k++) {
-        for (unsigned i = 0; i < BLOCK; i++, t++) b[i].left = b[i].right = (float)sin(2 * M_PI * hz * t / 44100.0);
+        for (unsigned i = 0; i < BLOCK; i++, t++) b[i].left = b[i].right = (float)sine(2 * PI * hz * t / 44100.0);
         fx->send(b, BLOCK); if (effect) effect(b, BLOCK); fx->ret(b, BLOCK);
         if (k > BLOCKS / 2) for (unsigned i = 0; i < BLOCK; i++) if (fabsf(b[i].left) > peak) peak = fabsf(b[i].left);
     }
@@ -74,7 +84,7 @@ int main(void) {
     rx3_beatfx_eq_module.stop(); assert(unregistered == 1 && released == 1);
     return 0;
 }
-''', [], ['-Wno-unused-function'])
+''', [], ['-D_DEFAULT_SOURCE', '-Wno-unused-function'])
 
     def test_all_bands_lit_is_the_stock_effect_exactly(self):
         self.run_units(HARNESS + r'''
@@ -83,15 +93,15 @@ int main(void) {
     assert(rx3_beatfx_eq_module.start(&services));
     struct rx3_stereo b[64], r[64];
     for (unsigned k = 0; k < 10; k++) {
-        for (unsigned i = 0; i < 64; i++) b[i].left = b[i].right = r[i].left = r[i].right = (float)sin(i * 0.37 + k);
+        for (unsigned i = 0; i < 64; i++) b[i].left = b[i].right = r[i].left = r[i].right = (float)sine(i * 0.37 + k);
         memcpy(r, b, sizeof(b)); fx->capture(r, 64);
         assert(!memcmp(r, b, sizeof(b)));
         fx->send(b, 64); doubler(b, 64); fx->ret(b, 64);
-        for (unsigned i = 0; i < 64; i++) assert(b[i].left == 2 * (float)sin(i * 0.37 + k) && b[i].right == (float)sin(i * 0.37 + k));
+        for (unsigned i = 0; i < 64; i++) assert(b[i].left == 2 * (float)sine(i * 0.37 + k) && b[i].right == (float)sine(i * 0.37 + k));
     }
     return 0;
 }
-''', [], ['-Wno-unused-function'])
+''', [], ['-D_DEFAULT_SOURCE', '-Wno-unused-function'])
 
     def test_a_dark_band_bypasses_the_effect(self):
         self.run_units(HARNESS + r'''
@@ -118,14 +128,14 @@ int main(void) {
     bands = BAND_MID | BAND_HIGH;
     static struct rx3_stereo b[BLOCK]; float peak = 0; unsigned t = 0;
     for (unsigned k = 0; k < BLOCKS; k++) {
-        for (unsigned i = 0; i < BLOCK; i++, t++) b[i].left = b[i].right = (float)sin(2 * M_PI * 50 * t / 44100.0);
+        for (unsigned i = 0; i < BLOCK; i++, t++) b[i].left = b[i].right = (float)sine(2 * PI * 50 * t / 44100.0);
         fx->capture(b, BLOCK);
         if (k > BLOCKS / 2) for (unsigned i = 0; i < BLOCK; i++) if (fabsf(b[i].left) > peak) peak = fabsf(b[i].left);
     }
     assert(peak < 0.05f);
     return 0;
 }
-''', [], ['-Wno-unused-function'])
+''', [], ['-D_DEFAULT_SOURCE', '-Wno-unused-function'])
 
     def test_a_band_change_is_ramped(self):
         self.run_units(HARNESS + r'''
@@ -144,7 +154,7 @@ int main(void) {
     assert(last > 0.99f);
     return 0;
 }
-''', [], ['-Wno-unused-function'])
+''', [], ['-D_DEFAULT_SOURCE', '-Wno-unused-function'])
 
 
 if __name__ == '__main__':
