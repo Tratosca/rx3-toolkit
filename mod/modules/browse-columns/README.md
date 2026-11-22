@@ -20,13 +20,9 @@ has left the cell (plus 24 pixels of trailing space), then returns to the start
 and pauses again. The added third field stays visible; it does not gain a
 separate scrolling surface.
 
-Choose **BPM** (default), **Key (Camelot)**, **Artist**, or **Duration** in the
-Toolkit module settings. The build writes `browse-columns.column` (7, 11, 13 or
-15) to the drive's `RX3_RUNTIME/settings.cfg`; `module.sh` reads it as data,
-validates the field and exports `RX3_BROWSE_FIELD`. No settings code is executed.
-On the deck, UTILITY > RX3 TOOLKIT > THIRD COLUMN changes it too; the new
-column shows once the drive is plugged in again (the line reads AFTER REPLUG
-until then).
+Choose **BPM** (default), **Key (Camelot)**, **Artist**, **Duration**, or **Rating** in the Toolkit module settings. The build writes `browse-columns.column` (7, 10, 11, 13 or 15) to the drive's `RX3_RUNTIME/settings.cfg`; `module.sh` reads it as data, validates the field and exports `RX3_BROWSE_FIELD`. No settings code is executed. On the deck, UTILITY > RX3 TOOLKIT > THIRD COLUMN changes it too; the new column shows once the drive is plugged in again (the line reads AFTER REPLUG until then).
+
+Rating shows the deck's own five stars, filled and empty (★★★☆☆), as the native column does when the list is sorted by rating; an unrated track shows five empty stars. On firmware 1.19 the player formats the rating record itself, so the column copies that text like any other field. Rating uses the generic metadata path rather than the fast local read, so it costs more per track than BPM, Key, Artist or Duration.
 
 ## USB settings
 

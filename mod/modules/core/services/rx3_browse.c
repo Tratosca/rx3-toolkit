@@ -488,7 +488,24 @@ static unsigned semantic_field(unsigned category,unsigned previous)
     /* Compatibility badges are row presentation, never metadata categories. */
     if(category==51 || category==52 || (category>=120 && category<=122))
         return previous?previous:15;
+    /* Sorted by rating, the native column carries category 100, not field 10. */
+    if(category==100)return 10;
     return category;
+}
+/* A Rating third column already shows the stars the native column switches to
+ * when sorted by rating, and a preserved BPM drops the key. In both cases the
+ * native column shows BPM and key instead, as it does unsorted. */
+static int native_bpm_key(const struct rx3_browse_column *column,unsigned second,unsigned preserved)
+{
+    return column && column->field==10 && (second==10 || (preserved && second==13));
+}
+static void bpm_key_text(uint16_t value[128],unsigned key)
+{
+    static const uint16_t unit[]={' ','b','p','m',0},dash[]={' ','-',' ',0};
+    unsigned n=0;while(n<127 && value[n])n++;
+    if(!n)return;
+    n+=copy_text(value+n,unit,127-n);
+    if(key>=1 && key<=24 && n<120){n+=copy_text(value+n,dash,127-n);key_text(key,value+n);}
 }
 static void process(uint8_t *context,uint8_t *message,
                     const struct rx3_browse_column *column,
@@ -522,11 +539,15 @@ static void process(uint8_t *context,uint8_t *message,
     if(secondary_db!=(unsigned)(unsigned long)db || secondary_depth!=depth)secondary_field=0;
     secondary_db=(unsigned)(unsigned long)db;secondary_depth=depth;
     unsigned second=preserve_field?preserve_field:semantic_field(half(message+first_row),secondary_field);
+    int bpm_key=native_bpm_key(column,second,preserve_field);
+    /* The field the native column is rewritten with, if any. */
+    unsigned replace=bpm_key?13u:preserve_field;
+    if(bpm_key)second=13;
     __atomic_store_n(&secondary_field,second,__ATOMIC_SEQ_CST);
     unsigned expected=0;
     if(!__atomic_compare_exchange_n(&busy,&expected,1u,0,__ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)){invalidate_metadata();return;}
     memcpy(rebuilt,message,0x84);source=20;unsigned dest=20;
-    metadata_bind(context,db,index,depth,native_sort,column?column->field:0,preserve_field);
+    metadata_bind(context,db,index,depth,native_sort,column?column->field:0,replace);
     struct rx3_harmonic_reference harmony=harmonic_reference();
     unsigned ref=word(context+0x10af8) && harmony.key>=0?(unsigned)harmony.key+1:0;
     for(unsigned i=0;i<count;i++) {
@@ -535,9 +556,10 @@ static void process(uint8_t *context,uint8_t *message,
         uint16_t value[128]={0},native_value[128]={0};unsigned badge=0;
         if(i) {
             unsigned id=word(context+rows+(i-1)*532);
-            int need_key=(marker && ref) || (column && (column->field==15 || preserve_field==15));
+            int need_key=(marker && ref) || bpm_key || (column && (column->field==15 || replace==15));
             key=metadata_values(db,id,context+rows+(i-1)*532,need_key,
-                                column?column->field:0,value,preserve_field,native_value);
+                                column?column->field:0,value,replace,native_value);
+            if(bpm_key)bpm_key_text(native_value,key);
             if(marker && ref && key>=1 && key<=24) {
                 if(harmony.native_keys&(1u<<(key-1)))category=52;
             }
@@ -548,8 +570,12 @@ static void process(uint8_t *context,uint8_t *message,
             }
         } else if(column)copy_text(value,column->caption,127);
         uint8_t replacement[532];
-        if(column && preserve_field) {
-            entry=replace_row_field(entry,replacement,native_value,preserve_field,i,&category);
+        if(column && replace) {
+            if(!i && bpm_key) {
+                /* Heading only: its category is also the native filter state. */
+                static const uint16_t heading[]={'B','P','M',0};unsigned keep=category;
+                entry=replace_row_field(entry,replacement,heading,13,1,&keep);
+            } else entry=replace_row_field(entry,replacement,native_value,replace,i,&category);
             if(i && marker)category=marker->category(ref,key,category);
         }
         unsigned size=column?append(rebuilt+0x70+dest,entry,value,badge):old_size;
